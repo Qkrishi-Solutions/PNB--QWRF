@@ -88,4 +88,3 @@ Do not commit client data, credentials or Gurobi licence files.
 - India Meteorological Department (IMD) gridded rainfall.
 - ERA5-Land, Copernicus Climate Change Service (C3S) / ECMWF.
 
-Please cite and follow the terms of each source.
