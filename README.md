@@ -43,27 +43,6 @@ Classical ML answers *what will happen*, the risk and finance layer answers *wha
 - Missing values are left blank, never filled. ICRISAT's `-1` and `-500` codes are set to blank.
 - See the Scientific Data Guide for column definitions, units, caveats and known data issues.
 
-Place the file in `data/` (this folder is git-ignored).
-
-## Repository layout
-
-```
-.
-├── README.md
-├── requirements.txt
-├── .gitignore
-├── data/                       # input data (not committed)
-├── output/                     # generated results (not committed)
-├── merge_weather_icrisat.py    # earlier merge script (2015–2017), kept for reference
-├── initial_model_check.py      # four-model check against a baseline
-└── docs/
-    ├── architecture.md         # architecture document
-    ├── hld.md                  # high-level design
-    └── data-sources.md         # download links and terms
-```
-
-Planned: `build_features.py`, `risk_finance.py`, `optimise_qaoa.py`, `optimise_gurobi.py`, `tests/`.
-
 
 ## Method summary
 
