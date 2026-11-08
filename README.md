@@ -43,6 +43,38 @@ Classical ML answers *what will happen*, the risk and finance layer answers *wha
 - Missing values are left blank, never filled. ICRISAT's `-1` and `-500` codes are set to blank.
 - See the Scientific Data Guide for column definitions, units, caveats and known data issues.
 
+## Merged Crop–Weather Datasets
+
+The project contains multiple versions of the merged district-year crop–weather
+dataset. Each version represents a different processing stage and should not be
+treated as interchangeable.
+
+| Dataset | Description | Status / Recommended use |
+|---|---|---|
+| `merged_district_year_v1b.csv` | Initial crop–weather merge using district and year mapping. Original rainfall missingness is preserved. | Baseline version for reproducibility and comparison. |
+| `merged_district_year_v1b_filledv2.csv` | `v1b` updated using the filled Srikakulam rainfall and recomputed annual weather features. | Intermediate weather-imputation version. Use when specifically analysing the Srikakulam rainfall reconstruction. |
+| `merged_district_year_v1c.csv` | Updated merged dataset with completed rainfall values and corrections identified during data-quality and EDA checks, including suspected crop-value scaling issues. | Main updated merged dataset for analysis and comparison. |
+| `merged_cleaned_v1d.csv` | Cleaned and refined version incorporating fixes and missing-value corrections identified in earlier versions. | Latest and preferred merged dataset for new analysis, subject to team validation. |
+
+
+
+### Dataset lineage
+
+```text
+merged_district_year_v1b.csv
+        |
+        |-- Srikakulam rainfall reconstruction
+        |       └── merged_district_year_v1b_filledv2.csv
+        |
+        |-- Data-quality and EDA corrections
+                └── merged_district_year_v1c.csv
+                        |
+                        └── Missing-value corrections and final cleaning
+                                └── merged_cleaned_v1d.csv
+
+
+
+
 
 ## Method summary
 
