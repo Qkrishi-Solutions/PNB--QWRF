@@ -1,0 +1,55 @@
+QWeatherRiskF - Issue #4 Yield Feature Engineering
+========================================================
+
+Method: Forward chaining
+Input: C:\Users\punithaqkrishi\Downloads\crop_long_v1.csv
+Input SHA-256: 4765429e3acb7cf3eb9e64226babc9d29d910fb8deb7d0c42ac48e3baddf727d
+Source rows: 1430
+Districts: 13
+Crops: 22
+Years: 2015, 2016, 2017, 2018, 2019
+Eligible observations: 870
+Baseline records: 1430
+Anomaly records: 1430
+
+Methodology
+-----------
+Forward chaining: only eligible observations from years strictly before the target year are used.
+Minimum training observations for anomaly metrics: 2
+Mean is reported with >=1 training observation; sample std requires >=2.
+Absolute, percentage and z-score anomalies require >=2 training observations.
+Low screening threshold: z <= -2.0
+High screening threshold: z >= 2.0
+
+Eligibility
+-----------
+Start with modelling_role == include.
+Exclude missing, non-finite, zero or negative yields.
+Exclude flag_nan_filled_with_zero == True.
+Exclude positive-area / zero-production records.
+Retain mismatch, yield-jump and estimated-allocation flags for review.
+Positive-area / zero-production rows are excluded, not corrected; review source data.
+
+Limitations
+-----------
+Forward chaining uses only prior years and is intended for prospective evaluation.
+The first target year has no prior observations; early years may have insufficient history.
+Z-score thresholds are statistical screening heuristics, not agronomic diagnoses.
+
+Validation checks
+-----------------
+                                                    check result                                                                    detail
+                       Expected forward baseline coverage   PASS                                                Expected=1430; actual=1430
+                Every source row has one forward baseline   PASS                                          Rows without matched baseline: 0
+                                   No future-year leakage   PASS                       Baseline rows with current/future training years: 0
+                  Forward training years and counts agree   PASS                                                      Inconsistent rows: 0
+               Independent forward-baseline recomputation   PASS                                    Baseline rows failing recomputation: 0
+        Forward anomaly formulas independently recomputed   PASS                              Absolute=True; percentage=True; z-score=True
+            Excluded forward observations have no metrics   PASS                                             Excluded rows with metrics: 0
+Insufficient-history forward observations have no metrics   PASS                                 Insufficient-history rows with metrics: 0
+    Forward zero-standard-deviation cases have no z-score   PASS                                             Zero-std rows with z-score: 0
+    Forward statuses and deviation classes are consistent   PASS                                   Status mismatches=0; class mismatches=0
+            First year has no prior training observations   PASS                             First-year rows with training observations: 0
+           Input file unchanged during forward processing   PASS SHA-256: 4765429e3acb7cf3eb9e64226babc9d29d910fb8deb7d0c42ac48e3baddf727d
+
+Failed checks: 0
