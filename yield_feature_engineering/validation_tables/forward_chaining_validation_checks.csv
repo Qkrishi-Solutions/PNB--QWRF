@@ -1,0 +1,13 @@
+check,result,detail
+Expected forward baseline coverage,PASS,Expected=1430; actual=1430
+Every source row has one forward baseline,PASS,Rows without matched baseline: 0
+No future-year leakage,PASS,Baseline rows with current/future training years: 0
+Forward training years and counts agree,PASS,Inconsistent rows: 0
+Independent forward-baseline recomputation,PASS,Baseline rows failing recomputation: 0
+Forward anomaly formulas independently recomputed,PASS,Absolute=True; percentage=True; z-score=True
+Excluded forward observations have no metrics,PASS,Excluded rows with metrics: 0
+Insufficient-history forward observations have no metrics,PASS,Insufficient-history rows with metrics: 0
+Forward zero-standard-deviation cases have no z-score,PASS,Zero-std rows with z-score: 0
+Forward statuses and deviation classes are consistent,PASS,Status mismatches=0; class mismatches=0
+First year has no prior training observations,PASS,First-year rows with training observations: 0
+Input file unchanged during forward processing,PASS,SHA-256: 4765429e3acb7cf3eb9e64226babc9d29d910fb8deb7d0c42ac48e3baddf727d
