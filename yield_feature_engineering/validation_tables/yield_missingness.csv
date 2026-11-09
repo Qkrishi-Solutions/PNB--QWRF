@@ -1,0 +1,11 @@
+modelling_role,eligibility_reason,record_count
+exclude_aggregate,excluded_modelling_role,125
+exclude_aggregate,excluded_modelling_role;positive_area_zero_production,3
+exclude_aggregate,excluded_modelling_role;zero_or_negative_yield,2
+exclude_group_category,excluded_modelling_role,39
+exclude_group_category,excluded_modelling_role;missing_yield,26
+include,eligible,870
+include,positive_area_zero_production,23
+include,zero_or_negative_yield,208
+include,zero_or_negative_yield;filled_zero_flag,126
+include,zero_or_negative_yield;positive_area_zero_production,8
