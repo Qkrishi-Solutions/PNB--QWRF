@@ -1,0 +1,9 @@
+check,status,detail
+weather_feature_count,PASS,78 unique features; expected 78
+weather_key_uniqueness,PASS,Unique district-year-feature keys
+yield_key_uniqueness,PASS,Unique district-year-crop keys
+heldout_year_excluded_from_training,PASS,Held-out year excluded from every crop-fold training set
+heldout_features_not_used,PASS,Held-out observations are not used for feature scoring
+missing_values_not_imputed,PASS,Pairwise-complete observations only; no imputation
+selected_feature_limit,PASS,At most 4 features per crop-fold
+scorable_years,PASS,"Usable target years: [np.int64(2017), np.int64(2018), np.int64(2019)]"
