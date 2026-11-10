@@ -1,0 +1,16 @@
+check,result,detail
+Unique district-crop-year source keys,PASS,Duplicate rows: 0
+Anomaly output preserves every source row,PASS,Source=1430; anomalies=1430
+Expected LOYO baseline coverage,PASS,Expected=1430; actual=1430
+Every source row has one matched LOYO baseline,PASS,Rows without a matched baseline: 0
+No validation-year leakage,PASS,Leaking baseline rows: 0
+Training years and observation counts agree,PASS,Baseline rows with inconsistent training years/counts: 0
+Independent baseline recomputation,PASS,Baseline rows failing recomputation: 0
+Anomaly formulas independently recomputed,PASS,Absolute=True; percentage=True; z-score=True
+Excluded observations have no anomaly metrics,PASS,Excluded rows with one or more anomaly metrics: 0
+Insufficient-history observations have no anomaly metrics,PASS,Insufficient-history rows with metrics: 0
+Zero-standard-deviation cases have no z-score,PASS,Zero-std rows with a z-score: 0
+Anomaly statuses and deviation classes are consistent,PASS,Status mismatches=0; class mismatches=0
+Eligibility follows documented rules,PASS,Eligibility mismatches: 0
+Eligible observations exist,PASS,Eligible observations: 870
+Input file unchanged during processing,PASS,SHA-256: 4765429e3acb7cf3eb9e64226babc9d29d910fb8deb7d0c42ac48e3baddf727d

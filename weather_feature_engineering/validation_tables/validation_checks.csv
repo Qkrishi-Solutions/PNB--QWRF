@@ -1,0 +1,12 @@
+check,result,detail
+Crop-long source key uniqueness,PASS,0 duplicate source keys
+Weather values consistent across crop rows,PASS,0 district-year/weather-column combinations differ
+One weather record per district-year,PASS,65 unique district-year rows
+No held-out year enters its fold's training normals,PASS,Verified training_years for every held-out-year fold.
+Independent recomputation of fold normals,PASS,"Independently verified normal means, sample standard deviations, and valid training counts for all normal rows."
+Expected number of weather normal records,PASS,5070 rows; expected 5070
+Expected number of weather anomaly records,PASS,25350 rows; expected 25350
+Expected number of weather stress records,PASS,325 rows; expected 325
+Missing weather values remain missing,PASS,845 missing values; expected 845
+Weather feature count is 78,PASS,78 features; expected 78
+Fold-specific normals remain consistent,PASS,Each district-feature group uses one normal throughout each fold.

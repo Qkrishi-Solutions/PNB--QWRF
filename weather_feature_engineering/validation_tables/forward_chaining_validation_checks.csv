@@ -1,0 +1,13 @@
+check,result,detail
+Crop-long source key uniqueness,PASS,0 duplicate source keys
+Weather values consistent across crop rows,PASS,0 inconsistent district-year/weather-column combinations
+One weather record per district-year,PASS,65 district-year rows
+Expected anomaly row count and unique keys,PASS,5070 rows; expected 5070
+Only strictly earlier years enter training,PASS,Training years verified for every target year.
+Independent recomputation of normals,PASS,"Normal means, sample standard deviations and counts independently verified."
+Insufficient history produces unavailable normals,PASS,2197 normal rows have insufficient history.
+Anomaly formula,PASS,Anomaly equals actual value minus training normal mean.
+Missing weather observations remain missing,PASS,169 missing values; expected 169
+Anomaly output contains target-year observations only,PASS,Each anomaly is generated for its corresponding target year.
+Zero or unavailable standard deviation produces no z-score,PASS,Z-scores remain missing when standard deviation is zero or unavailable.
+Input source remains unchanged,PASS,Source SHA-256 hash is unchanged.
