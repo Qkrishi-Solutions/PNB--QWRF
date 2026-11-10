@@ -1,0 +1,58 @@
+QWeatherRiskF - Issue #4 Yield Feature Engineering
+========================================================
+
+Method: LOYO
+Input: C:\Users\punithaqkrishi\Downloads\crop_long_v1.csv
+Input SHA-256: 4765429e3acb7cf3eb9e64226babc9d29d910fb8deb7d0c42ac48e3baddf727d
+Source rows: 1430
+Districts: 13
+Crops: 22
+Years: 2015, 2016, 2017, 2018, 2019
+Eligible observations: 870
+Baseline records: 1430
+Anomaly records: 1430
+
+Methodology
+-----------
+LOYO: the held-out year is excluded from its own district-crop baseline; other years may be used.
+Minimum training observations for anomaly metrics: 2
+Mean is reported with >=1 training observation; sample std requires >=2.
+Absolute, percentage and z-score anomalies require >=2 training observations.
+Low screening threshold: z <= -2.0
+High screening threshold: z >= 2.0
+
+Eligibility
+-----------
+Start with modelling_role == include.
+Exclude missing, non-finite, zero or negative yields.
+Exclude flag_nan_filled_with_zero == True.
+Exclude positive-area / zero-production records.
+Retain mismatch, yield-jump and estimated-allocation flags for review.
+Positive-area / zero-production rows are excluded, not corrected; review source data.
+
+Limitations
+-----------
+LOYO is retrospective and may use years later than the held-out year.
+It is not a prospective forecasting baseline.
+Z-score thresholds are statistical screening heuristics, not agronomic diagnoses.
+
+Validation checks
+-----------------
+                                                    check result                                                                    detail
+                    Unique district-crop-year source keys   PASS                                                         Duplicate rows: 0
+                Anomaly output preserves every source row   PASS                                               Source=1430; anomalies=1430
+                          Expected LOYO baseline coverage   PASS                                                Expected=1430; actual=1430
+           Every source row has one matched LOYO baseline   PASS                                        Rows without a matched baseline: 0
+                               No validation-year leakage   PASS                                                  Leaking baseline rows: 0
+              Training years and observation counts agree   PASS                  Baseline rows with inconsistent training years/counts: 0
+                       Independent baseline recomputation   PASS                                    Baseline rows failing recomputation: 0
+                Anomaly formulas independently recomputed   PASS                              Absolute=True; percentage=True; z-score=True
+            Excluded observations have no anomaly metrics   PASS                         Excluded rows with one or more anomaly metrics: 0
+Insufficient-history observations have no anomaly metrics   PASS                                 Insufficient-history rows with metrics: 0
+            Zero-standard-deviation cases have no z-score   PASS                                           Zero-std rows with a z-score: 0
+    Anomaly statuses and deviation classes are consistent   PASS                                   Status mismatches=0; class mismatches=0
+                     Eligibility follows documented rules   PASS                                                 Eligibility mismatches: 0
+                              Eligible observations exist   PASS                                                Eligible observations: 870
+                   Input file unchanged during processing   PASS SHA-256: 4765429e3acb7cf3eb9e64226babc9d29d910fb8deb7d0c42ac48e3baddf727d
+
+Failed checks: 0
