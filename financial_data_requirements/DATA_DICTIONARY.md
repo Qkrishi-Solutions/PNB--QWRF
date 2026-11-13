@@ -15,8 +15,8 @@
 | # | Field (as received) | Proposed standard name | Type (observed) | Observed format / domain | Description (proposed) | Sensitivity | Needed for analysis? |
 |---|---|---|---|---|---|---|---|
 | 1 | `reporting_date` | `reporting_date` | date | `YYYY-MM-DD`; single value in sample | Date as at which balances and status are reported | Low | Yes |
-| 2 | `zone` | `zone` | text | 1 value in sample (South) | PNB administrative zone | Low | Yes |
-| 3 | `circle` | `circle` | text | 13 values in sample (Andhra Pradesh cities); each maps to exactly one zone | PNB administrative circle | Low | Yes |
+| 2 | `zone` | `zone` | text | 1 value in sample (Hyderabad) | PNB administrative zone (Hyderabad zone covers the Andhra Pradesh portfolio) | Low | Yes |
+| 3 | `circle` | `circle` | text | 3 placeholder values in sample (Vijayawada, Visakhapatnam, Tirupati); each circle covers several districts | PNB administrative circle (one circle spans multiple districts; real circle list to be confirmed by PNB) | Low | Yes |
 | 4 | `branch ID` | `branch_id` | text | Pattern `AA999`; 1:1 with branch name in sample | Branch identifier | Low | Yes |
 | 5 | `branch name` | `branch_name` | text | Free text | Branch name | Low | Optional |
 | 6 | `customer ID` | `customer_id` | text | Pattern `AAAA99999`; unique per account in sample | Customer identifier | **High** (personal) | Pseudonymised only |
