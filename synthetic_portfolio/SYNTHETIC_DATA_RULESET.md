@@ -90,9 +90,9 @@ Fixed order matters: changing the order of draws changes every later value, even
 
 | File | Where | Tracked in Git? |
 |---|---|---|
-| `synthetic_portfolio_v1.csv` (SYNTHETIC) | `data/private/synthetic/` | No, regenerated on demand |
+| `SYNTHETIC_not_PNB_data_portfolio_v1.csv` (SYNTHETIC) | `data/private/synthetic/` | No, regenerated on demand |
 | `synthetic_generation_report_v1.csv` (counts by district, product, asset class; config hash; seed; row count; SHA-256 of the output) | `synthetic_portfolio/` | Yes (aggregate counts only) |
-| `SYNTHETIC_DATA_ASSUMPTIONS.md` | `synthetic_portfolio/` | Yes |
+| `SYNTHETIC_DATA_ASSUMPTIONS.md` | `financial_data_requirements/` | Yes |
 
 The CSV is synthetic and could be tracked, but is regenerated from the seed so there is no need, and keeping it out of Git avoids it ever being mistaken for portfolio data.
 

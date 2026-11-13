@@ -48,7 +48,7 @@ ASSET_CLASSES = ["Standard", "SMA 0", "SMA 1", "SMA 2", "NPA"]
 FIRST_BRANCH_NUMBER = 101
 CUSTOMER_ID_RANGE = (10001, 99999)
 ACCOUNT_NUMBER_RANGE = (10_000_000_000, 99_999_999_999)
-OUTPUT_NAME = "synthetic_portfolio_v1.csv"
+OUTPUT_NAME = "SYNTHETIC_not_PNB_data_portfolio_v1.csv"
 REPORT_NAME = "synthetic_generation_report_v1.csv"
 
 
@@ -111,7 +111,7 @@ def _build_customers(
 ) -> tuple[list[dict], list[int]]:
     """Create the customers of one district and the customer index of each account."""
     two_share = float(cfg["customers_with_two_accounts_percent"]) / 100
-    n_double = round(n_accounts * two_share)
+    n_double = round(n_accounts * two_share / (1 + two_share))
     n_customers = n_accounts - n_double
     lists = cfg["place_name_lists"]
     city = cfg["city_of_district"][district]
@@ -184,7 +184,7 @@ def generate(
     avoid_int = {int(v) for v in avoid_values if v.isdigit()}
     avoid_names = {v for v in avoid_values if not v.isdigit()}
     n_customers_total = sum(
-        n - round(n * float(cfg["customers_with_two_accounts_percent"]) / 100)
+        n - round(n * (float(cfg["customers_with_two_accounts_percent"]) / 100) / (1 + float(cfg["customers_with_two_accounts_percent"]) / 100))
         for n in per_district.values()
     )
     customer_pool = _unique_ints(
@@ -218,7 +218,7 @@ def generate(
         branch_counter += n_branches
         branch_names = _branch_names(city, n_branches)
 
-        n_double = round(n * float(cfg["customers_with_two_accounts_percent"]) / 100)
+        n_double = round(n * (float(cfg["customers_with_two_accounts_percent"]) / 100) / (1 + float(cfg["customers_with_two_accounts_percent"]) / 100))
         n_cust = n - n_double
         customers, account_customer = _build_customers(
             rng,
@@ -376,6 +376,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     args.report_dir.mkdir(parents=True, exist_ok=True)
     report.to_csv(args.report_dir / REPORT_NAME, index=False)
+    (args.outdir / "SYNTHETIC_DATA_LABEL.txt").write_text(
+        "SYNTHETIC - not PNB data\nDevelopment/testing only. Not real bank records.\n",
+        encoding="utf-8",
+    )
     LOGGER.info("SYNTHETIC portfolio: %d rows -> %s", len(frame), out_path)
     return 0
 
