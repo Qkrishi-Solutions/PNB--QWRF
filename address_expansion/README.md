@@ -79,7 +79,9 @@ python3 -m pytest address_expansion/tests
 ## Results on the temporary sample file (25 rows, Andhra Pradesh only)
 The temporary mapping file was rewritten so every row is in Andhra Pradesh (zone, circle, branch
 name, address locality and city, and pincode only; all financial and identifier fields are
-unchanged). Geography values are placeholders, not real PNB circles or branches.
+unchanged). Zone is Hyderabad on every row. Circle is one of three placeholder circles
+(Vijayawada, Visakhapatnam, Tirupati), each covering several districts; circle and the address city are
+different things. Circle, branch and locality values are placeholders, not real PNB structure.
 All 25 addresses parsed; all 25 pincodes mapped to a project district; all 13 project districts
 are present; 100% mapped. City check: 13 consistent, 12 not comparable, 0 conflict. The sample
 has no pincode inside the address text.
