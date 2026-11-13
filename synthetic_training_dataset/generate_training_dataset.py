@@ -24,6 +24,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 sys.path.insert(0, str(ROOT / "synthetic_portfolio"))
 
+from generate_synthetic_portfolio import OUTPUT_COLUMNS as PNB_LAYOUT_COLUMNS  # noqa: E402
 from generate_synthetic_portfolio import apportion, generate  # noqa: E402
 
 LOGGER = logging.getLogger("generate_training_dataset")
@@ -31,7 +32,9 @@ LOGGER = logging.getLogger("generate_training_dataset")
 ASSET_ORDER = ["Standard", "SMA 0", "SMA 1", "SMA 2", "NPA"]
 TRAIN_NAME = "synthetic_training_v2_train.csv"
 TEST_NAME = "synthetic_training_v2_test.csv"
-DICTIONARY_NAME = "synthetic_training_v2_data_dictionary.csv"
+PNB_LAYOUT_TRAIN_NAME = "Financial_data_PNB_SYNTHETIC_train.csv"
+PNB_LAYOUT_TEST_NAME = "Financial_data_PNB_SYNTHETIC_test.csv"
+DICTIONARY_NAME ="synthetic_training_v2_data_dictionary.csv"
 REPORT_NAME = "synthetic_training_report_v2.csv"
 INSURANCE_COLUMNS = [
     "crop_insurance_available",
@@ -484,6 +487,14 @@ def main(argv: list[str] | None = None) -> int:
     paths = {"train": args.outdir / TRAIN_NAME, "test": args.outdir / TEST_NAME}
     for split, path in paths.items():
         frame.loc[frame["split"] == split, cols].to_csv(path, index=False)
+    # Same 20 columns, same order, as Financial_data_PNB.csv (no labels or extras).
+    # Rows are the identical accounts as the train/test files above.
+    layout = {
+        "train": args.outdir / PNB_LAYOUT_TRAIN_NAME,
+        "test": args.outdir / PNB_LAYOUT_TEST_NAME,
+    }
+    for split, path in layout.items():
+        frame.loc[frame["split"] == split, PNB_LAYOUT_COLUMNS].to_csv(path, index=False)
     roles = {c: (r, d) for c, r, d in column_roles() + weather_roles(cfg["weather_feature_columns"])}
     pd.DataFrame(
         [(c, *roles[c]) for c in cols], columns=["column", "role", "description"]
