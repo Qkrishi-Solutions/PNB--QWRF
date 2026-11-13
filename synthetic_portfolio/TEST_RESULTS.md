@@ -1,20 +1,65 @@
 # Issue #25 verification record
 
-Executed on 2026-11-13 against the user-supplied Issue #23 pincode reference, project district data, and temporary 25-row sample (used only to avoid identifier/name collisions).
+Executed on 2026-11-13.
+
+## 1. Synthetic dataset checks
 
 | Check | Result |
 |---|---|
-| Generator unit tests | 8 passed |
-| Synthetic records | 5,000 rows; 20 columns |
-| District allocation | 13/13 districts; exact configured allocation |
-| Cross-field checks X1-X9 | 0 violations |
-| Distribution tolerance T5 | Largest deviation 0.31 percentage points |
-| Numeric ranges | 0 out-of-range values |
-| Pincodes | All generated pincodes have `mapped` status in supplied reference |
-| Pincode diversity | 1,175 distinct pincodes |
-| Collision check | 0 collisions against supplied sample identifiers/names |
-| Reproducibility | Regenerated file SHA-256 exactly matches packaged CSV |
+| Synthetic records generated | 5,000 |
+| Dataset columns | 20 |
+| Project districts represented | 13/13 |
+| Pincode reference rows | 19,300 |
+| Independent standard-library audit | 15 passed, 0 failed |
+| District account distribution | 5,000 accounts across 13 districts |
 
-Packaged CSV SHA-256: `18912212d3a6c0716867a3cf282f10dd5393a8976243404fde8d2657abd39dd0`.
+## 2. Independent audit
 
-**Not verified in this package review:** the repository's `financial_data_validation/validate_loan_portfolio.py` and `address_expansion/expand_addresses.py` were not supplied as executable files in this handoff. Run those repository scripts after copying the package into the repository. The 20-column header was preserved for validator compatibility; synthetic labelling is in the filename, companion label file, README and assumptions document.
+Executed using:
+
+`synthetic_portfolio/audit_synthetic_portfolio_stdlib.py`
+
+Results:
+- 5,000 records checked.
+- 15 checks passed.
+- 0 checks failed.
+- All 13 project districts represented.
+- Pincode mapping checked against the supplied reference.
+
+Generated reports:
+- `data/private/stdlib_audit/stdlib_audit_report.csv`
+- `data/private/stdlib_audit/stdlib_audit_summary.json`
+
+These reports are private validation outputs and are not committed.
+
+## 3. Official integration checks
+
+| Check | Status |
+|---|---|
+| Official financial data validator | Blocked |
+| Address expansion script | Blocked |
+| Repository pytest suite | Blocked |
+
+The scripts were present and execution was attempted. However, Python Pandas could not load its compiled `_cyutility` extension because Windows Application Control blocked the file.
+
+Therefore, the official validator, address expansion and repository test suite have not been successfully verified in this environment.
+
+They must be executed in an approved environment where Pandas can load successfully.
+
+## 4. Synthetic data labelling
+
+The generated CSV uses the original 20-column data dictionary header to preserve validator compatibility.
+
+Synthetic identification is currently provided through:
+- The filename.
+- The companion synthetic data label file.
+- The README.
+- The assumptions document.
+
+The literal synthetic label in the CSV header remains to be resolved against the validator's header requirements.
+
+## 5. Verification limitations
+
+The independent standard-library audit is supplementary. It does not replace the official financial data validator, address expansion integration or repository test suite.
+
+The dataset is synthetic and must never be represented as actual PNB borrower data or PNB results.
