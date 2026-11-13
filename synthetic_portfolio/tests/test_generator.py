@@ -77,3 +77,25 @@ def test_avoided_values_not_reused(reference: pd.DataFrame) -> None:
     second = generate(CONFIG, reference, CODES, avoid)
     assert not set(second["account number"]) & avoid
     assert not set(second["customer name"]) & set(first["customer name"])
+
+
+def test_two_account_customer_share(reference: pd.DataFrame) -> None:
+    cfg = {**CONFIG, "total_accounts": 5000}
+    frame = generate(cfg, reference, CODES)
+    per_customer = frame.groupby("customer ID").size()
+    assert per_customer.max() == 2
+    share = 100 * (per_customer == 2).sum() / len(per_customer)
+    assert abs(share - cfg["customers_with_two_accounts_percent"]) < 0.5
+
+
+def test_verifier_rejects_product_mix_distortion(reference: pd.DataFrame) -> None:
+    cfg = {**CONFIG, "total_accounts": 5000}
+    frame = generate(cfg, reference, CODES).astype(str)
+    # Keep triples valid but distort a district's composition drastically.
+    first = frame["_district"].iloc[0]
+    ix = frame.index[frame["_district"] == first]
+    row = cfg["product_mix_percent"][0]
+    for column in ("scheme code", "facility type", "agri sector"):
+        frame.loc[ix, column] = row[column]
+    result = run_checks(frame, cfg, reference, CODES, set())
+    assert any(not passed and check_id.startswith("T5") for check_id, passed, _ in result)

@@ -109,7 +109,17 @@ def run_checks(
     # T5: per-district share deviations, in percentage points.
     limit_rows = cfg["t5_tolerance_pp"]["small_district_rows"]
     worst = 0.0
+    combo_labels = (
+        frame["scheme code"].astype(str) + " | "
+        + frame["facility type"].astype(str) + " | "
+        + frame["agri sector"].astype(str)
+    )
+    product_weights = {
+        f"{r['scheme code']} | {r['facility type']} | {r['agri sector']}": r["weight"]
+        for r in cfg["product_mix_percent"]
+    }
     for dimension, global_share in (
+        ("product triple", product_weights),
         ("asset class", cfg["asset_class_percent"]),
         (
             "sanction amount",
@@ -117,7 +127,7 @@ def run_checks(
         ),
     ):
         total_w = float(sum(global_share.values()))
-        series = frame[dimension].astype(str)
+        series = combo_labels if dimension == "product triple" else frame[dimension].astype(str)
         for district, group in frame.groupby("district"):
             tol = cfg["t5_tolerance_pp"][
                 "small" if len(group) < limit_rows else "large"
@@ -134,13 +144,23 @@ def run_checks(
                             f"{dimension}/{key}/{district}: {dev:.1f}pp > {tol}",
                         )
                     )
-    out.append(
-        (
-            "T5",
-            worst <= cfg["t5_tolerance_pp"]["small"],
-            f"largest deviation={worst:.2f}pp",
-        )
-    )
+    # Numeric distributions: check each district uses the same allowed ranges.
+    # Per-district histogram equality for continuous random draws is not asserted.
+    numeric_failures = 0
+    for district, group in frame.groupby("district"):
+        rate = pd.to_numeric(group["rate of interest"], errors="coerce")
+        ratio = pd.to_numeric(group["balance outstanding"], errors="coerce") / pd.to_numeric(group["sanction amount"], errors="coerce")
+        low_rate, high_rate = cfg["interest_rate_range"]
+        low_ratio, high_ratio = cfg["outstanding_to_sanction_range"]
+        numeric_failures += int((~rate.between(low_rate, high_rate)).sum())
+        # Outstanding is rounded to integer rupees; allow one-rupee rounding.
+        sanction_values = pd.to_numeric(group["sanction amount"], errors="coerce")
+        numeric_failures += int(((ratio < low_ratio - 0.5 / sanction_values) | (ratio > high_ratio + 0.5 / sanction_values)).sum())
+        for asset, bounds in cfg["dpd_range"].items():
+            asset_dpd = pd.to_numeric(group.loc[group["asset class"] == asset, "days_past_due"], errors="coerce")
+            numeric_failures += int((~asset_dpd.between(*bounds)).sum())
+    out.append(("T5/ranges", numeric_failures == 0, f"out-of-range values={numeric_failures}"))
+    out.append(("T5/mix", worst <= cfg["t5_tolerance_pp"]["large"], f"largest deviation={worst:.2f}pp (product, asset, sanction)"))
 
     out.append(
         (
@@ -168,7 +188,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--input",
         type=Path,
-        default=Path("data/private/synthetic/synthetic_portfolio_v1.csv"),
+        default=Path("data/private/synthetic/SYNTHETIC_not_PNB_data_portfolio_v1.csv"),
     )
     parser.add_argument(
         "--config", type=Path, default=here / "synthetic_config_v1.json"
