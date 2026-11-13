@@ -1,0 +1,287 @@
+district_code,district_name,crop,crop_name,source_year_count,eligible_observation_count,first_source_year,last_source_year,coverage_status
+502,ANANTAPURAMU,castor,Castor,5,5,2015,2019,multiple_valid_observations
+502,ANANTAPURAMU,chickpea,Chickpea,5,5,2015,2019,multiple_valid_observations
+502,ANANTAPURAMU,cotton,Cotton,5,5,2015,2019,multiple_valid_observations
+502,ANANTAPURAMU,finger_millet,Finger Millet,5,5,2015,2019,multiple_valid_observations
+502,ANANTAPURAMU,groundnut,Groundnut,5,5,2015,2019,multiple_valid_observations
+502,ANANTAPURAMU,kharif_sorghum,Kharif Sorghum,5,5,2015,2019,multiple_valid_observations
+502,ANANTAPURAMU,linseed,Linseed,5,0,2015,2019,no_valid_observations
+502,ANANTAPURAMU,maize,Maize,5,5,2015,2019,multiple_valid_observations
+502,ANANTAPURAMU,minor_pulses,Minor Pulses,5,0,2015,2019,no_valid_observations
+502,ANANTAPURAMU,oilseeds,Oilseeds,5,0,2015,2019,no_valid_observations
+502,ANANTAPURAMU,pearl_millet,Pearl Millet,5,5,2015,2019,multiple_valid_observations
+502,ANANTAPURAMU,pigeonpea,Pigeonpea,5,5,2015,2019,multiple_valid_observations
+502,ANANTAPURAMU,rabi_sorghum,Rabi Sorghum,5,5,2015,2019,multiple_valid_observations
+502,ANANTAPURAMU,rapeseed_and_mustard,Rapeseed And Mustard,5,0,2015,2019,no_valid_observations
+502,ANANTAPURAMU,rice,Rice,5,5,2015,2019,multiple_valid_observations
+502,ANANTAPURAMU,safflower,Safflower,5,4,2015,2019,multiple_valid_observations
+502,ANANTAPURAMU,sesamum,Sesamum,5,2,2015,2019,multiple_valid_observations
+502,ANANTAPURAMU,sorghum,Sorghum,5,0,2015,2019,no_valid_observations
+502,ANANTAPURAMU,soyabean,Soyabean,5,5,2015,2019,multiple_valid_observations
+502,ANANTAPURAMU,sugarcane,Sugarcane,5,5,2015,2019,multiple_valid_observations
+502,ANANTAPURAMU,sunflower,Sunflower,5,5,2015,2019,multiple_valid_observations
+502,ANANTAPURAMU,wheat,Wheat,5,2,2015,2019,multiple_valid_observations
+503,CHITTOOR,castor,Castor,5,5,2015,2019,multiple_valid_observations
+503,CHITTOOR,chickpea,Chickpea,5,1,2015,2019,one_valid_observation
+503,CHITTOOR,cotton,Cotton,5,1,2015,2019,one_valid_observation
+503,CHITTOOR,finger_millet,Finger Millet,5,5,2015,2019,multiple_valid_observations
+503,CHITTOOR,groundnut,Groundnut,5,5,2015,2019,multiple_valid_observations
+503,CHITTOOR,kharif_sorghum,Kharif Sorghum,5,3,2015,2019,multiple_valid_observations
+503,CHITTOOR,linseed,Linseed,5,0,2015,2019,no_valid_observations
+503,CHITTOOR,maize,Maize,5,5,2015,2019,multiple_valid_observations
+503,CHITTOOR,minor_pulses,Minor Pulses,5,0,2015,2019,no_valid_observations
+503,CHITTOOR,oilseeds,Oilseeds,5,0,2015,2019,no_valid_observations
+503,CHITTOOR,pearl_millet,Pearl Millet,5,5,2015,2019,multiple_valid_observations
+503,CHITTOOR,pigeonpea,Pigeonpea,5,5,2015,2019,multiple_valid_observations
+503,CHITTOOR,rabi_sorghum,Rabi Sorghum,5,2,2015,2019,multiple_valid_observations
+503,CHITTOOR,rapeseed_and_mustard,Rapeseed And Mustard,5,0,2015,2019,no_valid_observations
+503,CHITTOOR,rice,Rice,5,5,2015,2019,multiple_valid_observations
+503,CHITTOOR,safflower,Safflower,5,0,2015,2019,no_valid_observations
+503,CHITTOOR,sesamum,Sesamum,5,5,2015,2019,multiple_valid_observations
+503,CHITTOOR,sorghum,Sorghum,5,0,2015,2019,no_valid_observations
+503,CHITTOOR,soyabean,Soyabean,5,0,2015,2019,no_valid_observations
+503,CHITTOOR,sugarcane,Sugarcane,5,5,2015,2019,multiple_valid_observations
+503,CHITTOOR,sunflower,Sunflower,5,5,2015,2019,multiple_valid_observations
+503,CHITTOOR,wheat,Wheat,5,0,2015,2019,no_valid_observations
+504,YSR,castor,Castor,5,5,2015,2019,multiple_valid_observations
+504,YSR,chickpea,Chickpea,5,5,2015,2019,multiple_valid_observations
+504,YSR,cotton,Cotton,5,5,2015,2019,multiple_valid_observations
+504,YSR,finger_millet,Finger Millet,5,5,2015,2019,multiple_valid_observations
+504,YSR,groundnut,Groundnut,5,5,2015,2019,multiple_valid_observations
+504,YSR,kharif_sorghum,Kharif Sorghum,5,5,2015,2019,multiple_valid_observations
+504,YSR,linseed,Linseed,5,3,2015,2019,multiple_valid_observations
+504,YSR,maize,Maize,5,5,2015,2019,multiple_valid_observations
+504,YSR,minor_pulses,Minor Pulses,5,0,2015,2019,no_valid_observations
+504,YSR,oilseeds,Oilseeds,5,0,2015,2019,no_valid_observations
+504,YSR,pearl_millet,Pearl Millet,5,5,2015,2019,multiple_valid_observations
+504,YSR,pigeonpea,Pigeonpea,5,5,2015,2019,multiple_valid_observations
+504,YSR,rabi_sorghum,Rabi Sorghum,5,5,2015,2019,multiple_valid_observations
+504,YSR,rapeseed_and_mustard,Rapeseed And Mustard,5,0,2015,2019,no_valid_observations
+504,YSR,rice,Rice,5,5,2015,2019,multiple_valid_observations
+504,YSR,safflower,Safflower,5,4,2015,2019,multiple_valid_observations
+504,YSR,sesamum,Sesamum,5,5,2015,2019,multiple_valid_observations
+504,YSR,sorghum,Sorghum,5,0,2015,2019,no_valid_observations
+504,YSR,soyabean,Soyabean,5,4,2015,2019,multiple_valid_observations
+504,YSR,sugarcane,Sugarcane,5,5,2015,2019,multiple_valid_observations
+504,YSR,sunflower,Sunflower,5,5,2015,2019,multiple_valid_observations
+504,YSR,wheat,Wheat,5,2,2015,2019,multiple_valid_observations
+505,EAST GODAVARI,castor,Castor,5,2,2015,2019,multiple_valid_observations
+505,EAST GODAVARI,chickpea,Chickpea,5,5,2015,2019,multiple_valid_observations
+505,EAST GODAVARI,cotton,Cotton,5,5,2015,2019,multiple_valid_observations
+505,EAST GODAVARI,finger_millet,Finger Millet,5,5,2015,2019,multiple_valid_observations
+505,EAST GODAVARI,groundnut,Groundnut,5,5,2015,2019,multiple_valid_observations
+505,EAST GODAVARI,kharif_sorghum,Kharif Sorghum,5,5,2015,2019,multiple_valid_observations
+505,EAST GODAVARI,linseed,Linseed,5,0,2015,2019,no_valid_observations
+505,EAST GODAVARI,maize,Maize,5,5,2015,2019,multiple_valid_observations
+505,EAST GODAVARI,minor_pulses,Minor Pulses,5,0,2015,2019,no_valid_observations
+505,EAST GODAVARI,oilseeds,Oilseeds,5,0,2015,2019,no_valid_observations
+505,EAST GODAVARI,pearl_millet,Pearl Millet,5,5,2015,2019,multiple_valid_observations
+505,EAST GODAVARI,pigeonpea,Pigeonpea,5,5,2015,2019,multiple_valid_observations
+505,EAST GODAVARI,rabi_sorghum,Rabi Sorghum,5,5,2015,2019,multiple_valid_observations
+505,EAST GODAVARI,rapeseed_and_mustard,Rapeseed And Mustard,5,0,2015,2019,no_valid_observations
+505,EAST GODAVARI,rice,Rice,5,5,2015,2019,multiple_valid_observations
+505,EAST GODAVARI,safflower,Safflower,5,0,2015,2019,no_valid_observations
+505,EAST GODAVARI,sesamum,Sesamum,5,5,2015,2019,multiple_valid_observations
+505,EAST GODAVARI,sorghum,Sorghum,5,0,2015,2019,no_valid_observations
+505,EAST GODAVARI,soyabean,Soyabean,5,0,2015,2019,no_valid_observations
+505,EAST GODAVARI,sugarcane,Sugarcane,5,5,2015,2019,multiple_valid_observations
+505,EAST GODAVARI,sunflower,Sunflower,5,5,2015,2019,multiple_valid_observations
+505,EAST GODAVARI,wheat,Wheat,5,0,2015,2019,no_valid_observations
+506,GUNTUR,castor,Castor,5,5,2015,2019,multiple_valid_observations
+506,GUNTUR,chickpea,Chickpea,5,5,2015,2019,multiple_valid_observations
+506,GUNTUR,cotton,Cotton,5,5,2015,2019,multiple_valid_observations
+506,GUNTUR,finger_millet,Finger Millet,5,5,2015,2019,multiple_valid_observations
+506,GUNTUR,groundnut,Groundnut,5,5,2015,2019,multiple_valid_observations
+506,GUNTUR,kharif_sorghum,Kharif Sorghum,5,4,2015,2019,multiple_valid_observations
+506,GUNTUR,linseed,Linseed,5,0,2015,2019,no_valid_observations
+506,GUNTUR,maize,Maize,5,5,2015,2019,multiple_valid_observations
+506,GUNTUR,minor_pulses,Minor Pulses,5,0,2015,2019,no_valid_observations
+506,GUNTUR,oilseeds,Oilseeds,5,0,2015,2019,no_valid_observations
+506,GUNTUR,pearl_millet,Pearl Millet,5,5,2015,2019,multiple_valid_observations
+506,GUNTUR,pigeonpea,Pigeonpea,5,5,2015,2019,multiple_valid_observations
+506,GUNTUR,rabi_sorghum,Rabi Sorghum,5,5,2015,2019,multiple_valid_observations
+506,GUNTUR,rapeseed_and_mustard,Rapeseed And Mustard,5,3,2015,2019,multiple_valid_observations
+506,GUNTUR,rice,Rice,5,5,2015,2019,multiple_valid_observations
+506,GUNTUR,safflower,Safflower,5,0,2015,2019,no_valid_observations
+506,GUNTUR,sesamum,Sesamum,5,5,2015,2019,multiple_valid_observations
+506,GUNTUR,sorghum,Sorghum,5,0,2015,2019,no_valid_observations
+506,GUNTUR,soyabean,Soyabean,5,3,2015,2019,multiple_valid_observations
+506,GUNTUR,sugarcane,Sugarcane,5,5,2015,2019,multiple_valid_observations
+506,GUNTUR,sunflower,Sunflower,5,2,2015,2019,multiple_valid_observations
+506,GUNTUR,wheat,Wheat,5,0,2015,2019,no_valid_observations
+510,KRISHNA,castor,Castor,5,0,2015,2019,no_valid_observations
+510,KRISHNA,chickpea,Chickpea,5,5,2015,2019,multiple_valid_observations
+510,KRISHNA,cotton,Cotton,5,5,2015,2019,multiple_valid_observations
+510,KRISHNA,finger_millet,Finger Millet,5,0,2015,2019,no_valid_observations
+510,KRISHNA,groundnut,Groundnut,5,5,2015,2019,multiple_valid_observations
+510,KRISHNA,kharif_sorghum,Kharif Sorghum,5,3,2015,2019,multiple_valid_observations
+510,KRISHNA,linseed,Linseed,5,0,2015,2019,no_valid_observations
+510,KRISHNA,maize,Maize,5,5,2015,2019,multiple_valid_observations
+510,KRISHNA,minor_pulses,Minor Pulses,5,0,2015,2019,no_valid_observations
+510,KRISHNA,oilseeds,Oilseeds,5,0,2015,2019,no_valid_observations
+510,KRISHNA,pearl_millet,Pearl Millet,5,0,2015,2019,no_valid_observations
+510,KRISHNA,pigeonpea,Pigeonpea,5,5,2015,2019,multiple_valid_observations
+510,KRISHNA,rabi_sorghum,Rabi Sorghum,5,5,2015,2019,multiple_valid_observations
+510,KRISHNA,rapeseed_and_mustard,Rapeseed And Mustard,5,5,2015,2019,multiple_valid_observations
+510,KRISHNA,rice,Rice,5,5,2015,2019,multiple_valid_observations
+510,KRISHNA,safflower,Safflower,5,1,2015,2019,one_valid_observation
+510,KRISHNA,sesamum,Sesamum,5,5,2015,2019,multiple_valid_observations
+510,KRISHNA,sorghum,Sorghum,5,0,2015,2019,no_valid_observations
+510,KRISHNA,soyabean,Soyabean,5,0,2015,2019,no_valid_observations
+510,KRISHNA,sugarcane,Sugarcane,5,5,2015,2019,multiple_valid_observations
+510,KRISHNA,sunflower,Sunflower,5,4,2015,2019,multiple_valid_observations
+510,KRISHNA,wheat,Wheat,5,0,2015,2019,no_valid_observations
+511,KURNOOL,castor,Castor,5,5,2015,2019,multiple_valid_observations
+511,KURNOOL,chickpea,Chickpea,5,5,2015,2019,multiple_valid_observations
+511,KURNOOL,cotton,Cotton,5,5,2015,2019,multiple_valid_observations
+511,KURNOOL,finger_millet,Finger Millet,5,0,2015,2019,no_valid_observations
+511,KURNOOL,groundnut,Groundnut,5,5,2015,2019,multiple_valid_observations
+511,KURNOOL,kharif_sorghum,Kharif Sorghum,5,5,2015,2019,multiple_valid_observations
+511,KURNOOL,linseed,Linseed,5,0,2015,2019,no_valid_observations
+511,KURNOOL,maize,Maize,5,5,2015,2019,multiple_valid_observations
+511,KURNOOL,minor_pulses,Minor Pulses,5,0,2015,2019,no_valid_observations
+511,KURNOOL,oilseeds,Oilseeds,5,0,2015,2019,no_valid_observations
+511,KURNOOL,pearl_millet,Pearl Millet,5,5,2015,2019,multiple_valid_observations
+511,KURNOOL,pigeonpea,Pigeonpea,5,5,2015,2019,multiple_valid_observations
+511,KURNOOL,rabi_sorghum,Rabi Sorghum,5,5,2015,2019,multiple_valid_observations
+511,KURNOOL,rapeseed_and_mustard,Rapeseed And Mustard,5,5,2015,2019,multiple_valid_observations
+511,KURNOOL,rice,Rice,5,5,2015,2019,multiple_valid_observations
+511,KURNOOL,safflower,Safflower,5,4,2015,2019,multiple_valid_observations
+511,KURNOOL,sesamum,Sesamum,5,5,2015,2019,multiple_valid_observations
+511,KURNOOL,sorghum,Sorghum,5,0,2015,2019,no_valid_observations
+511,KURNOOL,soyabean,Soyabean,5,5,2015,2019,multiple_valid_observations
+511,KURNOOL,sugarcane,Sugarcane,5,5,2015,2019,multiple_valid_observations
+511,KURNOOL,sunflower,Sunflower,5,5,2015,2019,multiple_valid_observations
+511,KURNOOL,wheat,Wheat,5,5,2015,2019,multiple_valid_observations
+515,SPR NELLORE,castor,Castor,5,1,2015,2019,one_valid_observation
+515,SPR NELLORE,chickpea,Chickpea,5,5,2015,2019,multiple_valid_observations
+515,SPR NELLORE,cotton,Cotton,5,5,2015,2019,multiple_valid_observations
+515,SPR NELLORE,finger_millet,Finger Millet,5,5,2015,2019,multiple_valid_observations
+515,SPR NELLORE,groundnut,Groundnut,5,5,2015,2019,multiple_valid_observations
+515,SPR NELLORE,kharif_sorghum,Kharif Sorghum,5,3,2015,2019,multiple_valid_observations
+515,SPR NELLORE,linseed,Linseed,5,0,2015,2019,no_valid_observations
+515,SPR NELLORE,maize,Maize,5,5,2015,2019,multiple_valid_observations
+515,SPR NELLORE,minor_pulses,Minor Pulses,5,0,2015,2019,no_valid_observations
+515,SPR NELLORE,oilseeds,Oilseeds,5,0,2015,2019,no_valid_observations
+515,SPR NELLORE,pearl_millet,Pearl Millet,5,5,2015,2019,multiple_valid_observations
+515,SPR NELLORE,pigeonpea,Pigeonpea,5,5,2015,2019,multiple_valid_observations
+515,SPR NELLORE,rabi_sorghum,Rabi Sorghum,5,5,2015,2019,multiple_valid_observations
+515,SPR NELLORE,rapeseed_and_mustard,Rapeseed And Mustard,5,1,2015,2019,one_valid_observation
+515,SPR NELLORE,rice,Rice,5,5,2015,2019,multiple_valid_observations
+515,SPR NELLORE,safflower,Safflower,5,0,2015,2019,no_valid_observations
+515,SPR NELLORE,sesamum,Sesamum,5,5,2015,2019,multiple_valid_observations
+515,SPR NELLORE,sorghum,Sorghum,5,0,2015,2019,no_valid_observations
+515,SPR NELLORE,soyabean,Soyabean,5,0,2015,2019,no_valid_observations
+515,SPR NELLORE,sugarcane,Sugarcane,5,5,2015,2019,multiple_valid_observations
+515,SPR NELLORE,sunflower,Sunflower,5,5,2015,2019,multiple_valid_observations
+515,SPR NELLORE,wheat,Wheat,5,0,2015,2019,no_valid_observations
+517,PRAKASAM,castor,Castor,5,5,2015,2019,multiple_valid_observations
+517,PRAKASAM,chickpea,Chickpea,5,5,2015,2019,multiple_valid_observations
+517,PRAKASAM,cotton,Cotton,5,5,2015,2019,multiple_valid_observations
+517,PRAKASAM,finger_millet,Finger Millet,5,5,2015,2019,multiple_valid_observations
+517,PRAKASAM,groundnut,Groundnut,5,5,2015,2019,multiple_valid_observations
+517,PRAKASAM,kharif_sorghum,Kharif Sorghum,5,5,2015,2019,multiple_valid_observations
+517,PRAKASAM,linseed,Linseed,5,0,2015,2019,no_valid_observations
+517,PRAKASAM,maize,Maize,5,5,2015,2019,multiple_valid_observations
+517,PRAKASAM,minor_pulses,Minor Pulses,5,0,2015,2019,no_valid_observations
+517,PRAKASAM,oilseeds,Oilseeds,5,0,2015,2019,no_valid_observations
+517,PRAKASAM,pearl_millet,Pearl Millet,5,5,2015,2019,multiple_valid_observations
+517,PRAKASAM,pigeonpea,Pigeonpea,5,5,2015,2019,multiple_valid_observations
+517,PRAKASAM,rabi_sorghum,Rabi Sorghum,5,5,2015,2019,multiple_valid_observations
+517,PRAKASAM,rapeseed_and_mustard,Rapeseed And Mustard,5,1,2015,2019,one_valid_observation
+517,PRAKASAM,rice,Rice,5,5,2015,2019,multiple_valid_observations
+517,PRAKASAM,safflower,Safflower,5,0,2015,2019,no_valid_observations
+517,PRAKASAM,sesamum,Sesamum,5,5,2015,2019,multiple_valid_observations
+517,PRAKASAM,sorghum,Sorghum,5,0,2015,2019,no_valid_observations
+517,PRAKASAM,soyabean,Soyabean,5,3,2015,2019,multiple_valid_observations
+517,PRAKASAM,sugarcane,Sugarcane,5,5,2015,2019,multiple_valid_observations
+517,PRAKASAM,sunflower,Sunflower,5,5,2015,2019,multiple_valid_observations
+517,PRAKASAM,wheat,Wheat,5,0,2015,2019,no_valid_observations
+519,SRIKAKULAM,castor,Castor,5,1,2015,2019,one_valid_observation
+519,SRIKAKULAM,chickpea,Chickpea,5,0,2015,2019,no_valid_observations
+519,SRIKAKULAM,cotton,Cotton,5,5,2015,2019,multiple_valid_observations
+519,SRIKAKULAM,finger_millet,Finger Millet,5,5,2015,2019,multiple_valid_observations
+519,SRIKAKULAM,groundnut,Groundnut,5,5,2015,2019,multiple_valid_observations
+519,SRIKAKULAM,kharif_sorghum,Kharif Sorghum,5,4,2015,2019,multiple_valid_observations
+519,SRIKAKULAM,linseed,Linseed,5,0,2015,2019,no_valid_observations
+519,SRIKAKULAM,maize,Maize,5,5,2015,2019,multiple_valid_observations
+519,SRIKAKULAM,minor_pulses,Minor Pulses,5,0,2015,2019,no_valid_observations
+519,SRIKAKULAM,oilseeds,Oilseeds,5,0,2015,2019,no_valid_observations
+519,SRIKAKULAM,pearl_millet,Pearl Millet,5,5,2015,2019,multiple_valid_observations
+519,SRIKAKULAM,pigeonpea,Pigeonpea,5,5,2015,2019,multiple_valid_observations
+519,SRIKAKULAM,rabi_sorghum,Rabi Sorghum,5,1,2015,2019,one_valid_observation
+519,SRIKAKULAM,rapeseed_and_mustard,Rapeseed And Mustard,5,0,2015,2019,no_valid_observations
+519,SRIKAKULAM,rice,Rice,5,5,2015,2019,multiple_valid_observations
+519,SRIKAKULAM,safflower,Safflower,5,0,2015,2019,no_valid_observations
+519,SRIKAKULAM,sesamum,Sesamum,5,5,2015,2019,multiple_valid_observations
+519,SRIKAKULAM,sorghum,Sorghum,5,0,2015,2019,no_valid_observations
+519,SRIKAKULAM,soyabean,Soyabean,5,0,2015,2019,no_valid_observations
+519,SRIKAKULAM,sugarcane,Sugarcane,5,5,2015,2019,multiple_valid_observations
+519,SRIKAKULAM,sunflower,Sunflower,5,5,2015,2019,multiple_valid_observations
+519,SRIKAKULAM,wheat,Wheat,5,0,2015,2019,no_valid_observations
+520,VISAKHAPATNAM,castor,Castor,5,1,2015,2019,one_valid_observation
+520,VISAKHAPATNAM,chickpea,Chickpea,5,5,2015,2019,multiple_valid_observations
+520,VISAKHAPATNAM,cotton,Cotton,5,2,2015,2019,multiple_valid_observations
+520,VISAKHAPATNAM,finger_millet,Finger Millet,5,5,2015,2019,multiple_valid_observations
+520,VISAKHAPATNAM,groundnut,Groundnut,5,5,2015,2019,multiple_valid_observations
+520,VISAKHAPATNAM,kharif_sorghum,Kharif Sorghum,5,5,2015,2019,multiple_valid_observations
+520,VISAKHAPATNAM,linseed,Linseed,5,0,2015,2019,no_valid_observations
+520,VISAKHAPATNAM,maize,Maize,5,5,2015,2019,multiple_valid_observations
+520,VISAKHAPATNAM,minor_pulses,Minor Pulses,5,0,2015,2019,no_valid_observations
+520,VISAKHAPATNAM,oilseeds,Oilseeds,5,0,2015,2019,no_valid_observations
+520,VISAKHAPATNAM,pearl_millet,Pearl Millet,5,5,2015,2019,multiple_valid_observations
+520,VISAKHAPATNAM,pigeonpea,Pigeonpea,5,5,2015,2019,multiple_valid_observations
+520,VISAKHAPATNAM,rabi_sorghum,Rabi Sorghum,5,1,2015,2019,one_valid_observation
+520,VISAKHAPATNAM,rapeseed_and_mustard,Rapeseed And Mustard,5,0,2015,2019,no_valid_observations
+520,VISAKHAPATNAM,rice,Rice,5,5,2015,2019,multiple_valid_observations
+520,VISAKHAPATNAM,safflower,Safflower,5,0,2015,2019,no_valid_observations
+520,VISAKHAPATNAM,sesamum,Sesamum,5,5,2015,2019,multiple_valid_observations
+520,VISAKHAPATNAM,sorghum,Sorghum,5,0,2015,2019,no_valid_observations
+520,VISAKHAPATNAM,soyabean,Soyabean,5,0,2015,2019,no_valid_observations
+520,VISAKHAPATNAM,sugarcane,Sugarcane,5,5,2015,2019,multiple_valid_observations
+520,VISAKHAPATNAM,sunflower,Sunflower,5,5,2015,2019,multiple_valid_observations
+520,VISAKHAPATNAM,wheat,Wheat,5,0,2015,2019,no_valid_observations
+521,VIZIANAGARAM,castor,Castor,5,2,2015,2019,multiple_valid_observations
+521,VIZIANAGARAM,chickpea,Chickpea,5,5,2015,2019,multiple_valid_observations
+521,VIZIANAGARAM,cotton,Cotton,5,5,2015,2019,multiple_valid_observations
+521,VIZIANAGARAM,finger_millet,Finger Millet,5,5,2015,2019,multiple_valid_observations
+521,VIZIANAGARAM,groundnut,Groundnut,5,5,2015,2019,multiple_valid_observations
+521,VIZIANAGARAM,kharif_sorghum,Kharif Sorghum,5,3,2015,2019,multiple_valid_observations
+521,VIZIANAGARAM,linseed,Linseed,5,0,2015,2019,no_valid_observations
+521,VIZIANAGARAM,maize,Maize,5,5,2015,2019,multiple_valid_observations
+521,VIZIANAGARAM,minor_pulses,Minor Pulses,5,0,2015,2019,no_valid_observations
+521,VIZIANAGARAM,oilseeds,Oilseeds,5,0,2015,2019,no_valid_observations
+521,VIZIANAGARAM,pearl_millet,Pearl Millet,5,5,2015,2019,multiple_valid_observations
+521,VIZIANAGARAM,pigeonpea,Pigeonpea,5,5,2015,2019,multiple_valid_observations
+521,VIZIANAGARAM,rabi_sorghum,Rabi Sorghum,5,1,2015,2019,one_valid_observation
+521,VIZIANAGARAM,rapeseed_and_mustard,Rapeseed And Mustard,5,0,2015,2019,no_valid_observations
+521,VIZIANAGARAM,rice,Rice,5,5,2015,2019,multiple_valid_observations
+521,VIZIANAGARAM,safflower,Safflower,5,0,2015,2019,no_valid_observations
+521,VIZIANAGARAM,sesamum,Sesamum,5,5,2015,2019,multiple_valid_observations
+521,VIZIANAGARAM,sorghum,Sorghum,5,0,2015,2019,no_valid_observations
+521,VIZIANAGARAM,soyabean,Soyabean,5,0,2015,2019,no_valid_observations
+521,VIZIANAGARAM,sugarcane,Sugarcane,5,5,2015,2019,multiple_valid_observations
+521,VIZIANAGARAM,sunflower,Sunflower,5,2,2015,2019,multiple_valid_observations
+521,VIZIANAGARAM,wheat,Wheat,5,1,2015,2019,one_valid_observation
+523,WEST GODAVARI,castor,Castor,5,1,2015,2019,one_valid_observation
+523,WEST GODAVARI,chickpea,Chickpea,5,5,2015,2019,multiple_valid_observations
+523,WEST GODAVARI,cotton,Cotton,5,5,2015,2019,multiple_valid_observations
+523,WEST GODAVARI,finger_millet,Finger Millet,5,1,2015,2019,one_valid_observation
+523,WEST GODAVARI,groundnut,Groundnut,5,5,2015,2019,multiple_valid_observations
+523,WEST GODAVARI,kharif_sorghum,Kharif Sorghum,5,4,2015,2019,multiple_valid_observations
+523,WEST GODAVARI,linseed,Linseed,5,0,2015,2019,no_valid_observations
+523,WEST GODAVARI,maize,Maize,5,5,2015,2019,multiple_valid_observations
+523,WEST GODAVARI,minor_pulses,Minor Pulses,5,0,2015,2019,no_valid_observations
+523,WEST GODAVARI,oilseeds,Oilseeds,5,0,2015,2019,no_valid_observations
+523,WEST GODAVARI,pearl_millet,Pearl Millet,5,0,2015,2019,no_valid_observations
+523,WEST GODAVARI,pigeonpea,Pigeonpea,5,5,2015,2019,multiple_valid_observations
+523,WEST GODAVARI,rabi_sorghum,Rabi Sorghum,5,3,2015,2019,multiple_valid_observations
+523,WEST GODAVARI,rapeseed_and_mustard,Rapeseed And Mustard,5,3,2015,2019,multiple_valid_observations
+523,WEST GODAVARI,rice,Rice,5,5,2015,2019,multiple_valid_observations
+523,WEST GODAVARI,safflower,Safflower,5,0,2015,2019,no_valid_observations
+523,WEST GODAVARI,sesamum,Sesamum,5,5,2015,2019,multiple_valid_observations
+523,WEST GODAVARI,sorghum,Sorghum,5,0,2015,2019,no_valid_observations
+523,WEST GODAVARI,soyabean,Soyabean,5,0,2015,2019,no_valid_observations
+523,WEST GODAVARI,sugarcane,Sugarcane,5,5,2015,2019,multiple_valid_observations
+523,WEST GODAVARI,sunflower,Sunflower,5,5,2015,2019,multiple_valid_observations
+523,WEST GODAVARI,wheat,Wheat,5,1,2015,2019,one_valid_observation
