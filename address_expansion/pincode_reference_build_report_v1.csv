@@ -1,0 +1,12 @@
+item,value
+raw_file,pincode.csv
+raw_sha256,84af12fa29adddedfa9addcf46546000d89d2e2899b2993dc88050fafc8861e2
+raw_rows,157126
+invalid_pincode_rows,0
+unique_pincodes,19300
+pincodes_ambiguous_district,18
+pincodes_ambiguous_state,46
+pincodes_mapped,1207
+pincodes_outside_project_scope,18029
+project_districts_covered,13
+project_districts_expected,13
