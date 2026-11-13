@@ -2,7 +2,7 @@
 
 **Status:** DRAFT for PNB review. Nothing here is a confirmed PNB definition.
 
-**Source of this draft:** the 20-column field layout of the sample file `Financial_data_PNB.csv` (a temporary 25-row dataset used for mapping purposes, one reporting date). The field layout was received from PNB; the sample values are not treated as real portfolio data, and no sample row values are reproduced in this document.
+**Source of this draft:** the 20-column field layout of the sample file `Financial_data_PNB.csv` (a temporary 25-row dataset used for mapping purposes, one reporting date, all rows in Andhra Pradesh). The field layout was received from PNB; the sample values are not treated as real portfolio data, and no sample row values are reproduced in this document.
 
 **Conventions**
 - "Observed" means seen in the 25-row sample only; it may not hold for the full extract.
@@ -15,14 +15,14 @@
 | # | Field (as received) | Proposed standard name | Type (observed) | Observed format / domain | Description (proposed) | Sensitivity | Needed for analysis? |
 |---|---|---|---|---|---|---|---|
 | 1 | `reporting_date` | `reporting_date` | date | `YYYY-MM-DD`; single value in sample | Date as at which balances and status are reported | Low | Yes |
-| 2 | `zone` | `zone` | text | 5 values (South, East, West, Central, North) | PNB administrative zone | Low | Yes |
-| 3 | `circle` | `circle` | text | 13 values; each maps to exactly one zone in sample | PNB administrative circle | Low | Yes |
+| 2 | `zone` | `zone` | text | 1 value in sample (South) | PNB administrative zone | Low | Yes |
+| 3 | `circle` | `circle` | text | 13 values in sample (Andhra Pradesh cities); each maps to exactly one zone | PNB administrative circle | Low | Yes |
 | 4 | `branch ID` | `branch_id` | text | Pattern `AA999`; 1:1 with branch name in sample | Branch identifier | Low | Yes |
 | 5 | `branch name` | `branch_name` | text | Free text | Branch name | Low | Optional |
 | 6 | `customer ID` | `customer_id` | text | Pattern `AAAA99999`; unique per account in sample | Customer identifier | **High** (personal) | Pseudonymised only |
 | 7 | `customer name` | - | text | Free text | Borrower name | **High** (personal) | **No - exclude from analysis** |
 | 8 | `borrowers address` | - | text | Free text | Borrower address | **High** (personal) | **No - exclude from analysis** |
-| 9 | `pincode` | `pincode` | integer (6 digits) | 6-digit PIN | Postal code, presumed borrower or branch location | Medium | Yes (location) |
+| 9 | `pincode` | `pincode` | integer (6 digits) | 6-digit PIN; 14 distinct values in sample, all in the Andhra Pradesh range (515001-535001) | Postal code, presumed borrower or branch location | Medium | Yes (location) |
 | 10 | `account number` | `account_ref` | integer (11 digits) | 11-digit number | Loan account number | **High** (personal) | Pseudonymised only |
 | 11 | `account open date` | `account_open_date` | date | `YYYY-MM-DD` | Date the account was opened | Low | Yes (not the same as disbursement date) |
 | 12 | `facility type` | `facility_type` | text | Cash Credit, Term Loan, Kisan Credit Card, Working Capital, Overdraft | Type of credit facility | Low | Yes |
