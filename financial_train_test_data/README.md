@@ -32,7 +32,7 @@ financial_train_test_data/
 ├── v3/                           CURRENT
 │   ├── Financial_data_PNB_SYNTHETIC_train.csv   exact 20-column Financial_data_PNB layout
 │   ├── Financial_data_PNB_SYNTHETIC_test.csv
-│   ├── synthetic_training_v3_train.csv          45 columns: loan, weather, yield, crop, insurance, targets
+│   ├── synthetic_training_v3_train.csv          44 columns: loan, weather, yield, crop, insurance, targets
 │   ├── synthetic_training_v3_test.csv
 │   └── synthetic_training_v3_data_dictionary.csv   machine-readable dictionary (source of truth)
 └── v2/                           previous version, kept for comparison (same file pattern, 13 insurance fields)
