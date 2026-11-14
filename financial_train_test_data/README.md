@@ -1,10 +1,20 @@
 # financial_train_test_data
 
 > **SYNTHETIC. This is not PNB customer or portfolio data.** PNB supplied field definitions only. Every row here was simulated from those fields and documented assumptions, for training and testing a loan asset-class model.
-> **Approval:** reported as reviewed and approved by PNB (per the project owner). No approval reference is recorded here yet.
+> **Approval:** v3 was reported as reviewed and approved by PNB (per the project owner); no approval reference is recorded here yet. **v4 changes the `agri sector` domain and its approval is not recorded.**
 > **Purpose:** learnability of the model. Class mix and effect sizes are tuned for that, not for realism. Do not quote any figure here as PNB's real asset quality, insurance coverage or lending mix.
 
-## Current version: v3
+## Which version
+
+| Version | `agri sector` values | Status |
+|---|---|---|
+| **v4** (latest) | Only `Crop Production`, `Fisheries` (prawn and shrimp only), `Poultry`, `Dairy & Animal Husbandry` | Approval not recorded. `Fisheries` is not in the original PNB sample domain, so the PNB-derived validator schema rejects it; use `synthetic_training_dataset/loan_portfolio_schema_v4.json`. See `docs/RULESET_V4.md` |
+| **v3** | Seven values, including Horticulture, Irrigation, Farm Mechanization, Non-Agri | Reported approved by PNB. Unchanged |
+| v2 | As v3, 13 insurance fields | Superseded (local only, not committed) |
+
+v4 and v3 are otherwise built the same way: 10,001 train and 999 test rows, 44 columns, 6 insurance fields, class mix 30/20/18/16/16 in every year. v4 baseline: accuracy 0.528, macro-F1 0.474 (shuffled labels 0.094). v3 baseline: accuracy 0.469, macro-F1 0.396. The v3 details below apply to v4 except for the sector change.
+
+## v3 details
 
 | Item | Value |
 |---|---|
@@ -22,14 +32,17 @@
 financial_train_test_data/
 ├── README.md                     this file
 ├── docs/                         all documentation (Markdown)
-│   ├── DATA_DICTIONARY_V3.md     column-by-column dictionary of the v3 rich files (roles, types, blanks)
+│   ├── DATA_DICTIONARY_V4.md     column-by-column dictionary of the v4 rich files (roles, types, blanks)
+│   ├── DATA_DICTIONARY_V3.md     same for v3
 │   ├── DATA_DICTIONARY_V2.md     same for v2
 │   ├── PNB_FIELD_DICTIONARY_DRAFT.md   the 20 fields PNB supplied (draft dictionary, no row values)
+│   ├── RULESET_V4.md             v4: the four agri sectors, validator schema note, results
 │   ├── RULESET_V3.md             v3 rules, choices, results, limitations
 │   ├── RULESET_V2.md             v2 rules (risk score, insurance, split)
 │   ├── RULESET_V1_BASE_PORTFOLIO.md    base 20-field portfolio generator rules
 │   └── ASSUMPTIONS_V1_BASE_PORTFOLIO.md  base generator assumptions
-├── v3/                           CURRENT
+├── v4/                           LATEST: four agri sectors (same file pattern as v3)
+├── v3/                           approved version
 │   ├── Financial_data_PNB_SYNTHETIC_train.csv   exact 20-column Financial_data_PNB layout
 │   ├── Financial_data_PNB_SYNTHETIC_test.csv
 │   ├── synthetic_training_v3_train.csv          44 columns: loan, weather, yield, crop, insurance, targets
