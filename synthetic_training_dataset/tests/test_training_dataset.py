@@ -167,3 +167,15 @@ def test_v3_checks_skip_dropped_columns_without_failing(built3, inputs) -> None:
     results = run_checks(out[out["split"] == "train"], out[out["split"] == "test"], CFG3, inputs[1])
     assert not [n for n, s, _ in results if s == "FAIL"]
     assert [n for n, s, _ in results if s == "SKIP"]  # dropped columns are reported, not passed
+
+
+def test_synthetic_flag_column_is_config_driven() -> None:
+    assert "synthetic_flag" not in ordered_columns(CFG3)  # v3: column removed
+    assert "synthetic_flag" in ordered_columns(CFG)  # v2 unchanged
+
+
+def test_v3_label_check_is_skipped_not_passed_without_the_column(built3, inputs) -> None:
+    out = built3[ordered_columns(CFG3)]
+    results = run_checks(out[out["split"] == "train"], out[out["split"] == "test"], CFG3, inputs[1])
+    v1 = [s for n, s, _ in results if n.startswith("V1 ")]
+    assert v1 == ["SKIP"]
