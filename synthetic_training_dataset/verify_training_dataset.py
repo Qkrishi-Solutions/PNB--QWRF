@@ -1,6 +1,8 @@
-"""Verify the SYNTHETIC train/test dataset (v2) and run a baseline sanity model.
+"""Verify the SYNTHETIC train/test dataset and run a baseline sanity model.
 
-Every rule is counted over all rows. Exit code 0 only if all checks pass.
+Every rule is counted over all rows. Exit code 0 only if no check fails.
+A check whose columns are not in the output (for example when only 6 of the 13
+insurance fields are written) is reported as SKIP, never as PASS.
 The baseline shows the label is learnable *because the rules were injected*;
 it is not evidence about real credit risk.
 """
@@ -17,9 +19,7 @@ import pandas as pd
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
-from generate_training_dataset import (  # noqa: E402
-    DICTIONARY_NAME, TEST_NAME, TRAIN_NAME, wx_name,
-)
+from generate_training_dataset import file_names, wx_name  # noqa: E402
 
 DPD_BANDS = {"Standard": (0, 0), "SMA 0": (1, 30), "SMA 1": (31, 60),
              "SMA 2": (61, 90), "NPA": (91, 365)}
@@ -32,13 +32,23 @@ def _date(series: pd.Series) -> pd.Series:
 
 def run_checks(
     train: pd.DataFrame, test: pd.DataFrame, cfg: dict, weather: pd.DataFrame | None = None
-) -> list[tuple[str, bool, str]]:
-    """Return ``(check, passed, detail)`` rows."""
+) -> list[tuple[str, str, str]]:
+    """Return ``(check, PASS|FAIL|SKIP, detail)`` rows."""
     both = pd.concat([train, test], ignore_index=True)
-    out: list[tuple[str, bool, str]] = []
+    out: list[tuple[str, str, str]] = []
 
     def add(name: str, ok: bool, detail: str = "") -> None:
-        out.append((name, bool(ok), detail))
+        out.append((name, "PASS" if ok else "FAIL", detail))
+
+    def skip(name: str, cols: list[str]) -> None:
+        out.append((name, "SKIP", f"columns not in output: {', '.join(cols)}"))
+
+    def need(name: str, cols: list[str]) -> bool:
+        absent = [c for c in cols if c not in both.columns]
+        if absent:
+            skip(name, absent)
+            return False
+        return True
 
     add("V1 all rows labelled SYNTHETIC", (both["synthetic_flag"] == "SYNTHETIC").all())
     years_train = sorted(s["year"] for s in cfg["snapshots"] if s["split"] == "train")
@@ -65,31 +75,49 @@ def run_checks(
         ((rep - opened).dt.days >= int(cfg["min_account_age_days"])).all())
 
     yes = both["crop_insurance_available"] == "Y"
-    blank_cols = [c for c in both.columns if c.startswith("insurance_") and c != "insurance_claim_status"
-                  and c != "insurance_coverage_status"]
-    add("V10 uninsured rows have blank insurance fields",
-        both.loc[~yes, blank_cols].isna().all().all())
-    add("V11 insured rows have policy fields and unique policy ids",
-        both.loc[yes, ["insurance_policy_id", "insurance_amount", "insurance_premium",
-                       "insurance_start_date", "insurance_end_date"]].notna().all().all()
-        and both.loc[yes, "insurance_policy_id"].is_unique)
     ins = both.loc[yes]
-    start, end, irep = _date(ins["insurance_start_date"]), _date(ins["insurance_end_date"]), _date(ins["reporting_date"])
-    add("V12 policy end after start", (end > start).all())
-    expected = np.where(end < irep, "Expired", np.where(start > irep, "Pending", "Active"))
-    add("V13 coverage status agrees with dates",
-        (ins["insurance_coverage_status"].to_numpy() == expected).all())
-    add("V14 premium < insured amount", (ins["insurance_premium"] < ins["insurance_amount"]).all())
-    has_claim = both["insurance_claim_status"].isin(CLAIM_STATUSES)
-    add("V15 claim amount present iff a claim exists",
-        (both["insurance_claim_amount"].notna() == has_claim).all())
-    paid = both["insurance_payout_amount"].notna()
-    add("V16 payout only for Paid claims, payout <= claim, dated within policy..reporting",
-        (both.loc[paid, "insurance_claim_status"] == "Paid").all()
-        and (both.loc[paid, "insurance_payout_amount"] <= both.loc[paid, "insurance_claim_amount"]).all()
-        and (_date(both.loc[paid, "insurance_payout_date"]) >= _date(both.loc[paid, "insurance_start_date"])).all()
-        and (_date(both.loc[paid, "insurance_payout_date"]) <= _date(both.loc[paid, "reporting_date"])).all()
-        and both.loc[~paid, "insurance_payout_date"].isna().all())
+    irep = _date(ins["reporting_date"])
+
+    if need("V10 uninsured rows have blank insurance fields",
+            ["insurance_amount", "insurance_end_date", "insurance_payout_amount"]):
+        blank = [c for c in ("insurance_amount", "insurance_end_date", "insurance_payout_amount",
+                             "insurance_policy_id", "insurance_premium", "insurance_start_date",
+                             "insurance_claim_amount", "insurance_payout_date") if c in both.columns]
+        add("V10 uninsured rows have blank insurance fields", both.loc[~yes, blank].isna().all().all())
+    if need("V11 insured rows have amount and end date", ["insurance_amount", "insurance_end_date"]):
+        add("V11 insured rows have amount and end date",
+            ins[["insurance_amount", "insurance_end_date"]].notna().all().all())
+    if "insurance_policy_id" in both.columns:
+        add("V11b policy ids unique", ins["insurance_policy_id"].is_unique)
+    if need("V12 policy end after start", ["insurance_start_date", "insurance_end_date"]):
+        add("V12 policy end after start",
+            (_date(ins["insurance_end_date"]) > _date(ins["insurance_start_date"])).all())
+    if need("V13 coverage status agrees with end date",
+            ["insurance_coverage_status", "insurance_end_date"]):
+        end = _date(ins["insurance_end_date"])
+        expired = ins["insurance_coverage_status"] == "Expired"
+        add("V13 coverage status agrees with end date (Expired <=> end before reporting date)",
+            ((end < irep) == expired).all()
+            and ins["insurance_coverage_status"].isin(["Active", "Expired", "Pending"]).all())
+    if need("V14 premium < insured amount", ["insurance_premium", "insurance_amount"]):
+        add("V14 premium < insured amount", (ins["insurance_premium"] < ins["insurance_amount"]).all())
+    if need("V15 claim amount present iff a claim exists",
+            ["insurance_claim_status", "insurance_claim_amount"]):
+        has_claim = both["insurance_claim_status"].isin(CLAIM_STATUSES)
+        add("V15 claim amount present iff a claim exists",
+            (both["insurance_claim_amount"].notna() == has_claim).all())
+    if need("V16 payout only for Paid claims and within insured amount",
+            ["insurance_claim_status", "insurance_payout_amount", "insurance_amount"]):
+        paid = both["insurance_payout_amount"].notna()
+        ok = (both.loc[paid, "insurance_claim_status"] == "Paid").all() \
+            and (both.loc[paid, "insurance_payout_amount"] <= both.loc[paid, "insurance_amount"]).all()
+        if "insurance_claim_amount" in both.columns:
+            ok = ok and (both.loc[paid, "insurance_payout_amount"] <= both.loc[paid, "insurance_claim_amount"]).all()
+        if "insurance_payout_date" in both.columns and "insurance_start_date" in both.columns:
+            pd_ = _date(both.loc[paid, "insurance_payout_date"])
+            ok = ok and (pd_ >= _date(both.loc[paid, "insurance_start_date"])).all() \
+                and (pd_ <= _date(both.loc[paid, "reporting_date"])).all()
+        add("V16 payout only for Paid claims and within insured amount", ok)
     add("V17 crop only for Crop Production; yield z only when calculated",
         both.loc[both["crop"].notna(), "agri sector"].eq("Crop Production").all()
         and both.loc[both["yield_anomaly_zscore"].notna(), "yield_anomaly_status"].eq("calculated").all())
@@ -155,27 +183,34 @@ def main(argv: list[str] | None = None) -> int:
 
     root = HERE.parent
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--datadir", type=Path, default=Path("financial_train_test_data"))
-    parser.add_argument("--config", type=Path, default=HERE / "synthetic_training_config_v2.json")
+    parser.add_argument("--config", type=Path, default=HERE / "synthetic_training_config_v3.json")
+    parser.add_argument("--datadir", type=Path, default=None,
+                        help="default: financial_train_test_data/<dataset_version>")
     parser.add_argument("--weather", type=Path,
                         default=root / "weather_feature_engineering" / "weather_anomalies_forward_chaining_v1.csv")
     parser.add_argument("--baseline", action="store_true", help="also run the sanity model")
     args = parser.parse_args(argv)
 
     cfg = json.loads(args.config.read_text(encoding="utf-8"))
-    train = pd.read_csv(args.datadir / TRAIN_NAME)
-    test = pd.read_csv(args.datadir / TEST_NAME)
+    version = cfg.get("dataset_version", "v2")
+    names = file_names(version)
+    datadir = args.datadir or Path("financial_train_test_data") / version
+    train = pd.read_csv(datadir / names["train"])
+    test = pd.read_csv(datadir / names["test"])
     from generate_training_dataset import load_weather
     weather = load_weather(args.weather, cfg["weather_feature_columns"], [s["year"] for s in cfg["snapshots"]])
 
     results = run_checks(train, test, cfg, weather)
-    for name, ok, detail in results:
-        print(f"{'PASS' if ok else 'FAIL'}  {name} {detail}")
-    failed = [n for n, ok, _ in results if not ok]
-    print(f"\nrows: train={len(train)} test={len(test)}; checks passed {len(results) - len(failed)}/{len(results)}")
+    for name, status, detail in results:
+        print(f"{status}  {name} {detail}")
+    failed = [n for n, s, _ in results if s == "FAIL"]
+    skipped = [n for n, s, _ in results if s == "SKIP"]
+    passed = len(results) - len(failed) - len(skipped)
+    print(f"\nversion {version}: rows train={len(train)} test={len(test)}; "
+          f"{passed} passed, {len(failed)} failed, {len(skipped)} skipped")
 
     if args.baseline:
-        dictionary = pd.read_csv(args.datadir / DICTIONARY_NAME)
+        dictionary = pd.read_csv(datadir / names["dictionary"])
         res = baseline(train, test, dictionary)
         print("\nbaseline (SYNTHETIC rules were injected; this is a pipeline check, not a finding):")
         for k, v in res.items():

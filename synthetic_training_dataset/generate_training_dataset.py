@@ -34,8 +34,19 @@ TRAIN_NAME = "synthetic_training_v2_train.csv"
 TEST_NAME = "synthetic_training_v2_test.csv"
 PNB_LAYOUT_TRAIN_NAME = "Financial_data_PNB_SYNTHETIC_train.csv"
 PNB_LAYOUT_TEST_NAME = "Financial_data_PNB_SYNTHETIC_test.csv"
-DICTIONARY_NAME ="synthetic_training_v2_data_dictionary.csv"
+DICTIONARY_NAME = "synthetic_training_v2_data_dictionary.csv"
 REPORT_NAME = "synthetic_training_report_v2.csv"
+
+
+def file_names(version: str) -> dict[str, str]:
+    """Output file names for a dataset version (``v2``, ``v3``, ...)."""
+    return {
+        "train": f"synthetic_training_{version}_train.csv",
+        "test": f"synthetic_training_{version}_test.csv",
+        "dictionary": f"synthetic_training_{version}_data_dictionary.csv",
+        "report": f"synthetic_training_report_{version}.csv",
+    }
+
 INSURANCE_COLUMNS = [
     "crop_insurance_available",
     "insurance_policy_id",
@@ -228,6 +239,10 @@ def build_dataset(
     """Build the full dataset (train and test rows) and a diagnostics dict."""
     seed = int(cfg["seed"])
     base = dict(base_cfg)
+    # optional documented synthetic overrides of the v1 mixes (chosen for learnability)
+    for key in ("product_mix_percent", "asset_class_percent"):
+        if f"{key}_override" in cfg:
+            base[key] = cfg[f"{key}_override"]
     base["seed"] = seed
     base["total_accounts"] = int(cfg["total_accounts"])
     frame = generate(base, reference, district_codes)
@@ -317,13 +332,24 @@ def build_dataset(
     noise = rng.normal(0.0, rs["noise_sd"], len(frame))
     score = signal + noise
 
-    order = np.argsort(score, kind="stable")
-    counts = apportion(len(frame), {k: float(v) for k, v in base_cfg["asset_class_percent"].items()})
+    # Rank by score and cut at the configured class shares. Pooled over all years
+    # (v2) a harsh weather year absorbs most NPA, so train and test class mixes
+    # differ a lot. With rank_within_snapshot_year every year gets the target mix;
+    # weather then differentiates districts and sectors inside each year.
+    shares = {k: float(v) for k, v in base["asset_class_percent"].items()}
+    if cfg.get("rank_within_snapshot_year", False):
+        groups = [np.flatnonzero(frame["snapshot_year"].to_numpy() == y)
+                  for y in sorted(frame["snapshot_year"].unique())]
+    else:
+        groups = [np.arange(len(frame))]
     asset = np.empty(len(frame), dtype=object)
-    cursor = 0
-    for cls in ASSET_ORDER:
-        asset[order[cursor : cursor + counts[cls]]] = cls
-        cursor += counts[cls]
+    for idx in groups:
+        order = idx[np.argsort(score[idx], kind="stable")]
+        counts = apportion(len(idx), shares)
+        cursor = 0
+        for cls in ASSET_ORDER:
+            asset[order[cursor : cursor + counts[cls]]] = cls
+            cursor += counts[cls]
     frame["asset class"] = asset
     frame["npa_flag"] = (frame["asset class"] == "NPA").astype(int)
 
@@ -416,7 +442,8 @@ def weather_roles(columns: list[str]) -> list[tuple[str, str, str]]:
 
 def ordered_columns(cfg: dict) -> list[str]:
     roles = column_roles()
-    names = [c for c, _, _ in roles]
+    keep_ins = set(cfg.get("insurance_output_fields", INSURANCE_COLUMNS))
+    names = [c for c, _, _ in roles if c not in INSURANCE_COLUMNS or c in keep_ins]
     # place weather features after climate_zone
     at = names.index("climate_zone") + 1
     wx = [wx_name(c) for c in cfg["weather_feature_columns"]]
@@ -462,14 +489,18 @@ def main(argv: list[str] | None = None) -> int:
                         default=ROOT / "yield_feature_engineering" / "yield_anomalies_forward_chaining_v1.csv")
     parser.add_argument("--zone-map", type=Path,
                         default=ROOT / "District Climate Zonal Clustering" / "district_zone_map_v1.csv")
-    parser.add_argument("--outdir", type=Path, default=Path("financial_train_test_data"))
+    parser.add_argument("--outdir", type=Path, default=None,
+                        help="default: financial_train_test_data/<dataset_version>")
     parser.add_argument("--report-dir", type=Path, default=HERE)
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
     cfg = json.loads(args.config.read_text(encoding="utf-8"))
+    names = file_names(cfg.get("dataset_version", "v2"))
+    if args.outdir is None:
+        args.outdir = Path("financial_train_test_data") / cfg.get("dataset_version", "v2")
     base_cfg = json.loads((args.config.parent / cfg["base_config"]).read_text(encoding="utf-8"))
-    years = [s["year"] for s in cfg["snapshots"]]
+    years =[s["year"] for s in cfg["snapshots"]]
     reference = pd.read_csv(args.pincode_reference, dtype=str)
     codes = load_district_codes(args.weather)
     weather = load_weather(args.weather, cfg["weather_feature_columns"], years)
@@ -484,7 +515,7 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError(f"columns not built: {missing}")
 
     args.outdir.mkdir(parents=True, exist_ok=True)
-    paths = {"train": args.outdir / TRAIN_NAME, "test": args.outdir / TEST_NAME}
+    paths = {"train": args.outdir / names["train"], "test": args.outdir / names["test"]}
     for split, path in paths.items():
         frame.loc[frame["split"] == split, cols].to_csv(path, index=False)
     # Same 20 columns, same order, as Financial_data_PNB.csv (no labels or extras).
@@ -498,14 +529,14 @@ def main(argv: list[str] | None = None) -> int:
     roles = {c: (r, d) for c, r, d in column_roles() + weather_roles(cfg["weather_feature_columns"])}
     pd.DataFrame(
         [(c, *roles[c]) for c in cols], columns=["column", "role", "description"]
-    ).to_csv(args.outdir / DICTIONARY_NAME, index=False)
+    ).to_csv(args.outdir / names["dictionary"], index=False)
 
     report = build_report(
         frame, sha256_of(args.config), diag,
         {p.name: sha256_of(p) for p in paths.values()},
     )
     args.report_dir.mkdir(parents=True, exist_ok=True)
-    report.to_csv(args.report_dir / REPORT_NAME, index=False)
+    report.to_csv(args.report_dir / names["report"], index=False)
     LOGGER.info("SYNTHETIC: train=%d test=%d -> %s",
                 (frame["split"] == "train").sum(), (frame["split"] == "test").sum(), args.outdir)
     return 0

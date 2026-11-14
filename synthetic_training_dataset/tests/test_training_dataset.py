@@ -71,8 +71,10 @@ def test_all_checks_pass(built, inputs) -> None:
     train = frame[frame["split"] == "train"]
     test = frame[frame["split"] == "test"]
     results = run_checks(train, test, CFG, inputs[1])
-    failed = [n for n, ok, _ in results if not ok]
+    failed = [n for n, status, _ in results if status == "FAIL"]
+    skipped = [n for n, status, _ in results if status == "SKIP"]
     assert not failed, failed
+    assert not skipped, skipped  # full frame has every column, so nothing is skipped
 
 
 def test_split_sizes_close_to_config(built) -> None:
@@ -121,3 +123,47 @@ def test_leakage_columns_are_not_features() -> None:
         assert roles[col] == "leakage_exclude"
     for col in ("insurance_claim_status", "insurance_payout_amount"):
         assert roles[col] == "post_event_exclude"
+
+
+# ----------------------------------------------------------------------------- v3
+CFG3 = json.loads((HERE / "synthetic_training_config_v3.json").read_text())
+CFG3["total_accounts"] = 1100
+CFG3["snapshots"] = CFG["snapshots"]
+
+
+@pytest.fixture(scope="module")
+def built3(inputs):
+    reference, weather, crops, zones = inputs
+    frame, _ = build_dataset(CFG3, BASE, reference, CODES, weather, crops, zones)
+    return frame
+
+
+def test_v3_writes_only_six_insurance_fields() -> None:
+    from generate_training_dataset import INSURANCE_COLUMNS
+
+    cols = ordered_columns(CFG3)
+    written = [c for c in cols if c in INSURANCE_COLUMNS]
+    assert sorted(written) == sorted(CFG3["insurance_output_fields"])
+    assert len(written) == 6
+    assert "insurance_coverage_ratio" in cols and "insurance_days_to_expiry" in cols
+
+
+def test_v3_asset_mix_follows_override(built3) -> None:
+    share = built3["asset class"].value_counts(normalize=True) * 100
+    for cls, pct in CFG3["asset_class_percent_override"].items():
+        assert abs(share[cls] - pct) < 0.5
+
+
+def test_v3_product_mix_uses_only_v1_combinations(built3) -> None:
+    allowed = {(r["scheme code"], r["facility type"], r["agri sector"]) for r in BASE["product_mix_percent"]}
+    used = set(zip(built3["scheme code"], built3["facility type"], built3["agri sector"], strict=True))
+    assert used <= allowed
+    assert abs(sum(r["weight"] for r in CFG3["product_mix_percent_override"]) - 100) < 1e-9
+    assert (built3["agri sector"] == "Crop Production").mean() > 0.25
+
+
+def test_v3_checks_skip_dropped_columns_without_failing(built3, inputs) -> None:
+    out = built3[ordered_columns(CFG3)]
+    results = run_checks(out[out["split"] == "train"], out[out["split"] == "test"], CFG3, inputs[1])
+    assert not [n for n, s, _ in results if s == "FAIL"]
+    assert [n for n, s, _ in results if s == "SKIP"]  # dropped columns are reported, not passed
