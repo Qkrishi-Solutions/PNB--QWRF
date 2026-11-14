@@ -2,13 +2,12 @@
 
 > **SYNTHETIC. Not PNB data.** Generated from `v3/synthetic_training_v3_data_dictionary.csv`; that CSV is the source of truth.
 
-45 columns in the rich files (`synthetic_training_v3_train.csv` / `_test.csv`). The `Financial_data_PNB_SYNTHETIC_*.csv` files hold only the first 20 original fields (see `PNB_FIELD_DICTIONARY_DRAFT.md`).
+44 columns in the rich files (`synthetic_training_v3_train.csv` / `_test.csv`). The `Financial_data_PNB_SYNTHETIC_*.csv` files hold only the first 20 original fields (see `PNB_FIELD_DICTIONARY_DRAFT.md`).
 
 ## Role legend
 
 | Role | Meaning |
 |---|---|
-| `label` | Marker column. |
 | `split` | train or test. |
 | `feature` | Model input. |
 | `feature_raw_date` | Raw date; prefer the derived day-count features. |
@@ -23,48 +22,47 @@
 
 | # | Column | Role | Type | Blank in train | Description |
 |---|---|---|---|---|---|
-| 1 | `synthetic_flag` | `label` | str | 0.0% | Always SYNTHETIC. |
-| 2 | `split` | `split` | str | 0.0% | train or test (out-of-time: by snapshot year). |
-| 3 | `snapshot_year` | `feature` | int64 | 0.0% | Reporting year of the snapshot; joins that year's weather. |
-| 4 | `reporting_date` | `feature_raw_date` | str | 0.0% | Snapshot reporting date. |
-| 5 | `zone` | `feature` | str | 0.0% | Constant placeholder zone. |
-| 6 | `circle` | `feature` | str | 0.0% | Placeholder circle grouping. |
-| 7 | `branch ID` | `identifier_exclude` | str | 0.0% | Placeholder branch id; high cardinality. |
-| 8 | `branch name` | `identifier_exclude` | str | 0.0% | Placeholder branch name. |
-| 9 | `customer ID` | `identifier_exclude` | str | 0.0% | Synthetic customer id. |
-| 10 | `customer name` | `identifier_exclude` | str | 0.0% | Synthetic name. |
-| 11 | `borrowers address` | `identifier_exclude` | str | 0.0% | Synthetic address. |
-| 12 | `pincode` | `geo_id` | int64 | 0.0% | Pincode mapped to the district. |
-| 13 | `account number` | `identifier_exclude` | int64 | 0.0% | Synthetic account number. |
-| 14 | `account open date` | `feature_raw_date` | str | 0.0% | Account open date. |
-| 15 | `facility type` | `feature` | str | 0.0% | Facility type. |
-| 16 | `scheme code` | `feature` | str | 0.0% | Scheme code. |
-| 17 | `agri sector` | `feature` | str | 0.0% | Agricultural sector. |
-| 18 | `sanction amount` | `feature` | int64 | 0.0% | Sanctioned amount (INR). |
-| 19 | `rate of interest` | `feature` | float64 | 0.0% | Interest rate (%). |
-| 20 | `balance outstanding` | `feature` | int64 | 0.0% | Outstanding balance (INR). |
-| 21 | `loan_age_days` | `feature` | int64 | 0.0% | Days from account open date to reporting date. |
-| 22 | `district_code` | `feature` | int64 | 0.0% | Project district code. |
-| 23 | `district_name` | `feature` | str | 0.0% | District name. |
-| 24 | `climate_zone` | `feature` | str | 0.0% | Issue 6 climate zone: similarity group, not a risk level. |
-| 25 | `wx_kharif__rain_sum_z` | `feature` | float64 | 0.0% | Forward-chaining anomaly z-score of kharif__rain_sum; blank when unavailable. Not imputed. |
-| 26 | `wx_kharif__longest_dry_z` | `feature` | float64 | 0.0% | Forward-chaining anomaly z-score of kharif__longest_dry; blank when unavailable. Not imputed. |
-| 27 | `wx_annual_crop__hot_days_z` | `feature` | float64 | 0.0% | Forward-chaining anomaly z-score of annual_crop__hot_days; blank when unavailable. Not imputed. |
-| 28 | `wx_kharif__tmax_mean_z` | `feature` | float64 | 0.0% | Forward-chaining anomaly z-score of kharif__tmax_mean; blank when unavailable. Not imputed. |
-| 29 | `wx_kharif__dtr_mean_z` | `feature` | float64 | 0.0% | Forward-chaining anomaly z-score of kharif__dtr_mean; blank when unavailable. Not imputed. |
-| 30 | `wx_ne__rainy_days_z` | `feature` | float64 | 0.0% | Forward-chaining anomaly z-score of ne__rainy_days; blank when unavailable. Not imputed. |
-| 31 | `crop` | `feature` | str | 68.0% | Crop for Crop Production accounts only; else blank. |
-| 32 | `yield_anomaly_zscore` | `feature` | float64 | 68.1% | Forward-chaining yield anomaly z-score; blank when not calculated. Not imputed. |
-| 33 | `yield_anomaly_status` | `feature` | str | 0.0% | Status of the yield anomaly (calculated, insufficient_history, ...). |
-| 34 | `crop_insurance_available` | `feature` | str | 0.0% | Y or N. |
-| 35 | `insurance_amount` | `feature` | float64 | 61.1% | Insured amount (INR). |
-| 36 | `insurance_coverage_status` | `feature` | str | 0.0% | Active, Expired, Pending or Not Insured. |
-| 37 | `insurance_end_date` | `feature_raw_date` | str | 61.1% | Policy end. |
-| 38 | `insurance_days_to_expiry` | `feature` | float64 | 61.1% | Policy end minus reporting date (negative = expired). |
-| 39 | `insurance_coverage_ratio` | `feature` | float64 | 61.1% | Insured amount / outstanding balance. |
-| 40 | `insurance_claim_status` | `post_event_exclude` | str | 0.0% | Claim outcome after the weather event; excluded for early-warning use. |
-| 41 | `insurance_payout_amount` | `post_event_exclude` | float64 | 96.3% | Payout amount. |
-| 42 | `days_past_due` | `leakage_exclude` | int64 | 0.0% | Determined by the asset class (target leakage). |
-| 43 | `overdue amount` | `leakage_exclude` | int64 | 0.0% | Determined by the asset class (target leakage). |
-| 44 | `asset class` | `target` | str | 0.0% | Standard, SMA 0, SMA 1, SMA 2, NPA (ordered). |
-| 45 | `npa_flag` | `target_binary` | int64 | 0.0% | 1 if asset class is NPA. |
+| 1 | `split` | `split` | str | 0.0% | train or test (out-of-time: by snapshot year). |
+| 2 | `snapshot_year` | `feature` | int64 | 0.0% | Reporting year of the snapshot; joins that year's weather. |
+| 3 | `reporting_date` | `feature_raw_date` | str | 0.0% | Snapshot reporting date. |
+| 4 | `zone` | `feature` | str | 0.0% | Constant placeholder zone. |
+| 5 | `circle` | `feature` | str | 0.0% | Placeholder circle grouping. |
+| 6 | `branch ID` | `identifier_exclude` | str | 0.0% | Placeholder branch id; high cardinality. |
+| 7 | `branch name` | `identifier_exclude` | str | 0.0% | Placeholder branch name. |
+| 8 | `customer ID` | `identifier_exclude` | str | 0.0% | Synthetic customer id. |
+| 9 | `customer name` | `identifier_exclude` | str | 0.0% | Synthetic name. |
+| 10 | `borrowers address` | `identifier_exclude` | str | 0.0% | Synthetic address. |
+| 11 | `pincode` | `geo_id` | int64 | 0.0% | Pincode mapped to the district. |
+| 12 | `account number` | `identifier_exclude` | int64 | 0.0% | Synthetic account number. |
+| 13 | `account open date` | `feature_raw_date` | str | 0.0% | Account open date. |
+| 14 | `facility type` | `feature` | str | 0.0% | Facility type. |
+| 15 | `scheme code` | `feature` | str | 0.0% | Scheme code. |
+| 16 | `agri sector` | `feature` | str | 0.0% | Agricultural sector. |
+| 17 | `sanction amount` | `feature` | int64 | 0.0% | Sanctioned amount (INR). |
+| 18 | `rate of interest` | `feature` | float64 | 0.0% | Interest rate (%). |
+| 19 | `balance outstanding` | `feature` | int64 | 0.0% | Outstanding balance (INR). |
+| 20 | `loan_age_days` | `feature` | int64 | 0.0% | Days from account open date to reporting date. |
+| 21 | `district_code` | `feature` | int64 | 0.0% | Project district code. |
+| 22 | `district_name` | `feature` | str | 0.0% | District name. |
+| 23 | `climate_zone` | `feature` | str | 0.0% | Issue 6 climate zone: similarity group, not a risk level. |
+| 24 | `wx_kharif__rain_sum_z` | `feature` | float64 | 0.0% | Forward-chaining anomaly z-score of kharif__rain_sum; blank when unavailable. Not imputed. |
+| 25 | `wx_kharif__longest_dry_z` | `feature` | float64 | 0.0% | Forward-chaining anomaly z-score of kharif__longest_dry; blank when unavailable. Not imputed. |
+| 26 | `wx_annual_crop__hot_days_z` | `feature` | float64 | 0.0% | Forward-chaining anomaly z-score of annual_crop__hot_days; blank when unavailable. Not imputed. |
+| 27 | `wx_kharif__tmax_mean_z` | `feature` | float64 | 0.0% | Forward-chaining anomaly z-score of kharif__tmax_mean; blank when unavailable. Not imputed. |
+| 28 | `wx_kharif__dtr_mean_z` | `feature` | float64 | 0.0% | Forward-chaining anomaly z-score of kharif__dtr_mean; blank when unavailable. Not imputed. |
+| 29 | `wx_ne__rainy_days_z` | `feature` | float64 | 0.0% | Forward-chaining anomaly z-score of ne__rainy_days; blank when unavailable. Not imputed. |
+| 30 | `crop` | `feature` | str | 68.1% | Crop for Crop Production accounts only; else blank. |
+| 31 | `yield_anomaly_zscore` | `feature` | float64 | 68.2% | Forward-chaining yield anomaly z-score; blank when not calculated. Not imputed. |
+| 32 | `yield_anomaly_status` | `feature` | str | 0.0% | Status of the yield anomaly (calculated, insufficient_history, ...). |
+| 33 | `crop_insurance_available` | `feature` | str | 0.0% | Y or N. |
+| 34 | `insurance_amount` | `feature` | float64 | 61.1% | Insured amount (INR). |
+| 35 | `insurance_coverage_status` | `feature` | str | 0.0% | Active, Expired, Pending or Not Insured. |
+| 36 | `insurance_end_date` | `feature_raw_date` | str | 61.1% | Policy end. |
+| 37 | `insurance_days_to_expiry` | `feature` | float64 | 61.1% | Policy end minus reporting date (negative = expired). |
+| 38 | `insurance_coverage_ratio` | `feature` | float64 | 61.1% | Insured amount / outstanding balance. |
+| 39 | `insurance_claim_status` | `post_event_exclude` | str | 0.0% | Claim outcome after the weather event; excluded for early-warning use. |
+| 40 | `insurance_payout_amount` | `post_event_exclude` | float64 | 96.0% | Payout amount. |
+| 41 | `days_past_due` | `leakage_exclude` | int64 | 0.0% | Determined by the asset class (target leakage). |
+| 42 | `overdue amount` | `leakage_exclude` | int64 | 0.0% | Determined by the asset class (target leakage). |
+| 43 | `asset class` | `target` | str | 0.0% | Standard, SMA 0, SMA 1, SMA 2, NPA (ordered). |
+| 44 | `npa_flag` | `target_binary` | int64 | 0.0% | 1 if asset class is NPA. |

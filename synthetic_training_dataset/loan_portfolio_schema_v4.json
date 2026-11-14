@@ -1,0 +1,41 @@
+{
+  "schema_version": "1.0",
+  "status": "DRAFT: definitions are proposals until confirmed by PNB (see financial_data_requirements/DATA_DICTIONARY.md)",
+  "date_format": "%Y-%m-%d",
+  "reporting_date_column": "reporting_date",
+  "account_key": "account number",
+  "columns": [
+    {"name": "reporting_date", "type": "date", "required": true},
+    {"name": "zone", "type": "text", "required": true},
+    {"name": "circle", "type": "text", "required": true},
+    {"name": "branch ID", "type": "text", "required": true, "pattern": "[A-Z]{2}\\d{3}", "pattern_severity": "warning"},
+    {"name": "branch name", "type": "text", "required": true},
+    {"name": "customer ID", "type": "text", "required": true, "pattern": "[A-Z]{4}\\d{5}", "pattern_severity": "warning"},
+    {"name": "customer name", "type": "text", "required": false},
+    {"name": "borrowers address", "type": "text", "required": false},
+    {"name": "pincode", "type": "text", "required": true, "pattern": "[1-9]\\d{5}"},
+    {"name": "account number", "type": "text", "required": true, "pattern": "\\d{11}", "pattern_severity": "warning"},
+    {"name": "account open date", "type": "date", "required": true},
+    {"name": "facility type", "type": "text", "required": true,
+     "allowed": ["Cash Credit", "Term Loan", "Kisan Credit Card", "Working Capital", "Overdraft"]},
+    {"name": "scheme code", "type": "text", "required": true,
+     "allowed": ["AGRI01", "AGRI09", "KCC02", "MSME05", "TL101", "WC204"]},
+    {"name": "agri sector", "type": "text", "required": true,
+     "allowed": ["Crop Production", "Dairy & Animal Husbandry", "Fisheries", "Poultry"]},
+    {"name": "sanction amount", "type": "number", "required": true, "min": 0},
+    {"name": "rate of interest", "type": "number", "required": true, "min": 0, "max": 100},
+    {"name": "balance outstanding", "type": "number", "required": true, "min": 0},
+    {"name": "overdue amount", "type": "number", "required": true, "min": 0},
+    {"name": "days_past_due", "type": "integer", "required": true, "min": 0},
+    {"name": "asset class", "type": "text", "required": true,
+     "allowed": ["Standard", "SMA 0", "SMA 1", "SMA 2", "NPA"]}
+  ],
+  "asset_class_dpd_bands": {
+    "Standard": [0, 0],
+    "SMA 0": [1, 30],
+    "SMA 1": [31, 60],
+    "SMA 2": [61, 90],
+    "NPA": [91, null]
+  },
+  "project_state": "ANDHRA PRADESH"
+}

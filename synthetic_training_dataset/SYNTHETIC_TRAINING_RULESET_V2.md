@@ -2,6 +2,7 @@
 
 > **Label: SYNTHETIC. This is not PNB data.** A development fixture for building and testing an asset-class prediction pipeline.
 > **Extends:** `synthetic_portfolio/` (v1 generator, config and ruleset). v1 is unchanged.
+> **Superseded.** The v2 files were built on the earlier Issue 25 generator. Regenerating v2 against the final generator now on `Main` gives different customers and row counts, so the numbers below describe the original v2 files only. v2 is not committed. Use v3 or v4.
 
 ## 1. What it is
 

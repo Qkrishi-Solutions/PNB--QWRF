@@ -50,7 +50,8 @@ def run_checks(
             return False
         return True
 
-    add("V1 all rows labelled SYNTHETIC", (both["synthetic_flag"] == "SYNTHETIC").all())
+    if need("V1 all rows labelled SYNTHETIC", ["synthetic_flag"]):
+        add("V1 all rows labelled SYNTHETIC", (both["synthetic_flag"] == "SYNTHETIC").all())
     years_train = sorted(s["year"] for s in cfg["snapshots"] if s["split"] == "train")
     years_test = sorted(s["year"] for s in cfg["snapshots"] if s["split"] == "test")
     add("V2 split follows snapshot year (out-of-time)",
@@ -131,6 +132,11 @@ def run_checks(
                         equal_nan=True) for c in cols
         )
         add("V18 weather features equal the source anomalies (not altered or imputed)", same)
+    if "allowed_agri_sectors" in cfg:
+        bad = sorted(set(both["agri sector"]) - set(cfg["allowed_agri_sectors"]))
+        missing = sorted(set(cfg["allowed_agri_sectors"]) - set(both["agri sector"]))
+        add("V19 agri sector uses only the allowed sectors, each present",
+            not bad and not missing, f"unexpected={bad} absent={missing}")
     return out
 
 

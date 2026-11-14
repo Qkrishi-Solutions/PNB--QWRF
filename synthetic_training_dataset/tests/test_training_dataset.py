@@ -167,3 +167,65 @@ def test_v3_checks_skip_dropped_columns_without_failing(built3, inputs) -> None:
     results = run_checks(out[out["split"] == "train"], out[out["split"] == "test"], CFG3, inputs[1])
     assert not [n for n, s, _ in results if s == "FAIL"]
     assert [n for n, s, _ in results if s == "SKIP"]  # dropped columns are reported, not passed
+
+
+# ----------------------------------------------------------------------------- v4
+CFG4 = json.loads((HERE / "synthetic_training_config_v4.json").read_text())
+CFG4["total_accounts"] = 1100
+CFG4["snapshots"] = CFG["snapshots"]
+SECTORS4 = {"Crop Production", "Fisheries", "Poultry", "Dairy & Animal Husbandry"}
+
+
+@pytest.fixture(scope="module")
+def built4(inputs):
+    reference, weather, crops, zones = inputs
+    frame, _ = build_dataset(CFG4, BASE, reference, CODES, weather, crops, zones)
+    return frame
+
+
+def test_v4_agri_sector_only_the_four_allowed(built4) -> None:
+    assert set(built4["agri sector"]) == SECTORS4
+    assert set(CFG4["allowed_agri_sectors"]) == SECTORS4
+
+
+def test_v4_product_mix_is_valid(built4) -> None:
+    weights = [r["weight"] for r in CFG4["product_mix_percent_override"]]
+    assert abs(sum(weights) - 100) < 1e-9
+    assert {r["agri sector"] for r in CFG4["product_mix_percent_override"]} == SECTORS4
+    # no scheme code or facility type outside the original PNB domain
+    schemes = {r["scheme code"] for r in BASE["product_mix_percent"]}
+    facilities = {r["facility type"] for r in BASE["product_mix_percent"]}
+    assert set(built4["scheme code"]) <= schemes
+    assert set(built4["facility type"]) <= facilities
+
+
+def test_v4_sector_config_maps_cover_every_sector() -> None:
+    for key in (CFG4["sector_weather_sensitivity"], CFG4["insurance"]["availability_probability"]):
+        assert set(key) == SECTORS4
+
+
+def test_v4_crop_only_for_crop_production_and_all_checks_pass(built4, inputs) -> None:
+    assert built4.loc[built4["crop"].notna(), "agri sector"].eq("Crop Production").all()
+    out = built4[ordered_columns(CFG4)]
+    results = run_checks(out[out["split"] == "train"], out[out["split"] == "test"], CFG4, inputs[1])
+    assert not [n for n, s, _ in results if s == "FAIL"]
+    assert [s for n, s, _ in results if n.startswith("V19")] == ["PASS"]
+
+
+def test_v4_sector_check_fails_on_an_unexpected_sector(built4, inputs) -> None:
+    out = built4[ordered_columns(CFG4)].copy()
+    out.loc[out.index[0], "agri sector"] = "Horticulture"
+    results = run_checks(out[out["split"] == "train"], out[out["split"] == "test"], CFG4, inputs[1])
+    assert [s for n, s, _ in results if n.startswith("V19")] == ["FAIL"]
+
+
+def test_synthetic_flag_column_is_config_driven() -> None:
+    assert "synthetic_flag" not in ordered_columns(CFG3)  # v3: column removed
+    assert "synthetic_flag" in ordered_columns(CFG)  # v2 unchanged
+
+
+def test_v3_label_check_is_skipped_not_passed_without_the_column(built3, inputs) -> None:
+    out = built3[ordered_columns(CFG3)]
+    results = run_checks(out[out["split"] == "train"], out[out["split"] == "test"], CFG3, inputs[1])
+    v1 = [s for n, s, _ in results if n.startswith("V1 ")]
+    assert v1 == ["SKIP"]

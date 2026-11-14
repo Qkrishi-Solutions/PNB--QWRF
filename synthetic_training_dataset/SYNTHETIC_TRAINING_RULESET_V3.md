@@ -28,22 +28,24 @@ Derived features computed from them before the fields are written: `insurance_da
 
 ## 3. Results (actual run, seed 2026)
 
-- Rows: **10,001 train, 999 test** (out-of-time: train 2017 and 2018, test 2019). 45 columns in the rich files.
+- Generated on the final Issue 25 base generator (customer-pair counting changed there), so these numbers replace the first v3 release (10,001 / 999 rows, built on the earlier generator). Class mix, sector mix and rules are unchanged; customers and some random draws differ.
+- Rows: **10,000 train, 1,000 test** (out-of-time: train 2017 and 2018, test 2019). 44 columns in the rich files. There is no in-file `synthetic_flag` column (removed on request; config `include_synthetic_flag: false`). The SYNTHETIC labelling is carried by the file names, the README and these docs, so keep them with the data.
 - Asset-class mix: train and test both 30 / 20 / 18 / 16 / 16 (NPA 16.0% in every year).
-- Insured accounts 39.1%; coverage: Not Insured 6,704, Active 2,974, Expired 958, Pending 364. Claims: Paid 369, Approved 212, Filed 177, Rejected 124.
+- Insured accounts 38.9%; coverage: Not Insured 6,724, Active 2,974, Expired 929, Pending 373. Claims: Paid 399, Approved 224, Filed 194, Rejected 111.
 - Accounts with a crop: 3,520 (3,511 with a calculated yield anomaly).
-- Verification: **15 passed, 0 failed, 3 skipped** (V12, V14, V15 need columns v3 no longer writes: start date, premium, claim amount; they are reported as SKIP, not PASS). The existing loan validator accepts the 20-column files: 56 PASS, 1 INFO, no errors, on both train and test.
-- Tests: 18 passed (`pytest synthetic_training_dataset/tests synthetic_portfolio/tests`).
+- Verification: **14 passed, 0 failed, 4 skipped** (V1 needs the removed `synthetic_flag` column; V12, V14, V15 need columns v3 no longer writes: start date, premium, claim amount. They are reported as SKIP, not PASS). The existing loan validator accepts the 20-column files: 56 PASS, 1 INFO, no errors, on both train and test.
+- Tests: 27 passed (`pytest synthetic_training_dataset/tests synthetic_portfolio/tests`).
+- Reproducibility: regenerating v3 gives byte-identical files (checked by hash).
 
 Baseline gradient boosting on 27 feature columns, trained on 2017-18, scored on 2019:
 
 | | Accuracy | Macro-F1 |
 |---|---|---|
-| Model | 0.469 | 0.396 |
-| Shuffled-label control | 0.290 | 0.100 |
-| Majority-class baseline | 0.299 | - |
+| Model | 0.472 | 0.410 |
+| Shuffled-label control | 0.232 | 0.167 |
+| Majority-class baseline | 0.300 | - |
 
-For reference, v2 scored accuracy 0.411 and macro-F1 0.278 against a majority baseline of 0.386.
+With 1,000 test rows the sampling noise on accuracy is about 1.6 points, so differences of a point or two between runs or versions are not meaningful. The first v3 release (earlier generator) scored accuracy 0.469 and macro-F1 0.396. For reference, v2 scored accuracy 0.411 and macro-F1 0.278 against a majority baseline of 0.386.
 
 How `noise_sd` affects learnability (first v3 attempt, pooled ranking, so not directly comparable with the table above): macro-F1 out-of-time 0.31 / 0.38 / 0.43 / 0.47 at noise 0.5 / 0.35 / 0.25 / 0.15. Edit `risk_score.noise_sd` to change it.
 
