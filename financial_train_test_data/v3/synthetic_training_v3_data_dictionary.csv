@@ -1,0 +1,46 @@
+column,role,description
+synthetic_flag,label,Always SYNTHETIC.
+split,split,train or test (out-of-time: by snapshot year).
+snapshot_year,feature,Reporting year of the snapshot; joins that year's weather.
+reporting_date,feature_raw_date,Snapshot reporting date.
+zone,feature,Constant placeholder zone.
+circle,feature,Placeholder circle grouping.
+branch ID,identifier_exclude,Placeholder branch id; high cardinality.
+branch name,identifier_exclude,Placeholder branch name.
+customer ID,identifier_exclude,Synthetic customer id.
+customer name,identifier_exclude,Synthetic name.
+borrowers address,identifier_exclude,Synthetic address.
+pincode,geo_id,Pincode mapped to the district.
+account number,identifier_exclude,Synthetic account number.
+account open date,feature_raw_date,Account open date.
+facility type,feature,Facility type.
+scheme code,feature,Scheme code.
+agri sector,feature,Agricultural sector.
+sanction amount,feature,Sanctioned amount (INR).
+rate of interest,feature,Interest rate (%).
+balance outstanding,feature,Outstanding balance (INR).
+loan_age_days,feature,Days from account open date to reporting date.
+district_code,feature,Project district code.
+district_name,feature,District name.
+climate_zone,feature,"Issue 6 climate zone: similarity group, not a risk level."
+wx_kharif__rain_sum_z,feature,Forward-chaining anomaly z-score of kharif__rain_sum; blank when unavailable. Not imputed.
+wx_kharif__longest_dry_z,feature,Forward-chaining anomaly z-score of kharif__longest_dry; blank when unavailable. Not imputed.
+wx_annual_crop__hot_days_z,feature,Forward-chaining anomaly z-score of annual_crop__hot_days; blank when unavailable. Not imputed.
+wx_kharif__tmax_mean_z,feature,Forward-chaining anomaly z-score of kharif__tmax_mean; blank when unavailable. Not imputed.
+wx_kharif__dtr_mean_z,feature,Forward-chaining anomaly z-score of kharif__dtr_mean; blank when unavailable. Not imputed.
+wx_ne__rainy_days_z,feature,Forward-chaining anomaly z-score of ne__rainy_days; blank when unavailable. Not imputed.
+crop,feature,Crop for Crop Production accounts only; else blank.
+yield_anomaly_zscore,feature,Forward-chaining yield anomaly z-score; blank when not calculated. Not imputed.
+yield_anomaly_status,feature,"Status of the yield anomaly (calculated, insufficient_history, ...)."
+crop_insurance_available,feature,Y or N.
+insurance_amount,feature,Insured amount (INR).
+insurance_coverage_status,feature,"Active, Expired, Pending or Not Insured."
+insurance_end_date,feature_raw_date,Policy end.
+insurance_days_to_expiry,feature,Policy end minus reporting date (negative = expired).
+insurance_coverage_ratio,feature,Insured amount / outstanding balance.
+insurance_claim_status,post_event_exclude,Claim outcome after the weather event; excluded for early-warning use.
+insurance_payout_amount,post_event_exclude,Payout amount.
+days_past_due,leakage_exclude,Determined by the asset class (target leakage).
+overdue amount,leakage_exclude,Determined by the asset class (target leakage).
+asset class,target,"Standard, SMA 0, SMA 1, SMA 2, NPA (ordered)."
+npa_flag,target_binary,1 if asset class is NPA.
