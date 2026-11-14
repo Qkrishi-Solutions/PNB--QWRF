@@ -1,0 +1,36 @@
+section,key,value
+meta,label,SYNTHETIC - not PNB data
+meta,seed,2026
+meta,config_sha256,39ed76ee49b37fc91fe2658bd5c08024465fc838a2c336ab4b5f7a1c32465b09
+meta,rows,11000
+meta,signal_variance_share,0.4375
+meta,noise_sd,0.6
+file_sha256,synthetic_training_v2_train.csv,9a4b346a83dc63708772a93f04eaa4c8ece03003addb03e392fda9ac83578c56
+file_sha256,synthetic_training_v2_test.csv,8609e1ec97c4542b63eed7a9d24f0cffa9e10fc03b0a5cec604343c0ec530f9e
+rows_by_split,train,9999
+rows_by_split,test,1001
+asset_class_by_split,test | NPA,121
+asset_class_by_split,test | SMA 0,217
+asset_class_by_split,test | SMA 1,148
+asset_class_by_split,test | SMA 2,129
+asset_class_by_split,test | Standard,386
+asset_class_by_split,train | NPA,1639
+asset_class_by_split,train | SMA 0,1983
+asset_class_by_split,train | SMA 1,1612
+asset_class_by_split,train | SMA 2,1191
+asset_class_by_split,train | Standard,3574
+rows_by_snapshot_year,2017,4998
+rows_by_snapshot_year,2018,5001
+rows_by_snapshot_year,2019,1001
+insurance_coverage_status,Not Insured,8856
+insurance_coverage_status,Active,1481
+insurance_coverage_status,Expired,491
+insurance_coverage_status,Pending,172
+insurance_claim_status,No Claim,10682
+insurance_claim_status,Paid,137
+insurance_claim_status,Approved,70
+insurance_claim_status,Filed,65
+insurance_claim_status,Rejected,46
+yield_anomaly_status,not_applicable,10561
+yield_anomaly_status,calculated,439
+meta,accounts_with_crop,439
