@@ -50,7 +50,8 @@ def run_checks(
             return False
         return True
 
-    add("V1 all rows labelled SYNTHETIC", (both["synthetic_flag"] == "SYNTHETIC").all())
+    if need("V1 all rows labelled SYNTHETIC", ["synthetic_flag"]):
+        add("V1 all rows labelled SYNTHETIC", (both["synthetic_flag"] == "SYNTHETIC").all())
     years_train = sorted(s["year"] for s in cfg["snapshots"] if s["split"] == "train")
     years_test = sorted(s["year"] for s in cfg["snapshots"] if s["split"] == "test")
     add("V2 split follows snapshot year (out-of-time)",

@@ -444,6 +444,8 @@ def ordered_columns(cfg: dict) -> list[str]:
     roles = column_roles()
     keep_ins = set(cfg.get("insurance_output_fields", INSURANCE_COLUMNS))
     names = [c for c, _, _ in roles if c not in INSURANCE_COLUMNS or c in keep_ins]
+    if not cfg.get("include_synthetic_flag", True):
+        names.remove("synthetic_flag")
     # place weather features after climate_zone
     at = names.index("climate_zone") + 1
     wx = [wx_name(c) for c in cfg["weather_feature_columns"]]

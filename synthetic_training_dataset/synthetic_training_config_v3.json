@@ -13,6 +13,7 @@
   "reporting_month_day": "10-31",
   "open_date_start": "2012-01-01",
   "min_account_age_days": 90,
+  "include_synthetic_flag": false,
   "rank_within_snapshot_year": true,
   "insurance_output_fields": [
     "crop_insurance_available",

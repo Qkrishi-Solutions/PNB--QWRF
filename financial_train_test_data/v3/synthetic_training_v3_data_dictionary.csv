@@ -1,5 +1,4 @@
 column,role,description
-synthetic_flag,label,Always SYNTHETIC.
 split,split,train or test (out-of-time: by snapshot year).
 snapshot_year,feature,Reporting year of the snapshot; joins that year's weather.
 reporting_date,feature_raw_date,Snapshot reporting date.

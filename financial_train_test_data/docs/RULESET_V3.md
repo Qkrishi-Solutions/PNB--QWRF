@@ -28,7 +28,7 @@ Derived features computed from them before the fields are written: `insurance_da
 
 ## 3. Results (actual run, seed 2026)
 
-- Rows: **10,001 train, 999 test** (out-of-time: train 2017 and 2018, test 2019). 45 columns in the rich files.
+- Rows: **10,001 train, 999 test** (out-of-time: train 2017 and 2018, test 2019). 44 columns in the rich files. There is no in-file `synthetic_flag` column (removed on request; config `include_synthetic_flag: false`). The SYNTHETIC labelling is carried by the file names, the README and these docs, so keep them with the data.
 - Asset-class mix: train and test both 30 / 20 / 18 / 16 / 16 (NPA 16.0% in every year).
 - Insured accounts 39.1%; coverage: Not Insured 6,704, Active 2,974, Expired 958, Pending 364. Claims: Paid 369, Approved 212, Filed 177, Rejected 124.
 - Accounts with a crop: 3,520 (3,511 with a calculated yield anomaly).
