@@ -65,4 +65,4 @@ python3 synthetic_training_dataset/generate_training_dataset.py \
 python3 synthetic_training_dataset/verify_training_dataset.py --baseline
 ```
 
-Outputs in `financial_train_test_data/v3/` (not committed): `Financial_data_PNB_SYNTHETIC_train.csv` and `_test.csv` (exact 20-column Financial_data_PNB layout), `synthetic_training_v3_train.csv`, `synthetic_training_v3_test.csv` and `synthetic_training_v3_data_dictionary.csv`. The aggregate report is `synthetic_training_report_v3.csv` in this folder. v2: pass `--config .../synthetic_training_config_v2.json` (outputs go to `financial_train_test_data/v2/`).
+Outputs in `financial_train_test_data/v3/` (committed on explicit request, issue #32; all SYNTHETIC): `Financial_data_PNB_SYNTHETIC_train.csv` and `_test.csv` (exact 20-column Financial_data_PNB layout), `synthetic_training_v3_train.csv`, `synthetic_training_v3_test.csv` and `synthetic_training_v3_data_dictionary.csv`. The aggregate report is `synthetic_training_report_v3.csv` in this folder. v2: pass `--config .../synthetic_training_config_v2.json` (outputs go to `financial_train_test_data/v2/`).
