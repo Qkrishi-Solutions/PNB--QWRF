@@ -29,31 +29,33 @@ Removed: Horticulture, Irrigation, Farm Mechanization, Non-Agri.
 
 ## 2. Validator schema for v4
 
-The PNB-derived validator schema (`financial_data_validation/loan_portfolio_schema_v1.json`) allows seven sector values and **does not include `Fisheries`**. Run against it, the v4 files fail the allowed-values check (189 of 999 test rows). v4 therefore ships `loan_portfolio_schema_v4.json` (a copy with the sector list narrowed to the four values), used via `--schema`. The Issue 24 validator and schema themselves are not modified. If PNB confirms `Fisheries` as a real value, the main schema should be updated.
+The PNB-derived validator schema (`financial_data_validation/loan_portfolio_schema_v1.json`) allows seven sector values and **does not include `Fisheries`**. Run against it, the v4 files fail the allowed-values check (181 of 1,000 test rows). v4 therefore ships `loan_portfolio_schema_v4.json` (a copy with the sector list narrowed to the four values), used via `--schema`. The Issue 24 validator and schema themselves are not modified. If PNB confirms `Fisheries` as a real value, the main schema should be updated.
 
 ## 3. Results (actual run, seed 2026)
 
-- Rows: **10,001 train, 999 test** (out-of-time: train 2017-2018, test 2019); 44 columns in the rich files, no `synthetic_flag` column.
+- Generated on the final Issue 25 base generator, same as the regenerated v3.
+- Rows: **10,000 train, 1,000 test** (out-of-time: train 2017-2018, test 2019); 44 columns in the rich files, no `synthetic_flag` column.
 - Class mix 30 / 20 / 18 / 16 / 16 in every year (NPA 16.0% in 2017, 2018 and 2019).
-- Sector counts: Crop Production 4,952; Dairy 2,752; Fisheries 2,196; Poultry 1,100. Accounts with a crop and a calculated yield anomaly: 4,946.
-- Insured accounts 45.0% (Crop 71%, Fisheries 38%, Poultry 16%, Dairy 15%).
+- Sector counts: Crop Production 4,952; Dairy 2,752; Fisheries 2,196; Poultry 1,100. Accounts with a crop and a calculated yield anomaly: 4,942.
+- Insured accounts 45.3% (Crop 70%, Fisheries 41%, Poultry 16%, Dairy 16%).
 - Verification: **15 passed, 0 failed, 4 skipped** (V1 label column, V12, V14, V15: their columns are not written). New check V19 (only the four allowed sectors, each present) passes and fails when an unexpected sector is injected.
 - Validator with the v4 schema on the 20-column files: 56 PASS, 1 INFO, no errors (train and test).
-- Tests: 25 passed (`pytest synthetic_training_dataset/tests synthetic_portfolio/tests`).
+- Tests: 27 passed (`pytest synthetic_training_dataset/tests synthetic_portfolio/tests`).
+- Reproducibility: regenerating v4 gives byte-identical files (checked by hash).
 
 Baseline gradient boosting on the rich features, trained 2017-18, scored 2019:
 
 | | Accuracy | Macro-F1 |
 |---|---|---|
-| Model | 0.528 | 0.474 |
-| Shuffled-label control | 0.298 | 0.094 |
-| Majority-class baseline | 0.299 | - |
+| Model | 0.484 | 0.423 |
+| Shuffled-label control | 0.256 | 0.186 |
+| Majority-class baseline | 0.300 | - |
 
-(v3 scored accuracy 0.469 and macro-F1 0.396.) The gain comes mostly from the larger Crop Production share (45% vs 32%), which puts the yield-anomaly signal on more rows.
+The regenerated v3 scores accuracy 0.472 and macro-F1 0.410. With 1,000 test rows the noise on accuracy is about 1.6 points, so **v4 is not shown to be more learnable than v3**. (An earlier run on the previous generator gave v4 a larger gap, 0.474 vs 0.396 macro-F1; that gap did not hold up after regeneration and should be treated as noise.)
 
 ## 4. Limitations (in addition to v3's)
 
-- Fisheries NPA is lower than the other sectors in this data (10% vs 17-19%) because it is more often insured (38% vs 15% for Dairy) and has no yield term in the score. That is an artefact of the assumptions here, not a statement about real fisheries lending.
+- Fisheries NPA is lower than the other sectors in this data (10% vs 17-19%) because it is more often insured (41% vs 16% for Dairy) and has no yield term in the score. That is an artefact of the assumptions here, not a statement about real fisheries lending.
 - Species (prawn or shrimp) is not a column and has no effect on any value.
 - The 45/25/20/10 sector mix and all sector-level effects are synthetic choices, not PNB or public figures.
 - All v3 limitations still apply: labels follow a documented risk score, class cut-offs are applied within each year, accounts are independent snapshots, and the data is not evidence about real borrowers.
