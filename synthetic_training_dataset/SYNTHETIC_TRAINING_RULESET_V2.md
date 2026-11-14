@@ -89,14 +89,16 @@ The label is learnable above the shuffled control, but only modestly: five order
 ```bash
 python3 synthetic_training_dataset/generate_training_dataset.py \
   --zone-map "District Climate Zonal Clustering/district_zone_map_v1.csv" \
-  --outdir financial_train_test_data
+  --config synthetic_training_dataset/synthetic_training_config_v2.json \
+  --outdir financial_train_test_data/v2
 
 python3 synthetic_training_dataset/verify_training_dataset.py \
-  --datadir financial_train_test_data --baseline
+  --config synthetic_training_dataset/synthetic_training_config_v2.json \
+  --datadir financial_train_test_data/v2 --baseline
 
 python3 -m pytest synthetic_training_dataset/tests -q
 ```
 
-Outputs in `financial_train_test_data/` (not committed): `Financial_data_PNB_SYNTHETIC_train.csv` and `_test.csv` (exact 20-column Financial_data_PNB layout), plus the richer `synthetic_training_v2_train.csv`, `synthetic_training_v2_test.csv` and `synthetic_training_v2_data_dictionary.csv`. The aggregate report `synthetic_training_report_v2.csv` is written to this folder (counts and hashes only, no row-level values). Same config and code give identical output (seed 2026).
+Outputs in `financial_train_test_data/v2/` (not committed; superseded by v3, see `SYNTHETIC_TRAINING_RULESET_V3.md`): `Financial_data_PNB_SYNTHETIC_train.csv` and `_test.csv` (exact 20-column Financial_data_PNB layout), plus the richer `synthetic_training_v2_train.csv`, `synthetic_training_v2_test.csv` and `synthetic_training_v2_data_dictionary.csv`. The aggregate report `synthetic_training_report_v2.csv` is written to this folder (counts and hashes only, no row-level values). Same config and code give identical output (seed 2026).
 
 Requirements: Python 3.12, pandas, numpy; `scikit-learn` only for `--baseline`.
