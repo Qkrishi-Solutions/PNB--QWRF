@@ -462,7 +462,7 @@ def main(argv: list[str] | None = None) -> int:
                         default=ROOT / "yield_feature_engineering" / "yield_anomalies_forward_chaining_v1.csv")
     parser.add_argument("--zone-map", type=Path,
                         default=ROOT / "District Climate Zonal Clustering" / "district_zone_map_v1.csv")
-    parser.add_argument("--outdir", type=Path, default=Path("data/private/synthetic_training"))
+    parser.add_argument("--outdir", type=Path, default=Path("financial_train_test_data"))
     parser.add_argument("--report-dir", type=Path, default=HERE)
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")

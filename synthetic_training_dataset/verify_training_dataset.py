@@ -155,7 +155,7 @@ def main(argv: list[str] | None = None) -> int:
 
     root = HERE.parent
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--datadir", type=Path, default=Path("data/private/synthetic_training"))
+    parser.add_argument("--datadir", type=Path, default=Path("financial_train_test_data"))
     parser.add_argument("--config", type=Path, default=HERE / "synthetic_training_config_v2.json")
     parser.add_argument("--weather", type=Path,
                         default=root / "weather_feature_engineering" / "weather_anomalies_forward_chaining_v1.csv")
