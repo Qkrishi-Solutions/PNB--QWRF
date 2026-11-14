@@ -1,12 +1,12 @@
 section,key,value
 meta,label,SYNTHETIC - not PNB data
 meta,seed,2026
-meta,config_sha256,cb74cbe63cc92409f599e91d69a510284c1bf31622074a0990a0a54178889b63
+meta,config_sha256,b6c9700a5c5df9b8556dfe8ae8a59e4354d7f1622e7fed2de4683ea2ae4a4d1f
 meta,rows,11000
 meta,signal_variance_share,0.9104
 meta,noise_sd,0.25
-file_sha256,synthetic_training_v3_train.csv,cbdc5bfbd6c8f0eb8df0b1bda831abdcbe47efcdcaef6196ce3884438ba233d8
-file_sha256,synthetic_training_v3_test.csv,57973c2761355fec1678b8ea90ce3b42bcb1d9adfd11f6a7ca54fd54817e1458
+file_sha256,synthetic_training_v3_train.csv,591635b90c4c2b9ef7df458eeae7f858e46a08d04fa5913a937b1189e8a823fc
+file_sha256,synthetic_training_v3_test.csv,e669588a55e65b0acedadb0bb9b8294366da7cfd123ca7c9444ce12d588de630
 rows_by_split,train,10001
 rows_by_split,test,999
 asset_class_by_split,test | NPA,160
