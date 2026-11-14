@@ -3,34 +3,34 @@ meta,label,SYNTHETIC - not PNB data
 meta,seed,2026
 meta,config_sha256,b6c9700a5c5df9b8556dfe8ae8a59e4354d7f1622e7fed2de4683ea2ae4a4d1f
 meta,rows,11000
-meta,signal_variance_share,0.9104
+meta,signal_variance_share,0.9141
 meta,noise_sd,0.25
-file_sha256,synthetic_training_v3_train.csv,591635b90c4c2b9ef7df458eeae7f858e46a08d04fa5913a937b1189e8a823fc
-file_sha256,synthetic_training_v3_test.csv,e669588a55e65b0acedadb0bb9b8294366da7cfd123ca7c9444ce12d588de630
-rows_by_split,train,10001
-rows_by_split,test,999
+file_sha256,synthetic_training_v3_train.csv,c518d6ed8c9c0c242f2e1164d806d4c0d1cbe1e9fe7dd14cc50facad7ad1bcdf
+file_sha256,synthetic_training_v3_test.csv,2a30f736c0cfb7925a713266e6c31de325f8fdcdb533e0ab0f9c6ac22d35faab
+rows_by_split,train,10000
+rows_by_split,test,1000
 asset_class_by_split,test | NPA,160
 asset_class_by_split,test | SMA 0,200
 asset_class_by_split,test | SMA 1,180
 asset_class_by_split,test | SMA 2,160
-asset_class_by_split,test | Standard,299
+asset_class_by_split,test | Standard,300
 asset_class_by_split,train | NPA,1600
 asset_class_by_split,train | SMA 0,2000
-asset_class_by_split,train | SMA 1,1801
+asset_class_by_split,train | SMA 1,1800
 asset_class_by_split,train | SMA 2,1600
 asset_class_by_split,train | Standard,3000
 rows_by_snapshot_year,2017,4998
-rows_by_snapshot_year,2018,5003
-rows_by_snapshot_year,2019,999
-insurance_coverage_status,Not Insured,6704
+rows_by_snapshot_year,2018,5002
+rows_by_snapshot_year,2019,1000
+insurance_coverage_status,Not Insured,6724
 insurance_coverage_status,Active,2974
-insurance_coverage_status,Expired,958
-insurance_coverage_status,Pending,364
-insurance_claim_status,No Claim,10118
-insurance_claim_status,Paid,369
-insurance_claim_status,Approved,212
-insurance_claim_status,Filed,177
-insurance_claim_status,Rejected,124
+insurance_coverage_status,Expired,929
+insurance_coverage_status,Pending,373
+insurance_claim_status,No Claim,10072
+insurance_claim_status,Paid,399
+insurance_claim_status,Approved,224
+insurance_claim_status,Filed,194
+insurance_claim_status,Rejected,111
 yield_anomaly_status,not_applicable,7480
 yield_anomaly_status,calculated,3511
 yield_anomaly_status,zero_baseline_std,5

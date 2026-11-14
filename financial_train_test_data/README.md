@@ -12,19 +12,19 @@
 | **v3** | Seven values, including Horticulture, Irrigation, Farm Mechanization, Non-Agri | Reported approved by PNB. Unchanged |
 | v2 | As v3, 13 insurance fields | Superseded (local only, not committed) |
 
-v4 and v3 are otherwise built the same way: 10,001 train and 999 test rows, 44 columns, 6 insurance fields, class mix 30/20/18/16/16 in every year. v4 baseline: accuracy 0.528, macro-F1 0.474 (shuffled labels 0.094). v3 baseline: accuracy 0.469, macro-F1 0.396. The v3 details below apply to v4 except for the sector change.
+v4 and v3 are otherwise built the same way: 10,000 train and 1,000 test rows, 44 columns, 6 insurance fields, class mix 30/20/18/16/16 in every year. Both were regenerated on the final Issue 25 generator (the first v3 release used the earlier one; customers and some draws differ). Baseline (train 2017-18, test 2019): v4 accuracy 0.484, macro-F1 0.423; v3 accuracy 0.472, macro-F1 0.410; with 1,000 test rows that difference is within noise, so v4 is not shown to be more learnable. The v3 details below apply to v4 except for the sector change.
 
 ## v3 details
 
 | Item | Value |
 |---|---|
-| Train rows | 10,001 (snapshot years 2017 and 2018) |
-| Test rows | 999 (snapshot year 2019); out-of-time split, no customer on both sides |
+| Train rows | 10,000 (snapshot years 2017 and 2018) |
+| Test rows | 1,000 (snapshot year 2019); out-of-time split, no customer on both sides |
 | Target | `asset class` (Standard, SMA 0, SMA 1, SMA 2, NPA); `npa_flag` is the binary version |
 | Class mix | 30 / 20 / 18 / 16 / 16 in every year |
 | Insurance fields | 6 (`crop_insurance_available`, `insurance_amount`, `insurance_end_date`, `insurance_coverage_status`, `insurance_claim_status`, `insurance_payout_amount`) plus derived days-to-expiry and coverage ratio |
 | Seed | 2026 (same config and code give identical files) |
-| Baseline check (2017-18 to 2019) | accuracy 0.469 (majority class 0.299), macro-F1 0.396 (shuffled labels 0.100) |
+| Baseline check (2017-18 to 2019) | accuracy 0.472 (majority class 0.300), macro-F1 0.410 (shuffled labels 0.167) |
 
 ## Layout
 

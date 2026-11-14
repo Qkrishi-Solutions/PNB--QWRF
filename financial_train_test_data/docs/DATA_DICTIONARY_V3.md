@@ -51,8 +51,8 @@
 | 27 | `wx_kharif__tmax_mean_z` | `feature` | float64 | 0.0% | Forward-chaining anomaly z-score of kharif__tmax_mean; blank when unavailable. Not imputed. |
 | 28 | `wx_kharif__dtr_mean_z` | `feature` | float64 | 0.0% | Forward-chaining anomaly z-score of kharif__dtr_mean; blank when unavailable. Not imputed. |
 | 29 | `wx_ne__rainy_days_z` | `feature` | float64 | 0.0% | Forward-chaining anomaly z-score of ne__rainy_days; blank when unavailable. Not imputed. |
-| 30 | `crop` | `feature` | str | 68.0% | Crop for Crop Production accounts only; else blank. |
-| 31 | `yield_anomaly_zscore` | `feature` | float64 | 68.1% | Forward-chaining yield anomaly z-score; blank when not calculated. Not imputed. |
+| 30 | `crop` | `feature` | str | 68.1% | Crop for Crop Production accounts only; else blank. |
+| 31 | `yield_anomaly_zscore` | `feature` | float64 | 68.2% | Forward-chaining yield anomaly z-score; blank when not calculated. Not imputed. |
 | 32 | `yield_anomaly_status` | `feature` | str | 0.0% | Status of the yield anomaly (calculated, insufficient_history, ...). |
 | 33 | `crop_insurance_available` | `feature` | str | 0.0% | Y or N. |
 | 34 | `insurance_amount` | `feature` | float64 | 61.1% | Insured amount (INR). |
@@ -61,7 +61,7 @@
 | 37 | `insurance_days_to_expiry` | `feature` | float64 | 61.1% | Policy end minus reporting date (negative = expired). |
 | 38 | `insurance_coverage_ratio` | `feature` | float64 | 61.1% | Insured amount / outstanding balance. |
 | 39 | `insurance_claim_status` | `post_event_exclude` | str | 0.0% | Claim outcome after the weather event; excluded for early-warning use. |
-| 40 | `insurance_payout_amount` | `post_event_exclude` | float64 | 96.3% | Payout amount. |
+| 40 | `insurance_payout_amount` | `post_event_exclude` | float64 | 96.0% | Payout amount. |
 | 41 | `days_past_due` | `leakage_exclude` | int64 | 0.0% | Determined by the asset class (target leakage). |
 | 42 | `overdue amount` | `leakage_exclude` | int64 | 0.0% | Determined by the asset class (target leakage). |
 | 43 | `asset class` | `target` | str | 0.0% | Standard, SMA 0, SMA 1, SMA 2, NPA (ordered). |
