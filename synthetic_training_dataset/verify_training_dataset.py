@@ -194,6 +194,9 @@ def main(argv: list[str] | None = None) -> int:
                         help="default: financial_train_test_data/<dataset_version>")
     parser.add_argument("--weather", type=Path,
                         default=root / "weather_feature_engineering" / "weather_anomalies_forward_chaining_v1.csv")
+    parser.add_argument("--weather-loyo", type=Path,
+                        default=root / "weather_feature_engineering" / "weather_anomalies_v1.csv",
+                        help="used when the config sets anomaly_method to loyo")
     parser.add_argument("--baseline", action="store_true", help="also run the sanity model")
     args = parser.parse_args(argv)
 
@@ -204,7 +207,10 @@ def main(argv: list[str] | None = None) -> int:
     train = pd.read_csv(datadir / names["train"])
     test = pd.read_csv(datadir / names["test"])
     from generate_training_dataset import load_weather
-    weather = load_weather(args.weather, cfg["weather_feature_columns"], [s["year"] for s in cfg["snapshots"]])
+    method = cfg.get("anomaly_method", "forward_chaining")
+    weather_path = args.weather_loyo if method == "loyo" else args.weather
+    weather = load_weather(weather_path, cfg["weather_feature_columns"],
+                           [s["year"] for s in cfg["snapshots"]], method)
 
     results = run_checks(train, test, cfg, weather)
     for name, status, detail in results:
