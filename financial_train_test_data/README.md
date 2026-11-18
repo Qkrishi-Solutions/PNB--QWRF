@@ -8,13 +8,13 @@
 
 | Version | `agri sector` values | Status |
 |---|---|---|
-| **v4** (latest) | Only `Crop Production`, `Fisheries` (prawn and shrimp only), `Poultry`, `Dairy & Animal Husbandry` | Approval not recorded. `Fisheries` is not in the original PNB sample domain, so the PNB-derived validator schema rejects it; use `synthetic_training_dataset/loan_portfolio_schema_v4.json`. See `docs/RULESET_V4.md` |
+| **v4** (latest) | Only `Crop Production`, `Fisheries` (prawn and shrimp only), `Poultry`, `Dairy & Animal Husbandry`. Train dates 2015-2017, test dates 2018-2019 | Approval not recorded. `Fisheries` is not in the original PNB sample domain, so the PNB-derived validator schema rejects it; use `synthetic_training_dataset/loan_portfolio_schema_v4.json`. See `docs/RULESET_V4.md` |
 | **v3** | Seven values, including Horticulture, Irrigation, Farm Mechanization, Non-Agri | Reported approved by PNB. Unchanged |
 | v2 | As v3, 13 insurance fields | Superseded (local only, not committed) |
 
-v4 and v3 are otherwise built the same way: 10,000 train and 1,000 test rows, 44 columns, 6 insurance fields, class mix 30/20/18/16/16 in every year. Both were regenerated on the final Issue 25 generator (the first v3 release used the earlier one; customers and some draws differ). Baseline (train 2017-18, test 2019): v4 accuracy 0.484, macro-F1 0.423; v3 accuracy 0.472, macro-F1 0.410; with 1,000 test rows that difference is within noise, so v4 is not shown to be more learnable. The v3 details below apply to v4 except for the sector change.
+**v3:** 10,000 train rows (reporting dates 2017-10-31 and 2018-10-31) and 1,000 test rows (2019-10-31), forward-chaining anomalies. **v4:** 10,002 train rows (reporting dates 2015-10-31, 2016-10-31 and 2017-10-31) and 998 test rows (2018-10-31 and 2019-10-31), leave-one-year-out (LOYO) anomalies, because forward-chaining anomalies do not exist for 2015 or 2016. Both have 44 columns, 6 insurance fields and class mix 30/20/18/16/16 in every year, and both were regenerated on the final Issue 25 generator. Baseline (train on the training years, test on the test years): v4 accuracy 0.470, macro-F1 0.420; v3 accuracy 0.472, macro-F1 0.410. The two are not directly comparable, because the years and the anomaly method differ. The table below describes v3; v4 differs as stated here and in `docs/RULESET_V4.md`.
 
-## v3 details
+## v3 details (v4 differs as stated above)
 
 | Item | Value |
 |---|---|

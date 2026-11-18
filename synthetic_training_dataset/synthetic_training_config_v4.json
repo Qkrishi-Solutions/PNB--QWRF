@@ -5,10 +5,13 @@
   "seed": 2026,
   "base_config": "../synthetic_portfolio/synthetic_config_v1.json",
   "total_accounts": 11000,
+  "anomaly_method": "loyo",
   "snapshots": [
-    {"year": 2017, "split": "train", "accounts": 5000},
-    {"year": 2018, "split": "train", "accounts": 5000},
-    {"year": 2019, "split": "test", "accounts": 1000}
+    {"year": 2015, "split": "train", "accounts": 3333},
+    {"year": 2016, "split": "train", "accounts": 3334},
+    {"year": 2017, "split": "train", "accounts": 3333},
+    {"year": 2018, "split": "test", "accounts": 500},
+    {"year": 2019, "split": "test", "accounts": 500}
   ],
   "reporting_month_day": "10-31",
   "open_date_start": "2012-01-01",

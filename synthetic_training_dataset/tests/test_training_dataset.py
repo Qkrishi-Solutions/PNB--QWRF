@@ -21,7 +21,7 @@ CFG["snapshots"] = [
     {"year": 2019, "split": "test", "accounts": 100},
 ]
 CODES = {d: 500 + i for i, d in enumerate(BASE["district_population_2011"])}
-YEARS = [2017, 2018, 2019]
+YEARS = [2015, 2016, 2017, 2018, 2019]
 
 
 @pytest.fixture(scope="module")
@@ -42,7 +42,9 @@ def inputs():
             for y in YEARS
         ]
     )
-    weather.loc[0, wx_name(cols[0])] = np.nan  # missing stays missing
+    # one district-year (2017, used by the tests' snapshots) is missing and must stay missing
+    missing_row = weather.index[(weather["district_code"] == 500) & (weather["year"] == 2017)][0]
+    weather.loc[missing_row, wx_name(cols[0])] = np.nan
     crops = pd.DataFrame(
         [
             {
@@ -217,6 +219,47 @@ def test_v4_sector_check_fails_on_an_unexpected_sector(built4, inputs) -> None:
     out.loc[out.index[0], "agri sector"] = "Horticulture"
     results = run_checks(out[out["split"] == "train"], out[out["split"] == "test"], CFG4, inputs[1])
     assert [s for n, s, _ in results if n.startswith("V19")] == ["FAIL"]
+
+
+def test_v4_uses_the_agreed_date_ranges(inputs) -> None:
+    """Training dates 2015-2017, test dates 2018-2019, with the real v4 snapshot years."""
+    cfg = json.loads((HERE / "synthetic_training_config_v4.json").read_text())
+    assert {s["year"] for s in cfg["snapshots"] if s["split"] == "train"} == {2015, 2016, 2017}
+    assert {s["year"] for s in cfg["snapshots"] if s["split"] == "test"} == {2018, 2019}
+    assert cfg["anomaly_method"] == "loyo"
+    cfg["total_accounts"] = 1100
+    for snap, n in zip(cfg["snapshots"], (330, 340, 330, 50, 50), strict=True):
+        snap["accounts"] = n
+    reference, weather, crops, zones = inputs
+    frame, _ = build_dataset(cfg, BASE, reference, CODES, weather, crops, zones)
+    rep = pd.to_datetime(frame["reporting_date"])
+    train, test = rep[frame["split"] == "train"], rep[frame["split"] == "test"]
+    assert train.min() >= pd.Timestamp("2015-01-01") and train.max() <= pd.Timestamp("2017-12-31")
+    assert test.min() >= pd.Timestamp("2018-01-01") and test.max() <= pd.Timestamp("2019-12-31")
+    assert train.max() < test.min()  # strictly out-of-time
+
+
+def test_loyo_loader_takes_only_the_held_out_year_rows(tmp_path) -> None:
+    """In the LOYO file each year appears in every fold; only its own fold is the anomaly."""
+    from generate_training_dataset import load_weather
+
+    col = "kharif__rain_sum"
+    rows = [
+        # year 2015 in its own fold (the real anomaly) and in another fold (must be ignored)
+        {"district_code": 502, "year": 2015, "weather_column": col, "anomaly_z": 1.5, "is_validation_year": True, "is_target_year": False},
+        {"district_code": 502, "year": 2015, "weather_column": col, "anomaly_z": 9.9, "is_validation_year": False, "is_target_year": False},
+        {"district_code": 502, "year": 2016, "weather_column": col, "anomaly_z": -0.5, "is_validation_year": True, "is_target_year": False},
+    ]
+    path = tmp_path / "loyo.csv"
+    pd.DataFrame(rows).to_csv(path, index=False)
+    wide = load_weather(path, [col], [2015, 2016], "loyo").set_index("year")
+    assert wide.loc[2015, wx_name(col)] == 1.5
+    assert wide.loc[2016, wx_name(col)] == -0.5
+
+
+def test_forward_chaining_stays_the_default_so_v3_is_unchanged() -> None:
+    cfg3 = json.loads((HERE / "synthetic_training_config_v3.json").read_text())
+    assert cfg3.get("anomaly_method", "forward_chaining") == "forward_chaining"
 
 
 def test_synthetic_flag_column_is_config_driven() -> None:
