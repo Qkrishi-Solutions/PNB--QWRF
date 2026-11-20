@@ -75,11 +75,19 @@ def wx_name(column: str) -> str:
 
 
 # --------------------------------------------------------------------------- inputs
-def load_weather(path: Path, columns: list[str], years: list[int]) -> pd.DataFrame:
-    """District-year forward-chaining weather anomaly z-scores (NaN kept as NaN)."""
+def load_weather(
+    path: Path, columns: list[str], years: list[int], method: str = "forward_chaining"
+) -> pd.DataFrame:
+    """District-year weather anomaly z-scores (NaN kept as NaN).
+
+    ``forward_chaining``: normal from strictly earlier years only (no values exist
+    for 2015 and 2016). ``loyo``: leave-one-year-out normal, which uses the other
+    years including later ones, but exists for every year.
+    """
+    flag = {"forward_chaining": "is_target_year", "loyo": "is_validation_year"}[method]
     frame = pd.read_csv(path)
     frame = frame[
-        frame["is_target_year"]
+        frame[flag]
         & frame["weather_column"].isin(columns)
         & frame["year"].isin(years)
     ]
@@ -444,6 +452,8 @@ def ordered_columns(cfg: dict) -> list[str]:
     roles = column_roles()
     keep_ins = set(cfg.get("insurance_output_fields", INSURANCE_COLUMNS))
     names = [c for c, _, _ in roles if c not in INSURANCE_COLUMNS or c in keep_ins]
+    if not cfg.get("include_synthetic_flag", True):
+        names.remove("synthetic_flag")
     # place weather features after climate_zone
     at = names.index("climate_zone") + 1
     wx = [wx_name(c) for c in cfg["weather_feature_columns"]]
@@ -459,6 +469,7 @@ def build_report(frame: pd.DataFrame, cfg_hash: str, diag: dict, hashes: dict[st
         ("meta", "rows", str(len(frame))),
         ("meta", "signal_variance_share", f"{diag['signal_variance_share']:.4f}"),
         ("meta", "noise_sd", str(diag["noise_sd"])),
+        ("meta", "anomaly_method", str(diag.get("anomaly_method", "forward_chaining"))),
     ]
     rec += [("file_sha256", k, v) for k, v in hashes.items()]
     for k, v in frame["split"].value_counts().items():
@@ -487,6 +498,12 @@ def main(argv: list[str] | None = None) -> int:
                         default=ROOT / "weather_feature_engineering" / "weather_anomalies_forward_chaining_v1.csv")
     parser.add_argument("--yield-anomalies", type=Path,
                         default=ROOT / "yield_feature_engineering" / "yield_anomalies_forward_chaining_v1.csv")
+    parser.add_argument("--weather-loyo", type=Path,
+                        default=ROOT / "weather_feature_engineering" / "weather_anomalies_v1.csv",
+                        help="used when the config sets anomaly_method to loyo")
+    parser.add_argument("--yield-loyo", type=Path,
+                        default=ROOT / "yield_feature_engineering" / "yield_anomalies_v1.csv",
+                        help="used when the config sets anomaly_method to loyo")
     parser.add_argument("--zone-map", type=Path,
                         default=ROOT / "District Climate Zonal Clustering" / "district_zone_map_v1.csv")
     parser.add_argument("--outdir", type=Path, default=None,
@@ -502,12 +519,16 @@ def main(argv: list[str] | None = None) -> int:
     base_cfg = json.loads((args.config.parent / cfg["base_config"]).read_text(encoding="utf-8"))
     years =[s["year"] for s in cfg["snapshots"]]
     reference = pd.read_csv(args.pincode_reference, dtype=str)
-    codes = load_district_codes(args.weather)
-    weather = load_weather(args.weather, cfg["weather_feature_columns"], years)
-    crops = load_crop_table(args.yield_anomalies, years)
+    method = cfg.get("anomaly_method", "forward_chaining")
+    weather_path = args.weather_loyo if method == "loyo" else args.weather
+    yield_path = args.yield_loyo if method == "loyo" else args.yield_anomalies
+    codes = load_district_codes(weather_path)
+    weather = load_weather(weather_path, cfg["weather_feature_columns"], years, method)
+    crops = load_crop_table(yield_path, years)
     zones = pd.read_csv(args.zone_map)[["district_code", "climate_zone"]]
 
     frame, diag = build_dataset(cfg, base_cfg, reference, codes, weather, crops, zones)
+    diag["anomaly_method"] = method
     frame.attrs["seed"] = cfg["seed"]
     cols = ordered_columns(cfg)
     missing = [c for c in cols if c not in frame.columns]

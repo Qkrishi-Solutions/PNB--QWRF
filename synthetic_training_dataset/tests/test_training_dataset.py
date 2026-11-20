@@ -21,7 +21,7 @@ CFG["snapshots"] = [
     {"year": 2019, "split": "test", "accounts": 100},
 ]
 CODES = {d: 500 + i for i, d in enumerate(BASE["district_population_2011"])}
-YEARS = [2017, 2018, 2019]
+YEARS = [2015, 2016, 2017, 2018, 2019]
 
 
 @pytest.fixture(scope="module")
@@ -42,7 +42,9 @@ def inputs():
             for y in YEARS
         ]
     )
-    weather.loc[0, wx_name(cols[0])] = np.nan  # missing stays missing
+    # one district-year (2017, used by the tests' snapshots) is missing and must stay missing
+    missing_row = weather.index[(weather["district_code"] == 500) & (weather["year"] == 2017)][0]
+    weather.loc[missing_row, wx_name(cols[0])] = np.nan
     crops = pd.DataFrame(
         [
             {
@@ -167,3 +169,106 @@ def test_v3_checks_skip_dropped_columns_without_failing(built3, inputs) -> None:
     results = run_checks(out[out["split"] == "train"], out[out["split"] == "test"], CFG3, inputs[1])
     assert not [n for n, s, _ in results if s == "FAIL"]
     assert [n for n, s, _ in results if s == "SKIP"]  # dropped columns are reported, not passed
+
+
+# ----------------------------------------------------------------------------- v4
+CFG4 = json.loads((HERE / "synthetic_training_config_v4.json").read_text())
+CFG4["total_accounts"] = 1100
+CFG4["snapshots"] = CFG["snapshots"]
+SECTORS4 = {"Crop Production", "Fisheries", "Poultry", "Dairy & Animal Husbandry"}
+
+
+@pytest.fixture(scope="module")
+def built4(inputs):
+    reference, weather, crops, zones = inputs
+    frame, _ = build_dataset(CFG4, BASE, reference, CODES, weather, crops, zones)
+    return frame
+
+
+def test_v4_agri_sector_only_the_four_allowed(built4) -> None:
+    assert set(built4["agri sector"]) == SECTORS4
+    assert set(CFG4["allowed_agri_sectors"]) == SECTORS4
+
+
+def test_v4_product_mix_is_valid(built4) -> None:
+    weights = [r["weight"] for r in CFG4["product_mix_percent_override"]]
+    assert abs(sum(weights) - 100) < 1e-9
+    assert {r["agri sector"] for r in CFG4["product_mix_percent_override"]} == SECTORS4
+    # no scheme code or facility type outside the original PNB domain
+    schemes = {r["scheme code"] for r in BASE["product_mix_percent"]}
+    facilities = {r["facility type"] for r in BASE["product_mix_percent"]}
+    assert set(built4["scheme code"]) <= schemes
+    assert set(built4["facility type"]) <= facilities
+
+
+def test_v4_sector_config_maps_cover_every_sector() -> None:
+    for key in (CFG4["sector_weather_sensitivity"], CFG4["insurance"]["availability_probability"]):
+        assert set(key) == SECTORS4
+
+
+def test_v4_crop_only_for_crop_production_and_all_checks_pass(built4, inputs) -> None:
+    assert built4.loc[built4["crop"].notna(), "agri sector"].eq("Crop Production").all()
+    out = built4[ordered_columns(CFG4)]
+    results = run_checks(out[out["split"] == "train"], out[out["split"] == "test"], CFG4, inputs[1])
+    assert not [n for n, s, _ in results if s == "FAIL"]
+    assert [s for n, s, _ in results if n.startswith("V19")] == ["PASS"]
+
+
+def test_v4_sector_check_fails_on_an_unexpected_sector(built4, inputs) -> None:
+    out = built4[ordered_columns(CFG4)].copy()
+    out.loc[out.index[0], "agri sector"] = "Horticulture"
+    results = run_checks(out[out["split"] == "train"], out[out["split"] == "test"], CFG4, inputs[1])
+    assert [s for n, s, _ in results if n.startswith("V19")] == ["FAIL"]
+
+
+def test_v4_uses_the_agreed_date_ranges(inputs) -> None:
+    """Training dates 2015-2017, test dates 2018-2019, with the real v4 snapshot years."""
+    cfg = json.loads((HERE / "synthetic_training_config_v4.json").read_text())
+    assert {s["year"] for s in cfg["snapshots"] if s["split"] == "train"} == {2015, 2016, 2017}
+    assert {s["year"] for s in cfg["snapshots"] if s["split"] == "test"} == {2018, 2019}
+    assert cfg["anomaly_method"] == "loyo"
+    cfg["total_accounts"] = 1100
+    for snap, n in zip(cfg["snapshots"], (330, 340, 330, 50, 50), strict=True):
+        snap["accounts"] = n
+    reference, weather, crops, zones = inputs
+    frame, _ = build_dataset(cfg, BASE, reference, CODES, weather, crops, zones)
+    rep = pd.to_datetime(frame["reporting_date"])
+    train, test = rep[frame["split"] == "train"], rep[frame["split"] == "test"]
+    assert train.min() >= pd.Timestamp("2015-01-01") and train.max() <= pd.Timestamp("2017-12-31")
+    assert test.min() >= pd.Timestamp("2018-01-01") and test.max() <= pd.Timestamp("2019-12-31")
+    assert train.max() < test.min()  # strictly out-of-time
+
+
+def test_loyo_loader_takes_only_the_held_out_year_rows(tmp_path) -> None:
+    """In the LOYO file each year appears in every fold; only its own fold is the anomaly."""
+    from generate_training_dataset import load_weather
+
+    col = "kharif__rain_sum"
+    rows = [
+        # year 2015 in its own fold (the real anomaly) and in another fold (must be ignored)
+        {"district_code": 502, "year": 2015, "weather_column": col, "anomaly_z": 1.5, "is_validation_year": True, "is_target_year": False},
+        {"district_code": 502, "year": 2015, "weather_column": col, "anomaly_z": 9.9, "is_validation_year": False, "is_target_year": False},
+        {"district_code": 502, "year": 2016, "weather_column": col, "anomaly_z": -0.5, "is_validation_year": True, "is_target_year": False},
+    ]
+    path = tmp_path / "loyo.csv"
+    pd.DataFrame(rows).to_csv(path, index=False)
+    wide = load_weather(path, [col], [2015, 2016], "loyo").set_index("year")
+    assert wide.loc[2015, wx_name(col)] == 1.5
+    assert wide.loc[2016, wx_name(col)] == -0.5
+
+
+def test_forward_chaining_stays_the_default_so_v3_is_unchanged() -> None:
+    cfg3 = json.loads((HERE / "synthetic_training_config_v3.json").read_text())
+    assert cfg3.get("anomaly_method", "forward_chaining") == "forward_chaining"
+
+
+def test_synthetic_flag_column_is_config_driven() -> None:
+    assert "synthetic_flag" not in ordered_columns(CFG3)  # v3: column removed
+    assert "synthetic_flag" in ordered_columns(CFG)  # v2 unchanged
+
+
+def test_v3_label_check_is_skipped_not_passed_without_the_column(built3, inputs) -> None:
+    out = built3[ordered_columns(CFG3)]
+    results = run_checks(out[out["split"] == "train"], out[out["split"] == "test"], CFG3, inputs[1])
+    v1 = [s for n, s, _ in results if n.startswith("V1 ")]
+    assert v1 == ["SKIP"]
