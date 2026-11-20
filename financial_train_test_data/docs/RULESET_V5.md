@@ -39,13 +39,13 @@ Consequences to be aware of:
 
 ## 3. Results (actual run, seed 2026)
 
-- Rows: **10,002 train (2015 to 2017), 998 test (2018 and 2019)**; 39 columns in the rich files, plus the 20-column PNB layout files for the same accounts.
+- Rows: **10,002 train (2015 to 2017), 998 test (2018 and 2019)**; 39 columns in the rich files, plus the PNB-layout files for the same accounts: **23 columns = the 20 PNB loan fields + the 3 PNB insurance fields** (`crop_insurance_available`, `insurance_start_date`, `insurance_end_date`, appended after `asset class`). In v3 and v4 the PNB-layout files had 20 columns.
 - Rows per year: 2015 3,330; 2016 3,337; 2017 3,335; 2018 498; 2019 500. Class mix 30/20/18/16/16 in every year.
 - Insured share overall 45.0%: Crop Production 70.5%, Fisheries 40.4%, Dairy 14.9%, Poultry 14.6%. By year: 45.8%, 43.4%, 46.0%, 44.4%, 44.2% (2015 to 2019).
 - Date ranges: account open 2015-01-01 to 2019-07-31; insurance start 2015-01-01 to 2019-12-14; insurance end 2015-02-15 to 2019-12-31; reporting 2015-10-31 to 2019-10-31.
 - Verifier: 16 passed, 0 failed, 7 skipped (dropped columns).
-- Existing `validate_loan_portfolio.py` on the 20-column files with `loan_portfolio_schema_v4.json`: 53 PASS, 1 INFO, no errors (train and test).
-- Tests: 36 pass (`python3 -m pytest synthetic_training_dataset/tests synthetic_portfolio/tests`).
+- Existing `validate_loan_portfolio.py` on the 23-column files with the new `loan_portfolio_schema_v5.json` (v4 schema plus the 3 insurance columns, all optional): no errors. It WARNs that the two insurance date columns have blanks (5,493 train rows); that is expected, since uninsured accounts have no policy dates.
+- Tests: 37 pass (`python3 -m pytest synthetic_training_dataset/tests synthetic_portfolio/tests`).
 - Baseline gradient boosting, train 2015 to 2017, test 2018 to 2019: accuracy 0.453 (majority class 0.300), macro-F1 0.418 (shuffled-label control 0.099). This is a pipeline check on rules the generator injected, not a finding about real borrowers.
 
 ## 4. Limitations

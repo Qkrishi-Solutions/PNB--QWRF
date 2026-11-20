@@ -332,3 +332,31 @@ def test_v5_is_deterministic(inputs) -> None:
     b, _ = build_dataset(CFG5, BASE, reference, CODES, weather, crops, zones)
     cols = ordered_columns(CFG5)
     pd.testing.assert_frame_equal(a[cols], b[cols])
+
+
+def test_v5_pnb_layout_files_have_20_fields_plus_3_insurance_fields(tmp_path) -> None:
+    """End to end on the real inputs: the PNB-layout files are 20 + 3 columns."""
+    from generate_synthetic_portfolio import OUTPUT_COLUMNS
+    from generate_training_dataset import main
+
+    cfg = json.loads((HERE / "synthetic_training_config_v5.json").read_text())
+    cfg["total_accounts"] = 330
+    cfg["snapshots"] = [
+        {"year": 2015, "split": "train", "accounts": 100},
+        {"year": 2016, "split": "train", "accounts": 100},
+        {"year": 2017, "split": "train", "accounts": 100},
+        {"year": 2018, "split": "test", "accounts": 15},
+        {"year": 2019, "split": "test", "accounts": 15},
+    ]
+    cfg_path = tmp_path / "v5_small.json"
+    cfg_path.write_text(json.dumps(cfg))
+    # the config's relative base_config path must still resolve
+    cfg["base_config"] = str((HERE / cfg["base_config"]).resolve())
+    cfg_path.write_text(json.dumps(cfg))
+    out = tmp_path / "out"
+    main(["--config", str(cfg_path), "--outdir", str(out), "--report-dir", str(tmp_path)])
+    for split in ("train", "test"):
+        cols = list(pd.read_csv(out / f"Financial_data_PNB_SYNTHETIC_{split}.csv").columns)
+        assert cols == list(OUTPUT_COLUMNS) + [
+            "crop_insurance_available", "insurance_start_date", "insurance_end_date"]
+        assert len(cols) == 23

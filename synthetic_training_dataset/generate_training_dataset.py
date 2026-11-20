@@ -570,8 +570,12 @@ def main(argv: list[str] | None = None) -> int:
         "train": args.outdir / PNB_LAYOUT_TRAIN_NAME,
         "test": args.outdir / PNB_LAYOUT_TEST_NAME,
     }
+    # v5: PNB supplied 20 loan fields plus 3 insurance fields; append the 3 when flagged.
+    layout_cols = list(PNB_LAYOUT_COLUMNS)
+    if cfg.get("pnb_layout_includes_insurance", False):
+        layout_cols += [c for c in cfg["insurance_output_fields"] if c not in layout_cols]
     for split, path in layout.items():
-        frame.loc[frame["split"] == split, PNB_LAYOUT_COLUMNS].to_csv(path, index=False)
+        frame.loc[frame["split"] == split, layout_cols].to_csv(path, index=False)
     roles = {c: (r, d) for c, r, d in column_roles() + weather_roles(cfg["weather_feature_columns"])}
     pd.DataFrame(
         [(c, *roles[c]) for c in cols], columns=["column", "role", "description"]

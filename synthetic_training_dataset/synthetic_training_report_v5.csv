@@ -1,7 +1,7 @@
 section,key,value
 meta,label,SYNTHETIC - not PNB data
 meta,seed,2026
-meta,config_sha256,e8831401c4c51ee2306498609392cc4194a9a138a6db62737e36364b60df5e6e
+meta,config_sha256,c7d7e4959614b4cda1134dd9181d81fc1213a254d7607b784edecb629c39f89f
 meta,rows,11000
 meta,signal_variance_share,0.8714
 meta,noise_sd,0.25
