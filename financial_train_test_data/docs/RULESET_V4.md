@@ -1,5 +1,7 @@
 # Synthetic Training Dataset (v4): Four Agri Sectors
 
+> **Superseded by v5 for current use.** v5 (`financial_train_test_data/v5/`) has the 3 PNB insurance fields only, a 23-column PNB layout, and every date inside 2015 to 2019. v4 is kept unchanged for comparison (6 insurance fields, 20-column PNB layout, account open dates from 2012). Do not mix v4 and v5 figures.
+
 > **Label: SYNTHETIC. This is not PNB data.** PNB supplies field definitions only, so this is simulated data for model development and testing.
 > **Approval status:** v3 was reported approved by PNB (per the project owner). **v4 changes the `agri sector` domain and its approval is not recorded.** v3 is unchanged and remains available.
 > Everything not listed here (sections 1, 1b) is unchanged from v3 (`SYNTHETIC_TRAINING_RULESET_V3.md`).

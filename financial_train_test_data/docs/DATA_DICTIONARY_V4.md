@@ -1,5 +1,7 @@
 # Data Dictionary: synthetic_training_v4
 
+> **Superseded by v5 for current use.** v5 (`financial_train_test_data/v5/`) has the 3 PNB insurance fields only, a 23-column PNB layout, and every date inside 2015 to 2019. v4 is kept unchanged for comparison (6 insurance fields, 20-column PNB layout, account open dates from 2012). Do not mix v4 and v5 figures.
+
 > **SYNTHETIC. Not PNB data.** Generated from `v4/synthetic_training_v4_data_dictionary.csv`; that CSV is the source of truth.
 
 44 columns in the rich files (`synthetic_training_v4_train.csv` / `_test.csv`). The `Financial_data_PNB_SYNTHETIC_*.csv` files hold only the first 20 original fields (see `PNB_FIELD_DICTIONARY_DRAFT.md`).

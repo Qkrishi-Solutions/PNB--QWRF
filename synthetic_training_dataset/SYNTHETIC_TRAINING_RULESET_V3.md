@@ -1,5 +1,7 @@
 # Synthetic Training Dataset (v3): Changes from v2
 
+> **Superseded by v5 for current use.** v5 (`financial_train_test_data/v5/`) has the 3 PNB insurance fields only (`crop_insurance_available`, `insurance_start_date`, `insurance_end_date`), 23-column PNB layout, and every date inside 2015 to 2019. v3 is kept unchanged as the version reported as approved by PNB (6 insurance fields, 20-column PNB layout, dates 2012 to 2020). Do not mix v3 and v5 figures.
+
 > **Label: SYNTHETIC. This is not PNB data.** PNB supplies field definitions only, so this simulated data is the deliverable for development, demos and UAT-style testing. It is not a statement about PNB's real portfolio, and any model trained on it recovers the rules in `synthetic_training_config_v3.json`.
 > Everything not listed here is unchanged from `SYNTHETIC_TRAINING_RULESET_V2.md`. v2 files are kept in `financial_train_test_data/v2/` for comparison.
 
