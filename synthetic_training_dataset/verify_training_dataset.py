@@ -119,6 +119,22 @@ def run_checks(
             ok = ok and (pd_ >= _date(both.loc[paid, "insurance_start_date"])).all() \
                 and (pd_ <= _date(both.loc[paid, "reporting_date"])).all()
         add("V16 payout only for Paid claims and within insured amount", ok)
+    if cfg.get("insurance", {}).get("minimal", False):
+        allowed = set(cfg["insurance_output_fields"])
+        extra = [c for c in both.columns if c.startswith("insurance_") and c not in allowed]
+        add("V20 only insured Y/N, start date and end date are written", not extra, ", ".join(extra))
+        add("V20b insured Y/N holds only Y or N", both["crop_insurance_available"].isin(["Y", "N"]).all())
+        dates = both[["insurance_start_date", "insurance_end_date"]]
+        add("V20c insured rows have start and end date; uninsured rows have neither",
+            dates[yes].notna().all().all() and dates[~yes].isna().all().all())
+    window = cfg.get("date_window")
+    if window:
+        lo, hi = pd.Timestamp(window["start"]), pd.Timestamp(window["end"])
+        cols = [c for c in ("reporting_date", "account open date", "insurance_start_date",
+                            "insurance_end_date") if c in both.columns]
+        bad = [c for c in cols
+               if not _date(both[c]).dropna().between(lo, hi).all()]
+        add(f"V21 every date inside {window['start']} to {window['end']}", not bad, ", ".join(bad))
     add("V17 crop only for Crop Production; yield z only when calculated",
         both.loc[both["crop"].notna(), "agri sector"].eq("Crop Production").all()
         and both.loc[both["yield_anomaly_zscore"].notna(), "yield_anomaly_status"].eq("calculated").all())

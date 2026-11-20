@@ -272,3 +272,91 @@ def test_v3_label_check_is_skipped_not_passed_without_the_column(built3, inputs)
     results = run_checks(out[out["split"] == "train"], out[out["split"] == "test"], CFG3, inputs[1])
     v1 = [s for n, s, _ in results if n.startswith("V1 ")]
     assert v1 == ["SKIP"]
+
+
+# ----------------------------------------------------------------------------- v5
+CFG5 = json.loads((HERE / "synthetic_training_config_v5.json").read_text())
+CFG5["total_accounts"] = 1100
+CFG5["snapshots"] = CFG["snapshots"]
+
+
+@pytest.fixture(scope="module")
+def built5(inputs):
+    reference, weather, crops, zones = inputs
+    frame, _ = build_dataset(CFG5, BASE, reference, CODES, weather, crops, zones)
+    return frame
+
+
+def test_v5_writes_only_insured_flag_start_and_end() -> None:
+    from generate_training_dataset import INSURANCE_COLUMNS
+
+    cols = ordered_columns(CFG5)
+    written = [c for c in cols if c.startswith("insurance_") or c == "crop_insurance_available"]
+    assert sorted(written) == sorted(["crop_insurance_available", "insurance_start_date", "insurance_end_date"])
+    assert set(c for c in cols if c in INSURANCE_COLUMNS) == set(written)
+
+
+def test_v5_checks_pass_and_cover_the_new_rules(built5, inputs) -> None:
+    out = built5[ordered_columns(CFG5)]
+    results = run_checks(out[out["split"] == "train"], out[out["split"] == "test"], CFG5, inputs[1])
+    assert not [n for n, s, _ in results if s == "FAIL"]
+    assert [s for n, s, _ in results if n.startswith(("V20 ", "V20c", "V21"))] == ["PASS"] * 3
+
+
+def test_v5_all_dates_inside_2015_2019(built5) -> None:
+    lo, hi = pd.Timestamp("2015-01-01"), pd.Timestamp("2019-12-31")
+    for col in ("reporting_date", "account open date", "insurance_start_date", "insurance_end_date"):
+        dates = pd.to_datetime(built5[col]).dropna()
+        assert dates.min() >= lo and dates.max() <= hi, col
+
+
+def test_v5_insured_rows_have_ordered_dates_uninsured_blank(built5) -> None:
+    yes = built5["crop_insurance_available"] == "Y"
+    assert yes.any() and (~yes).any()
+    assert (pd.to_datetime(built5.loc[yes, "insurance_end_date"])
+            > pd.to_datetime(built5.loc[yes, "insurance_start_date"])).all()
+    assert built5.loc[~yes, ["insurance_start_date", "insurance_end_date"]].isna().all().all()
+
+
+def test_v5_date_check_fails_when_a_date_leaves_the_window(built5, inputs) -> None:
+    out = built5[ordered_columns(CFG5)].copy()
+    first = out.index[out["crop_insurance_available"] == "Y"][0]
+    out.loc[first, "insurance_end_date"] = "2021-01-01"
+    results = run_checks(out[out["split"] == "train"], out[out["split"] == "test"], CFG5, inputs[1])
+    assert [s for n, s, _ in results if n.startswith("V21")] == ["FAIL"]
+
+
+def test_v5_is_deterministic(inputs) -> None:
+    reference, weather, crops, zones = inputs
+    a, _ = build_dataset(CFG5, BASE, reference, CODES, weather, crops, zones)
+    b, _ = build_dataset(CFG5, BASE, reference, CODES, weather, crops, zones)
+    cols = ordered_columns(CFG5)
+    pd.testing.assert_frame_equal(a[cols], b[cols])
+
+
+def test_v5_pnb_layout_files_have_20_fields_plus_3_insurance_fields(tmp_path) -> None:
+    """End to end on the real inputs: the PNB-layout files are 20 + 3 columns."""
+    from generate_synthetic_portfolio import OUTPUT_COLUMNS
+    from generate_training_dataset import main
+
+    cfg = json.loads((HERE / "synthetic_training_config_v5.json").read_text())
+    cfg["total_accounts"] = 330
+    cfg["snapshots"] = [
+        {"year": 2015, "split": "train", "accounts": 100},
+        {"year": 2016, "split": "train", "accounts": 100},
+        {"year": 2017, "split": "train", "accounts": 100},
+        {"year": 2018, "split": "test", "accounts": 15},
+        {"year": 2019, "split": "test", "accounts": 15},
+    ]
+    cfg_path = tmp_path / "v5_small.json"
+    cfg_path.write_text(json.dumps(cfg))
+    # the config's relative base_config path must still resolve
+    cfg["base_config"] = str((HERE / cfg["base_config"]).resolve())
+    cfg_path.write_text(json.dumps(cfg))
+    out = tmp_path / "out"
+    main(["--config", str(cfg_path), "--outdir", str(out), "--report-dir", str(tmp_path)])
+    for split in ("train", "test"):
+        cols = list(pd.read_csv(out / f"Financial_data_PNB_SYNTHETIC_{split}.csv").columns)
+        assert cols == list(OUTPUT_COLUMNS) + [
+            "crop_insurance_available", "insurance_start_date", "insurance_end_date"]
+        assert len(cols) == 23

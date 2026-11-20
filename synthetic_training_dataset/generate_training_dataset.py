@@ -189,6 +189,19 @@ def make_insurance(
         start = rep + pd.Timedelta(days=int(rng.integers(1, int(ins["pending_start_within_days"]) + 1)))
         end = start + pd.Timedelta(days=term)
 
+    window_end = cfg.get("date_window", {}).get("end")
+    if window_end:
+        end = min(end, pd.Timestamp(window_end))
+    if ins.get("minimal", False):
+        # v5: only insured Y/N, start date and end date are written. The coverage
+        # status is kept internally (it feeds the risk score) but is not an output.
+        return dict(
+            crop_insurance_available="Y",
+            insurance_start_date=start.strftime("%Y-%m-%d"),
+            insurance_end_date=end.strftime("%Y-%m-%d"),
+            insurance_coverage_status=status,
+        )
+
     lo, hi = ins["insured_to_sanction_range"]
     amount = round(float(row["sanction amount"]) * float(rng.uniform(lo, hi)))
     plo, phi = ins["premium_to_insured_range"]
@@ -307,7 +320,13 @@ def build_dataset(
         make_insurance(frame.iloc[i], float(stress[i]), float(yield_z[i]), cfg, rng)
         for i in range(len(frame))
     ]
-    frame = pd.concat([frame.reset_index(drop=True), pd.DataFrame(ins_rows)], axis=1)
+    ins_frame = pd.DataFrame(ins_rows)
+    for col in INSURANCE_COLUMNS:
+        if col not in ins_frame.columns:
+            ins_frame[col] = None
+    if cfg["insurance"].get("minimal", False):
+        ins_frame["insurance_claim_status"] = None
+    frame = pd.concat([frame.reset_index(drop=True), ins_frame], axis=1)
 
     rs = cfg["risk_score"]
     sens = frame["agri sector"].map(cfg["sector_weather_sensitivity"]).to_numpy(dtype=float)
@@ -322,6 +341,7 @@ def build_dataset(
         np.clip(1 - insured_amt / np.maximum(outstanding, 1), 0, 1),
         0.0,
     )
+    shortfall = np.nan_to_num(shortfall, nan=0.0)  # minimal insurance: no amount, no shortfall term
 
     def z(values: np.ndarray) -> np.ndarray:
         return (values - values.mean()) / values.std()
@@ -454,6 +474,7 @@ def ordered_columns(cfg: dict) -> list[str]:
     names = [c for c, _, _ in roles if c not in INSURANCE_COLUMNS or c in keep_ins]
     if not cfg.get("include_synthetic_flag", True):
         names.remove("synthetic_flag")
+    names = [c for c in names if c not in cfg.get("drop_columns", [])]
     # place weather features after climate_zone
     at = names.index("climate_zone") + 1
     wx = [wx_name(c) for c in cfg["weather_feature_columns"]]
@@ -482,6 +503,10 @@ def build_report(frame: pd.DataFrame, cfg_hash: str, diag: dict, hashes: dict[st
         rec.append(("insurance_coverage_status", str(k), str(v)))
     for k, v in frame["insurance_claim_status"].value_counts().items():
         rec.append(("insurance_claim_status", str(k), str(v)))
+    rec.append(("insured_Y_share", "all", f"{(frame['crop_insurance_available'] == 'Y').mean():.4f}"))
+    for col in ("account open date", "insurance_start_date", "insurance_end_date", "reporting_date"):
+        dates = pd.to_datetime(frame[col], errors="coerce").dropna()
+        rec.append(("date_range", col, f"{dates.min().date()} to {dates.max().date()}"))
     for k, v in frame["yield_anomaly_status"].value_counts().items():
         rec.append(("yield_anomaly_status", str(k), str(v)))
     rec.append(("meta", "accounts_with_crop", str(int(frame["crop"].notna().sum()))))
@@ -545,8 +570,12 @@ def main(argv: list[str] | None = None) -> int:
         "train": args.outdir / PNB_LAYOUT_TRAIN_NAME,
         "test": args.outdir / PNB_LAYOUT_TEST_NAME,
     }
+    # v5: PNB supplied 20 loan fields plus 3 insurance fields; append the 3 when flagged.
+    layout_cols = list(PNB_LAYOUT_COLUMNS)
+    if cfg.get("pnb_layout_includes_insurance", False):
+        layout_cols += [c for c in cfg["insurance_output_fields"] if c not in layout_cols]
     for split, path in layout.items():
-        frame.loc[frame["split"] == split, PNB_LAYOUT_COLUMNS].to_csv(path, index=False)
+        frame.loc[frame["split"] == split, layout_cols].to_csv(path, index=False)
     roles = {c: (r, d) for c, r, d in column_roles() + weather_roles(cfg["weather_feature_columns"])}
     pd.DataFrame(
         [(c, *roles[c]) for c in cols], columns=["column", "role", "description"]
