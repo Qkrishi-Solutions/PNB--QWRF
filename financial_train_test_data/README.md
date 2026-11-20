@@ -8,7 +8,8 @@
 
 | Version | `agri sector` values | Status |
 |---|---|---|
-| **v4** (latest) | Only `Crop Production`, `Fisheries` (prawn and shrimp only), `Poultry`, `Dairy & Animal Husbandry`. Train dates 2015-2017, test dates 2018-2019 | Approval not recorded. `Fisheries` is not in the original PNB sample domain, so the PNB-derived validator schema rejects it; use `synthetic_training_dataset/loan_portfolio_schema_v4.json`. See `docs/RULESET_V4.md` |
+| **v5** (latest) | Same four sectors as v4. Insurance cut to three fields: `crop_insurance_available` (Y/N), `insurance_start_date`, `insurance_end_date`. Every date (reporting, account open, insurance) inside 2015-2019. Train 2015-2017, test 2018-2019 | Approval not recorded. See `docs/RULESET_V5.md` |
+| v4 | Only `Crop Production`, `Fisheries` (prawn and shrimp only), `Poultry`, `Dairy & Animal Husbandry`. Train dates 2015-2017, test dates 2018-2019 | Approval not recorded. `Fisheries` is not in the original PNB sample domain, so the PNB-derived validator schema rejects it; use `synthetic_training_dataset/loan_portfolio_schema_v4.json`. See `docs/RULESET_V4.md` |
 | **v3** | Seven values, including Horticulture, Irrigation, Farm Mechanization, Non-Agri | Reported approved by PNB. Unchanged |
 | v2 | As v3, 13 insurance fields | Superseded (local only, not committed) |
 

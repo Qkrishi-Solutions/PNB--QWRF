@@ -1,0 +1,41 @@
+section,key,value
+meta,label,SYNTHETIC - not PNB data
+meta,seed,2026
+meta,config_sha256,e8831401c4c51ee2306498609392cc4194a9a138a6db62737e36364b60df5e6e
+meta,rows,11000
+meta,signal_variance_share,0.8714
+meta,noise_sd,0.25
+meta,anomaly_method,loyo
+file_sha256,synthetic_training_v5_train.csv,a6c99940375873cba64644d78cd5466c5f661326f0414367d5d04fad22a379f5
+file_sha256,synthetic_training_v5_test.csv,4d2ce29b06cadafe3ea8205c815ae8865aca15697b5565c9af56c9d11373dfb1
+rows_by_split,train,10002
+rows_by_split,test,998
+asset_class_by_split,test | NPA,160
+asset_class_by_split,test | SMA 0,199
+asset_class_by_split,test | SMA 1,180
+asset_class_by_split,test | SMA 2,160
+asset_class_by_split,test | Standard,299
+asset_class_by_split,train | NPA,1601
+asset_class_by_split,train | SMA 0,2000
+asset_class_by_split,train | SMA 1,1800
+asset_class_by_split,train | SMA 2,1601
+asset_class_by_split,train | Standard,3000
+rows_by_snapshot_year,2015,3330
+rows_by_snapshot_year,2016,3337
+rows_by_snapshot_year,2017,3335
+rows_by_snapshot_year,2018,498
+rows_by_snapshot_year,2019,500
+insurance_coverage_status,Not Insured,6049
+insurance_coverage_status,Active,3441
+insurance_coverage_status,Expired,1115
+insurance_coverage_status,Pending,395
+insured_Y_share,all,0.4501
+date_range,account open date,2015-01-01 to 2019-07-31
+date_range,insurance_start_date,2015-01-01 to 2019-12-14
+date_range,insurance_end_date,2015-02-15 to 2019-12-31
+date_range,reporting_date,2015-10-31 to 2019-10-31
+yield_anomaly_status,not_applicable,6048
+yield_anomaly_status,calculated,4949
+yield_anomaly_status,ineligible_observation,2
+yield_anomaly_status,insufficient_history,1
+meta,accounts_with_crop,4952
