@@ -29,7 +29,6 @@ This document fixes what we are building, in what order, and how the pieces conn
 | Loan risk score | A classical classification and scoring step (Section 3.1): per-account aggregate score and priority class. Descriptive; not an approved PNB asset classification |
 | Scenario handling | Demo mode: the user picks current conditions or one of 3 named cases (normal, heavy rain or dry spell, cyclone). Full mode: the six weighted scenarios of Section 4.4 |
 | Quantum selection input | The user sets scope and limits on a screen (Section 4.8); QAOA selects the set of loans to act on |
-| Quantum machine learning | A benchmarked experiment only (Section 4.9). The production risk score stays classical |
 
 ## 2. Where we are today
 
@@ -48,7 +47,7 @@ Open items from the finished work (carried into Phase 0): the Issue 5 deliverabl
 
 ## 3. Hybrid architecture
 
-Classical ML predicts. The risk layer turns predictions into exposure. A scenario engine builds weighted combinations of weather, yield and insurance outcomes. QAOA then searches for the best follow-up plan under constraints, and every result is benchmarked against an exact classical solver. Quantum is used for the optimisation step. Prediction and the loan risk score stay classical; a quantum machine-learning classifier is run only as a benchmarked experiment (Section 4.9).
+Classical ML predicts. The risk layer turns predictions into exposure. A scenario engine builds weighted combinations of weather, yield and insurance outcomes. QAOA then searches for the best follow-up plan under constraints, and every result is benchmarked against an exact classical solver. Quantum is used only for the optimisation step, never for prediction.
 
 ```mermaid
 flowchart TD
@@ -319,20 +318,6 @@ Rules:
 - Demo mode uses one selected scenario with weight 1. Full mode uses the six weighted scenarios of Section 4.4.
 - Fields marked "No" above would need to be supplied by PNB.
 
-### 4.9 Quantum machine-learning experiment (benchmark only)
-
-A variational quantum classifier (VQC) is tested on the same risk-score classification task as the classical model.
-
-| Item | Decision |
-|---|---|
-| Task | Predict asset class (or stress versus not) on the v5 dataset, same train and test years as M6 |
-| Experiment | Feature-count sweep (for example 4, 8, 12, 16, 20 features), VQC against gradient boosting and logistic regression |
-| Execution | Simulator, about 20 qubits at most (one feature per qubit) |
-| Reported | Accuracy, macro-F1, runtime, seeds, per feature count |
-| Claim | None of quantum advantage. If the classical model wins, we report that |
-
-The production risk score stays classical. The synthetic labels follow a documented rule, so any model recovers that rule; the result says nothing about real borrowers.
-
 ---
 
 ## 5. Requirement-to-module map
@@ -345,7 +330,6 @@ The production risk score stays classical. The synthetic labels follow a documen
 | 4. Zonal manager alerts | A1, A2, A3 |
 | Loan risk score and priority class | M6, R5 |
 | Hybrid scenario optimisation (Problem A) | C1-C4, Q1-Q7 |
-| Quantum machine-learning benchmark (experiment) | Q8 |
 | Dashboards and reports | A4 |
 | Governance | Gv1-Gv4 |
 
@@ -425,7 +409,6 @@ For M6, the synthetic labels follow a documented risk score, so a good score sho
 | Q5 | Result processor | Q4 | ranked feasible plans with scenario-wise breakdown | each candidate re-scored exactly on all scenarios; infeasible samples discarded | Open |
 | Q6 | Exact benchmark (brute force and OR-Tools CP-SAT) | Q2 | optimal solution | gap and runtime table against QAOA, same instances | Open |
 | Q7 | Constraints and scenario-selector input (Section 4.8) | R5, Q1 | screen or config producing the constraint set and chosen scenario for Q1 | every limit maps to a QUBO penalty or a hard check; invalid inputs rejected; demo mode (current or 3 named cases) tested | Open |
-| Q8 | Quantum machine-learning experiment: VQC against classical models (Section 4.9) | M6 dataset, R5 | metrics table by feature count | same train and test years as M6; fixed seeds; no advantage claimed | Open |
 
 ### Phase 6: Alerts and workflow (Objective 4)
 
@@ -502,7 +485,6 @@ Issue #32 (the synthetic training and test dataset) is already closed. The remai
 | Problem A formulation, QUBO and Ising conversion | Q1-Q3 | 5 |
 | QAOA runner, result processor and exact benchmark | Q4-Q6 | 5 |
 | Constraints and scenario-selector input | Q7 | 5 |
-| Quantum machine-learning experiment against classical models | Q8 | 5 |
 | Alert generator, lifecycle and audit trail | A1-A3 | 6 |
 | Dashboards and reports | A4 | 6 |
 | Role-based access, audit logging, data-handling controls, UAT plan | Gv1-Gv4 | 7 |
@@ -555,6 +537,5 @@ Main schedule risks: PNB turnaround on `Fisheries` and the v4 dataset, data lice
 | Loan risk score | Classical classification and scoring (Section 3.1). Proposed definition; PNB must agree it before any operational use |
 | Quantum selection input | The user sets scope and limits on a screen; QAOA selects the set of loans; always benchmarked against the exact solver (Section 4.8) |
 | Scenarios | Demo mode: current conditions or one of 3 named cases. Full mode: six weighted scenarios |
-| Quantum machine learning | Benchmarked experiment only; production score stays classical (Section 4.9) |
 | Phase 2 (prawn and shrimp) | Separate roadmap, starts after Phase 1 exit criteria are met |
  
