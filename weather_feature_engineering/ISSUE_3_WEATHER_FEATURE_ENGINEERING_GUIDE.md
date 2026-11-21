@@ -35,7 +35,7 @@ Both methodologies generate separate outputs and validation results. Their outpu
 
 ## Input and source handling
 
-Input: `crop_long_v1.csv` from `Issues/CropLongFormatv1/`.
+Input: `crop_long_v1.csv` from `CropLongFormatv1/`.
 
 The source has 1,430 crop-long rows, but weather measurements are district-year measurements repeated across crop rows. The scripts first verify that repeated weather values are identical within each `(district_code, year)` group, then extract one weather row per district-year.
 
