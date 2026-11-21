@@ -1,0 +1,79 @@
+{
+  "config_version": "2.0",
+  "label": "SYNTHETIC - not PNB data",
+  "seed": 2026,
+  "base_config": "../synthetic_portfolio/synthetic_config_v1.json",
+  "total_accounts": 11000,
+  "snapshots": [
+    {"year": 2017, "split": "train", "accounts": 5000},
+    {"year": 2018, "split": "train", "accounts": 5000},
+    {"year": 2019, "split": "test", "accounts": 1000}
+  ],
+  "reporting_month_day": "10-31",
+  "open_date_start": "2012-01-01",
+  "min_account_age_days": 90,
+  "weather_feature_columns": [
+    "kharif__rain_sum",
+    "kharif__longest_dry",
+    "annual_crop__hot_days",
+    "kharif__tmax_mean",
+    "kharif__dtr_mean",
+    "ne__rainy_days"
+  ],
+  "weather_stress_signs": {
+    "kharif__rain_sum": -1,
+    "kharif__longest_dry": 1,
+    "annual_crop__hot_days": 1,
+    "kharif__tmax_mean": 1
+  },
+  "anomaly_z_clip": 3.0,
+  "sector_weather_sensitivity": {
+    "Crop Production": 1.0,
+    "Horticulture": 0.8,
+    "Irrigation": 0.5,
+    "Farm Mechanization": 0.3,
+    "Dairy & Animal Husbandry": 0.3,
+    "Poultry": 0.2,
+    "Non-Agri": 0.1
+  },
+  "insurance": {
+    "availability_probability": {
+      "Crop Production": 0.70,
+      "Horticulture": 0.50,
+      "Irrigation": 0.20,
+      "Farm Mechanization": 0.10,
+      "Dairy & Animal Husbandry": 0.15,
+      "Poultry": 0.15,
+      "Non-Agri": 0.02
+    },
+    "status_percent": {"Active": 70, "Expired": 22, "Pending": 8},
+    "scheme_by_sector": {
+      "Crop Production": "SYN-AREA-YIELD",
+      "Horticulture": "SYN-WEATHER-INDEX"
+    },
+    "default_scheme": "SYN-GENERAL",
+    "providers": ["Synthetic Insurer 1", "Synthetic Insurer 2", "Synthetic Insurer 3"],
+    "term_days": 364,
+    "pending_start_within_days": 45,
+    "insured_to_sanction_range": [0.5, 1.2],
+    "premium_to_insured_range": [0.02, 0.05],
+    "claim_stress_threshold": 0.5,
+    "claim_probability_given_stress": 0.6,
+    "claim_status_percent": {"Filed": 20, "Approved": 20, "Rejected": 15, "Paid": 45},
+    "claim_to_insured_range": [0.2, 0.8],
+    "payout_to_claim_range": [0.6, 1.0],
+    "min_days_start_to_payout": 30
+  },
+  "risk_score": {
+    "weather": 0.6,
+    "yield_shortfall": 0.4,
+    "uninsured_agri": 0.5,
+    "expired_policy": 0.4,
+    "coverage_shortfall": 0.5,
+    "log_sanction": 0.15,
+    "interest_rate": 0.2,
+    "account_age": 0.1,
+    "noise_sd": 0.6
+  },
+  "split_rule": "out-of-time: snapshot years marked train vs test"
+}
