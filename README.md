@@ -71,10 +71,19 @@ merged_district_year_v1b.csv
                         |
                         └── Missing-value corrections and final cleaning
                                 └── merged_cleaned_v1d.csv
+```
 
+## Canonical Issue Deliverables & Artifact Paths
 
+Canonical locations for foundational feature engineering and data processing deliverables:
 
+| Issue | Component | Canonical Path | Primary Outputs / Scripts | Description |
+|---|---|---|---|---|
+| **Issue 1** | Crop Long Format Dataset | `CropLongFormatv1/` | `crop_long_v1.csv`<br>`crop_restructure_validate.py` | Restructured unpivoted crop-long dataset (1,430 rows × 124 columns), change logs (`v1f_change_log.csv`), and validation reports. |
+| **Issue 2** | Crop Model Eligibility | `CropModelEligibility/` | `crop_model_eligibility_v1.csv`<br>`crop_observation_coverage_summary_v1.csv` | Multi-crop suitability classification, observation coverage thresholds, and evaluation report. |
+| **Issue 6** | Climate Zonal Clustering | `District Climate Zonal Clustering/` | `district_climate_profiles_v1.csv`<br>`district_zone_map_v1.csv`<br>`district_climate_clustering.py` | Long-term district climate profiling, zone boundary mapping (Coastal vs. Rayalaseema), and clustering metrics (`clustering_evaluation_v1.csv`). |
 
+> **Note on Issue 1 canonical location:** The legacy duplicate folder previously located under the `Issues` directory has been removed. All downstream pipelines must reference `CropLongFormatv1/crop_long_v1.csv`.
 
 ## Method summary
 
