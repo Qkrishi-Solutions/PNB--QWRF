@@ -71,10 +71,18 @@ merged_district_year_v1b.csv
                         |
                         └── Missing-value corrections and final cleaning
                                 └── merged_cleaned_v1d.csv
+```
 
+## Canonical Geography Master (Issue #42)
 
+The canonical geography master unifies all-India postal pincodes, PNB administrative circles and zones, and climate clusters for all 13 Andhra Pradesh districts (`district_code` 502–523):
 
-
+| Component | Canonical File | Rows | Description |
+|---|---|:---:|---|
+| **Geography Master** | `geography_master/geography_master_v1.csv` | 19,300 | Pincode-grain master lookup connecting pincodes to district codes, PNB circles/zones, and climate zones. |
+| **District Master** | `geography_master/district_geography_master_v1.csv` | 13 | Canonical 13-district summary with administrative and climate assignments and mapped pincode counts. |
+| **Coverage Report** | `geography_master/geography_master_coverage_report_v1.csv` | 12 | Summary metrics, join validation, and mapping status counts. |
+| **Ambiguous Pincodes** | `geography_master/unmatched_ambiguous_pincodes_v1.csv` | 64 | Audit of multi-district and border pincodes left unassigned per the non-guessing policy. |
 
 ## Method summary
 

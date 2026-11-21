@@ -1,0 +1,13 @@
+metric,value
+total_pincodes_evaluated,19300.0
+pincodes_mapped_to_ap_district,1207.0
+pincodes_ambiguous_within_ap_district,18.0
+pincodes_ambiguous_border_state,46.0
+pincodes_outside_project_scope,18029.0
+unique_project_districts_mapped,13.0
+pnb_zones_represented,1.0
+pnb_circles_represented,3.0
+climate_zones_represented,3.0
+min_pincodes_per_district,52.0
+max_pincodes_per_district,126.0
+mean_pincodes_per_district,92.84615384615384
