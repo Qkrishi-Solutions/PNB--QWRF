@@ -301,6 +301,171 @@ def select_features_for_fold(
     return selected, statistics, status
 
 
+
+# ---------------------------------------------------------
+# CROP-FEATURE REPORT (crop_feature_selection_v1.csv)
+# ---------------------------------------------------------
+
+def build_crop_feature_report(
+    crops,
+    feature_columns,
+    scores_df,
+    fold_df,
+    consensus_df,
+    scorable_years
+):
+    """
+    One row per crop x weather feature, aggregated over the scorable
+    LOYO folds only (held-out year in scorable_years), so that the
+    selection counts match crop_feature_selection_consensus.csv.
+
+    Statistics summarise per-fold training-set values. Features with no
+    evaluable fold keep their row with empty statistics; missing is not
+    zero.
+    """
+
+    if len(scores_df):
+        scorable_scores = scores_df[
+            scores_df["heldout_year"].isin(scorable_years)
+        ]
+    else:
+        scorable_scores = scores_df
+
+    empty_stats = {
+        "mean_spearman_rho": np.nan,
+        "min_spearman_rho": np.nan,
+        "max_spearman_rho": np.nan,
+        "mean_abs_spearman_rho": np.nan,
+        "rho_sign_consistent": np.nan,
+        "min_bh_q_value": np.nan,
+        "mean_bh_q_value": np.nan,
+        "max_bh_q_value": np.nan,
+        "min_paired_n": np.nan,
+        "max_paired_n": np.nan,
+        "folds_passing_screen": 0,
+        "folds_rejected_multicollinearity": 0,
+        "selected_in_heldout_years": "",
+    }
+
+    rows = []
+
+    for crop in crops:
+
+        n_folds = int(
+            (
+                fold_df["crop"].eq(crop)
+                & fold_df["heldout_year"].isin(scorable_years)
+            ).sum()
+        )
+
+        consensus_row = consensus_df[consensus_df["crop"].eq(crop)].iloc[0]
+
+        stable = {
+            item.split(":")[0]
+            for item in str(consensus_row["selection_frequency"]).split(";")
+            if item and item != "nan"
+        }
+
+        for feature in feature_columns:
+
+            window, indicator = feature.split("__", 1)
+
+            if len(scorable_scores):
+                subset = scorable_scores[
+                    scorable_scores["crop"].eq(crop)
+                    & scorable_scores["feature"].eq(feature)
+                ]
+            else:
+                subset = scorable_scores
+
+            n_evaluated = len(subset)
+            n_selected = int(subset["selected"].sum()) if n_evaluated else 0
+
+            if n_evaluated:
+                rho = subset["spearman_rho"]
+                signs = np.sign(rho)
+                stats = {
+                    "mean_spearman_rho": float(rho.mean()),
+                    "min_spearman_rho": float(rho.min()),
+                    "max_spearman_rho": float(rho.max()),
+                    "mean_abs_spearman_rho": float(rho.abs().mean()),
+                    "rho_sign_consistent": bool(
+                        (signs > 0).all() or (signs < 0).all()
+                    ),
+                    "min_bh_q_value": float(subset["bh_q_value"].min()),
+                    "mean_bh_q_value": float(subset["bh_q_value"].mean()),
+                    "max_bh_q_value": float(subset["bh_q_value"].max()),
+                    "min_paired_n": int(subset["paired_n"].min()),
+                    "max_paired_n": int(subset["paired_n"].max()),
+                    "folds_passing_screen": int(subset["passes_screen"].sum()),
+                    "folds_rejected_multicollinearity": int(
+                        subset["rejected_for_multicollinearity"].sum()
+                    ),
+                    "selected_in_heldout_years": ";".join(
+                        str(int(y))
+                        for y in sorted(
+                            subset.loc[subset["selected"], "heldout_year"]
+                        )
+                    ),
+                }
+            else:
+                stats = dict(empty_stats)
+
+            rows.append({
+                "crop": crop,
+                "feature": feature,
+                "season_window": window,
+                "weather_indicator": indicator,
+                "usable_yield_anomaly_rows": int(
+                    consensus_row["usable_yield_anomaly_rows"]
+                ),
+                "district_count": int(consensus_row["district_count"]),
+                "scorable_loyo_folds": n_folds,
+                "folds_evaluated": n_evaluated,
+                "folds_selected": n_selected,
+                "selection_frequency": (
+                    n_selected / n_folds if n_folds else np.nan
+                ),
+                "is_stable_predictor": feature in stable,
+                **stats,
+                "crop_selection_status": consensus_row["selection_status"],
+                "interpretation": "statistical_association_only",
+            })
+
+    report = pd.DataFrame(rows)
+
+    # Integrity checks specific to this deliverable.
+    if report.duplicated(["crop", "feature"]).any():
+        raise ValueError(
+            "crop_feature_selection_v1: duplicate crop-feature keys."
+        )
+
+    if len(report) != len(crops) * len(feature_columns):
+        raise ValueError(
+            "crop_feature_selection_v1: expected one row per crop-feature."
+        )
+
+    for row in consensus_df.itertuples():
+        expected = {
+            item.split(":")[0]
+            for item in str(row.selection_frequency).split(";")
+            if item and item != "nan"
+        }
+        actual = set(
+            report.loc[
+                report["crop"].eq(row.crop) & report["is_stable_predictor"],
+                "feature"
+            ]
+        )
+        if expected != actual:
+            raise ValueError(
+                "crop_feature_selection_v1: stable predictors differ from "
+                f"consensus for {row.crop}."
+            )
+
+    return report
+
+
 # ---------------------------------------------------------
 # MAIN PIPELINE
 # ---------------------------------------------------------
@@ -552,6 +717,15 @@ def run_feature_selection(
 
     consensus_df = pd.DataFrame(consensus_results)
 
+    report_df = build_crop_feature_report(
+        crops=crops,
+        feature_columns=feature_columns,
+        scores_df=scores_df,
+        fold_df=fold_df,
+        consensus_df=consensus_df,
+        scorable_years=scorable_years
+    )
+
     # -----------------------------------------------------
     # VALIDATION
     # -----------------------------------------------------
@@ -665,6 +839,11 @@ def run_feature_selection(
         index=False
     )
 
+    report_df.to_csv(
+        output_directory / "crop_feature_selection_v1.csv",
+        index=False
+    )
+
     validation_df.to_csv(
         output_directory / "crop_feature_selection_validation.csv",
         index=False
@@ -685,6 +864,8 @@ def run_feature_selection(
 
     print("\nCROP-LEVEL CONSENSUS")
     print(consensus_df.to_string(index=False))
+
+    print(f"\ncrop_feature_selection_v1.csv rows: {len(report_df)}")
 
     print("\nVALIDATION CHECKS")
     print(checks_df.to_string(index=False))
