@@ -73,6 +73,18 @@ merged_district_year_v1b.csv
                                 └── merged_cleaned_v1d.csv
 ```
 
+## Canonical Geography Master (Issue #42)
+
+The canonical geography master unifies all-India postal pincodes, provisional PNB administrative circles and zones, and climate clusters across all 13 Andhra Pradesh districts (`district_code` 502–523):
+
+| Component | Canonical File | Rows | Description |
+|---|---|:---:|---|
+| **Geography Master** | `geography_master/geography_master_v1.csv` | 19,300 | Pincode-grain master lookup connecting pincodes to district codes, provisional PNB circles/zones, and climate zones with nullable integer types (`502`, not `502.0`). |
+| **District Master** | `geography_master/district_geography_master_v1.csv` | 13 | Canonical 13-district summary with provisional administrative and climate assignments and mapped pincode counts. |
+| **Coverage Report** | `geography_master/geography_master_coverage_report_v1.csv` | 18 | Summary metrics, join validation, mapping status counts, and cross-dataset consistency audit. |
+| **Ambiguous Pincodes** | `geography_master/unmatched_ambiguous_pincodes_v1.csv` | 64 | Audit of multi-district and border pincodes left unassigned per the non-guessing policy. |
+
+> **Note on PNB Administrative Divisions:** Banking hierarchy assignments (`pnb_zone_provisional`, `pnb_circle_provisional`) are provisional placeholders derived from loan generator configuration; they will be updated upon ingestion of official PNB administrative branch circulars. Cross-dataset consistency of `district_code` is programmatically verified against weather and yield feature datasets.
 ## Canonical Issue Deliverables & Artifact Paths
 
 Canonical locations for foundational feature engineering and data processing deliverables:
