@@ -4,8 +4,9 @@ Inputs (public, not committed):
   * IBTrACS v04r01, North Indian Ocean CSV. The IMD (RSMC New Delhi) fields
     NEWDELHI_LAT / NEWDELHI_LON / NEWDELHI_GRADE / NEWDELHI_WIND / NEWDELHI_PRES
     are the IMD track data; they are the only position and intensity fields used.
-  * geoBoundaries IND ADM2 (CC BY 4.0), which still has the 13 Andhra Pradesh
-    districts that the project uses (pre-2022 boundaries).
+  * geoBoundaries IND ADM2, which still has the 13 Andhra Pradesh districts
+    that the project uses (pre-2022 boundaries). Its licence and attribution
+    terms must be confirmed before the outputs are distributed (see README).
   * The project district file (district_code, district_name).
 
 AFFECTED-DISTRICT RULE (assumption, there is no authoritative IMD definition):
@@ -149,7 +150,8 @@ def load_project_districts(path):
     frame = pd.read_csv(path, usecols=["district_code", "district_name"]).drop_duplicates()
     if frame.district_code.duplicated().any() or frame.district_name.duplicated().any():
         raise ValueError("District file must map each name to one code.")
-    return {str(n).upper().strip(): int(c) for c, n in zip(frame.district_code, frame.district_name, strict=True)}
+    # Both columns come from the same frame, so their lengths are equal.
+    return {str(n).upper().strip(): int(c) for c, n in zip(frame.district_code, frame.district_name)}
 
 
 def load_district_polygons(boundaries_path, project_codes):
@@ -180,6 +182,22 @@ def load_district_polygons(boundaries_path, project_codes):
     return out
 
 
+UNNAMED_VALUES = {"", "UNNAMED", "NOT_NAMED"}
+
+
+def pick_name(names):
+    """One name per storm id.
+
+    IBTrACS can change the NAME of a storm while it is being tracked (for example
+    from UNNAMED to its name once named). Use the most frequent real name; if the
+    storm never had one, return UNNAMED.
+    """
+    real = [n for n in names if n.strip().upper() not in UNNAMED_VALUES]
+    if not real:
+        return "UNNAMED"
+    return pd.Series(real).value_counts().sort_index().sort_values(ascending=False, kind="stable").index[0]
+
+
 def load_tracks(path, start_year):
     """IMD track rows. Returns (imd_points, storm_info) as DataFrames."""
     use = ["SID", "SEASON", "NAME", "ISO_TIME", "SUBBASIN", "NEWDELHI_LAT", "NEWDELHI_LON",
@@ -202,9 +220,11 @@ def load_tracks(path, start_year):
     raw["time"] = pd.to_datetime(raw["ISO_TIME"], utc=True)
     raw["grade"] = raw["NEWDELHI_GRADE"].map(normalise_grade)
 
+    if (raw.groupby("SID")["SEASON"].nunique() > 1).any():
+        raise ValueError("A storm id has more than one season in the track file.")
     storm_info = (
         raw.groupby("SID")
-        .agg(season=("SEASON", "first"), name=("NAME", "first"),
+        .agg(season=("SEASON", "first"), name=("NAME", pick_name),
              subbasins=("SUBBASIN", lambda s: ";".join(sorted(set(s) - {""}))))
         .reset_index()
     )
@@ -221,9 +241,16 @@ def sample_track(points):
     """Samples along one storm's CS-or-above track (originals plus interpolated).
 
     Returns a DataFrame with lat, lon, time, wind_kt, grade, original.
-    An interpolated sample inherits wind and grade from its nearer end point.
+    An interpolated sample inherits wind and grade from its nearer end point,
+    so only rows with original=True are observed IMD values.
+
+    `frame.attrs["skipped_long_gaps"]` counts consecutive CS-or-above points that
+    were NOT joined because they are more than MAX_GAP_HOURS apart. Rows without
+    IMD coordinates are removed before this function, so they widen a gap too.
+    A track that crosses a district inside a skipped gap can be missed.
     """
     rows = []
+    skipped = 0
     pts = points.reset_index(drop=True)
     is_cs = pts["grade"].isin(CS_OR_ABOVE).to_numpy()
     for i in range(len(pts)):
@@ -234,6 +261,8 @@ def sample_track(points):
         if i + 1 < len(pts) and is_cs[i + 1]:
             q = pts.loc[i + 1]
             gap_h = (q.time - p.time).total_seconds() / 3600.0
+            if gap_h > MAX_GAP_HOURS:
+                skipped += 1
             if gap_h <= 0 or gap_h > MAX_GAP_HOURS:
                 continue
             x1, y1 = to_xy(p.NEWDELHI_LON, p.NEWDELHI_LAT)
@@ -245,7 +274,9 @@ def sample_track(points):
                 rows.append((p.NEWDELHI_LAT + f * (q.NEWDELHI_LAT - p.NEWDELHI_LAT),
                              p.NEWDELHI_LON + f * (q.NEWDELHI_LON - p.NEWDELHI_LON),
                              p.time + (q.time - p.time) * f, near.NEWDELHI_WIND, near.grade, False))
-    return pd.DataFrame(rows, columns=["lat", "lon", "time", "wind_kt", "grade", "original"])
+    frame = pd.DataFrame(rows, columns=["lat", "lon", "time", "wind_kt", "grade", "original"])
+    frame.attrs["skipped_long_gaps"] = skipped
+    return frame
 
 
 # ---------------------------------------------------------
@@ -253,6 +284,11 @@ def sample_track(points):
 # ---------------------------------------------------------
 
 def build(tracks_path, boundaries_path, districts_path, distance_km=100.0, start_year=1990):
+    if not (distance_km > 0 and np.isfinite(distance_km)):
+        raise ValueError("distance_km must be a positive number.")
+    # Distances are computed up to this cap. It follows the requested threshold, so a
+    # threshold above DISTANCE_CAP_KM is honoured and never silently truncated.
+    cap_km = max(DISTANCE_CAP_KM, float(distance_km))
     project_codes = load_project_districts(districts_path)
     districts = load_district_polygons(boundaries_path, project_codes)
     imd, storm_info = load_tracks(tracks_path, start_year)
@@ -264,20 +300,23 @@ def build(tracks_path, boundaries_path, districts_path, distance_km=100.0, start
 
     events, pairs = [], []
     sensitivity = {km: set() for km in SENSITIVITY_KM}
+    skipped_gaps_total = 0
 
     for sid in catalogue_ids:
         pts = imd[imd["SID"] == sid]
         samples = sample_track(pts)
+        skipped_gaps = int(samples.attrs.get("skipped_long_gaps", 0))
+        skipped_gaps_total += skipped_gaps
         n_cs = int(pts["grade"].isin(CS_OR_ABOVE).sum())
         affected = []
 
         if len(samples):
             px, py = to_xy(samples["lon"].to_numpy(), samples["lat"].to_numpy())
             for code, (dname, polygons) in districts.items():
-                xmin = min(r[:, 0].min() for p in polygons for r in p) - DISTANCE_CAP_KM
-                xmax = max(r[:, 0].max() for p in polygons for r in p) + DISTANCE_CAP_KM
-                ymin = min(r[:, 1].min() for p in polygons for r in p) - DISTANCE_CAP_KM
-                ymax = max(r[:, 1].max() for p in polygons for r in p) + DISTANCE_CAP_KM
+                xmin = min(r[:, 0].min() for p in polygons for r in p) - cap_km
+                xmax = max(r[:, 0].max() for p in polygons for r in p) + cap_km
+                ymin = min(r[:, 1].min() for p in polygons for r in p) - cap_km
+                ymax = max(r[:, 1].max() for p in polygons for r in p) + cap_km
                 near_box = (px >= xmin) & (px <= xmax) & (py >= ymin) & (py <= ymax)
                 if not near_box.any():
                     continue
@@ -285,7 +324,7 @@ def build(tracks_path, boundaries_path, districts_path, distance_km=100.0, start
                 dist = distance_to_district(px[idx], py[idx], polygons)
                 closest = int(np.argmin(dist))
                 min_d = float(dist[closest])
-                if not np.isfinite(min_d) or min_d > DISTANCE_CAP_KM:
+                if not np.isfinite(min_d) or min_d > cap_km:
                     continue
                 for km in SENSITIVITY_KM:
                     if min_d <= km:
@@ -294,7 +333,10 @@ def build(tracks_path, boundaries_path, districts_path, distance_km=100.0, start
                     continue
                 within = idx[dist <= distance_km]
                 s = samples.iloc[idx[closest]]
-                winds = samples.iloc[within]["wind_kt"].dropna()
+                # Peak wind uses observed IMD points only; interpolated samples borrow
+                # their wind from an end point and are not observations.
+                within_samples = samples.iloc[within]
+                winds = within_samples.loc[within_samples["original"], "wind_kt"].dropna()
                 pairs.append({
                     "event_id": sid, "season": int(info.loc[sid, "season"]), "name": info.loc[sid, "name"],
                     "district_code": code, "district_name": dname,
@@ -305,6 +347,7 @@ def build(tracks_path, boundaries_path, districts_path, distance_km=100.0, start
                     "first_time_within_utc": samples.iloc[within]["time"].min().strftime("%Y-%m-%d %H:%M"),
                     "time_at_closest_utc": s["time"].strftime("%Y-%m-%d %H:%M"),
                     "grade_at_closest": s["grade"],
+                    "closest_point_is_observed": bool(s["original"]),
                     "max_imd_wind_kt_within": float(winds.max()) if len(winds) else np.nan,
                 })
                 affected.append(code)
@@ -322,6 +365,7 @@ def build(tracks_path, boundaries_path, districts_path, distance_km=100.0, start
             "first_time_utc": pts["time"].min().strftime("%Y-%m-%d %H:%M"),
             "last_time_utc": pts["time"].max().strftime("%Y-%m-%d %H:%M"),
             "n_imd_points": len(pts), "n_cs_or_above_points": n_cs,
+            "n_cs_segments_not_interpolated": skipped_gaps,
             "grades_observed": ";".join(sorted(set(pts["grade"]) - {""})),
             "max_imd_wind_kt": float(wind.max()) if wind.notna().any() else np.nan,
             "min_imd_pressure_hpa": float(pres.min()) if pres.notna().any() else np.nan,
@@ -352,30 +396,57 @@ def build(tracks_path, boundaries_path, districts_path, distance_km=100.0, start
         "catalogue_events": len(events_df),
         "sensitivity_pairs": {km: len(v) for km, v in sensitivity.items()},
         "sensitivity_events": {km: len({e for e, _ in v}) for km, v in sensitivity.items()},
+        "events_with_skipped_long_gaps": int((events_df["n_cs_segments_not_interpolated"] > 0).sum()),
+        "cs_segments_not_interpolated": skipped_gaps_total,
         "distance_km": distance_km, "start_year": start_year,
     }
     return events_df, pairs_df, unmapped_df.reset_index(drop=True), context
 
 
-def validate(events_df, pairs_df, districts_n=13):
-    """Return a list of (check, passed, detail)."""
+PAIR_COLUMNS = ["event_id", "district_code", "rule_tier", "min_distance_km", "distance_threshold_km"]
+
+
+def validate(events_df, pairs_df, project_codes=None, districts_n=13):
+    """Return a list of (check, passed, detail).
+
+    Every check always runs. An empty map is not skipped: the catalogue must then
+    agree that no event has an affected district. `project_codes` is the set of valid
+    district codes; without it only the number of distinct codes is checked.
+    """
     checks = []
+    n_pairs = len(pairs_df)
+    if n_pairs == 0:
+        pairs_df = pd.DataFrame({c: pd.Series(dtype=object) for c in PAIR_COLUMNS})
     checks.append(("event_key_unique", not events_df.duplicated("event_id").any(), f"{len(events_df)} events"))
-    if len(pairs_df):
-        checks.append(("pair_key_unique", not pairs_df.duplicated(["event_id", "district_code"]).any(),
-                       f"{len(pairs_df)} event-district pairs"))
-        checks.append(("pairs_reference_catalogue", set(pairs_df["event_id"]) <= set(events_df["event_id"]),
-                       "every mapped event is in the catalogue"))
-        checks.append(("district_codes_valid", pairs_df["district_code"].nunique() <= districts_n,
-                       f"{pairs_df['district_code'].nunique()} districts appear"))
-        checks.append(("distances_within_threshold",
-                       bool((pairs_df["min_distance_km"] <= pairs_df["distance_threshold_km"]).all()), "all pairs within the threshold"))
-        checks.append(("inside_means_zero_distance",
-                       bool(((pairs_df["rule_tier"] == "inside") == (pairs_df["min_distance_km"] == 0)).all()), "tier agrees with distance"))
-        counts = pairs_df.groupby("event_id").size()
-        merged = events_df.set_index("event_id")["n_affected_districts"]
-        checks.append(("affected_counts_agree",
-                       bool((counts.reindex(merged.index).fillna(0).astype(int) == merged).all()), "catalogue counts match the map"))
+    checks.append(("pair_key_unique", not pairs_df.duplicated(["event_id", "district_code"]).any(),
+                   f"{n_pairs} event-district pairs"))
+    checks.append(("pairs_reference_catalogue", set(pairs_df["event_id"]) <= set(events_df["event_id"]),
+                   "every mapped event is in the catalogue"))
+    codes = set(pairs_df["district_code"])
+    if project_codes is None:
+        codes_ok, codes_detail = len(codes) <= districts_n, f"{len(codes)} district codes appear"
+    else:
+        codes_ok = codes <= set(project_codes)
+        codes_detail = f"{len(codes)} district codes appear, all in the {len(set(project_codes))} project codes" if codes_ok \
+            else f"codes not in the project list: {sorted(codes - set(project_codes))}"
+    checks.append(("district_codes_valid", codes_ok, codes_detail))
+    dist = pd.to_numeric(pairs_df["min_distance_km"], errors="coerce")
+    thr = pd.to_numeric(pairs_df["distance_threshold_km"], errors="coerce")
+    checks.append(("distances_valid", bool((np.isfinite(dist) & (dist >= 0) & (dist <= thr)).all()),
+                   "finite, non-negative and within each pair's threshold"))
+    checks.append(("inside_means_zero_distance",
+                   bool(((pairs_df["rule_tier"] == "inside") == (dist == 0)).all()), "tier agrees with distance"))
+    counts = pairs_df.groupby("event_id").size()
+    merged = events_df.set_index("event_id")["n_affected_districts"]
+    checks.append(("affected_counts_agree",
+                   bool((counts.reindex(merged.index).fillna(0).astype(int) == merged).all()),
+                   "catalogue counts match the map"))
+    by_event = pairs_df.groupby("event_id")["district_code"].apply(lambda s: {int(c) for c in s})
+    listed = events_df.set_index("event_id")["affected_district_codes"].fillna("").astype(str)
+    codes_agree = all(
+        {int(x) for x in listed[e].split(";") if x} == by_event.get(e, set()) for e in listed.index
+    )
+    checks.append(("affected_codes_agree", codes_agree, "catalogue district codes match the map"))
     checks.append(("mapped_status_consistent",
                    bool(((events_df["mapping_status"] == "mapped") == (events_df["n_affected_districts"] > 0)).all()),
                    "status mapped iff at least one district"))
@@ -393,26 +464,42 @@ SPOT_CHECKS = [
     ("MICHAUNG", 2023, ["GUNTUR"], "landfall near Bapatla (then in Guntur)"),
     ("LAILA", 2010, ["GUNTUR"], "landfall near Bapatla"),
     ("TITLI", 2018, ["SRIKAKULAM"], "landfall near the Odisha-Srikakulam coast"),
+    ("GULAB", 2021, ["SRIKAKULAM"], "landfall near Kalingapatnam (Srikakulam)"),
 ]
 
 
-def spot_checks(events_df, pairs_df):
+def spot_checks(events_df, pairs_df, start_year=1990):
+    """Compare known events with the map.
+
+    Status: `pass` (all expected districts found), `fail` (event found but an expected
+    district is missing), `not_in_catalogue` (event absent although its season is in range)
+    or `skipped_before_start_year`. Compound IBTrACS names such as `GULAB:SHAHEEN-GU` are
+    matched on the part before the colon.
+    """
+    base = events_df["name"].str.upper().str.split(":").str[0].str.strip() if len(events_df) else pd.Series(dtype=str)
     rows = []
     for name, season, expected, note in SPOT_CHECKS:
-        ev = events_df[(events_df["name"].str.upper() == name) & (events_df["season"] == season)]
+        row = {"event": name, "season": season, "expected_districts": ";".join(expected), "note": note,
+               "status": "", "found_in_catalogue": False, "found_districts": "", "all_expected_found": False,
+               "closest_expected_distance_km": np.nan}
+        if season < start_year:
+            row["status"] = "skipped_before_start_year"
+            rows.append(row)
+            continue
+        ev = events_df[(base == name) & (events_df["season"] == season)]
         if ev.empty:
-            rows.append({"event": name, "season": season, "expected_districts": ";".join(expected), "note": note,
-                         "found_in_catalogue": False, "found_districts": "", "all_expected_found": False,
-                         "closest_expected_distance_km": np.nan})
+            row["status"] = "not_in_catalogue"
+            rows.append(row)
             continue
         sid = ev.iloc[0]["event_id"]
         sub = pairs_df[pairs_df["event_id"] == sid] if len(pairs_df) else pairs_df
         found = sorted(sub["district_name"]) if len(sub) else []
         dists = sub[sub["district_name"].isin(expected)]["min_distance_km"] if len(sub) else []
-        rows.append({"event": name, "season": season, "expected_districts": ";".join(expected), "note": note,
-                     "found_in_catalogue": True, "found_districts": ";".join(found),
-                     "all_expected_found": all(d in found for d in expected),
-                     "closest_expected_distance_km": float(min(dists)) if len(dists) else np.nan})
+        row.update({"found_in_catalogue": True, "found_districts": ";".join(found),
+                    "all_expected_found": all(d in found for d in expected),
+                    "closest_expected_distance_km": float(min(dists)) if len(dists) else np.nan})
+        row["status"] = "pass" if row["all_expected_found"] else "fail"
+        rows.append(row)
     return pd.DataFrame(rows)
 
 
@@ -422,12 +509,14 @@ def main():
     parser.add_argument("--boundaries", required=True, help="geoBoundaries IND ADM2 GeoJSON")
     parser.add_argument("--districts", required=True, help="CSV with district_code and district_name")
     parser.add_argument("--outdir", required=True)
-    parser.add_argument("--distance-km", type=float, default=100.0)
+    parser.add_argument("--distance-km", type=float, default=100.0,
+                        help="affected-district threshold in km (any positive value; distances are computed up to "
+                             "max(200, this value))")
     parser.add_argument("--start-year", type=int, default=1990)
     a = parser.parse_args()
 
     events, pairs, unmapped, ctx = build(a.tracks, a.boundaries, a.districts, a.distance_km, a.start_year)
-    checks = validate(events, pairs)
+    checks = validate(events, pairs, project_codes=set(load_project_districts(a.districts).values()))
     failed = [c for c in checks if not c[1]]
     out = Path(a.outdir)
     out.mkdir(parents=True, exist_ok=True)
@@ -437,8 +526,9 @@ def main():
     pd.DataFrame(checks, columns=["check", "passed", "detail"]).assign(
         status=lambda d: np.where(d["passed"], "PASS", "FAIL"))[["check", "status", "detail"]].to_csv(
         out / "validation_checks.csv", index=False)
-    checks_df = spot_checks(events, pairs)
+    checks_df = spot_checks(events, pairs, a.start_year)
     checks_df.to_csv(out / "cyclone_spot_checks_v1.csv", index=False)
+    spot_failed = checks_df[checks_df["status"].isin(["fail", "not_in_catalogue"])]
 
     print("CYCLONE CATALOGUE COMPLETED")
     print("---------------------------")
@@ -452,8 +542,15 @@ def main():
     print("\nSPOT CHECKS (expectations from public reports, not from the data)")
     print(checks_df.to_string(index=False))
     print(f"\nOutputs saved to: {out.resolve()}")
+    problems = []
     if failed:
-        raise SystemExit("Validation failed: " + ", ".join(c[0] for c in failed))
+        problems.append("Validation failed: " + ", ".join(c[0] for c in failed))
+    if len(spot_failed):
+        problems.append("Spot check did not match expectations for: "
+                        + ", ".join(f"{r.event} {r.season} ({r.status})" for r in spot_failed.itertuples())
+                        + ". Expectations come from public reports; review before relying on this run.")
+    if problems:
+        raise SystemExit("\n".join(problems))
 
 
 if __name__ == "__main__":

@@ -24,9 +24,11 @@ PROJECT = [
     (510, "KRISHNA"), (511, "KURNOOL"), (515, "SPR NELLORE"), (517, "PRAKASAM"), (519, "SRIKAKULAM"),
     (520, "VISAKHAPATNAM"), (521, "VIZIANAGARAM"), (523, "WEST GODAVARI"),
 ]
-GB_NAMES = list(c.GB_TO_PROJECT)  # same order as PROJECT's districts by construction below
-NAME_BY_CODE = {code: name for code, name in PROJECT}
 GB_BY_PROJECT = {v: k for k, v in c.GB_TO_PROJECT.items()}
+# Position of each district code in PROJECT. Test squares are laid out in this order, so tests
+# look positions up by code instead of hard-coding an index.
+IDX = {code: i for i, (code, _) in enumerate(PROJECT)}
+PROJECT_CODES = {code for code, _ in PROJECT}
 
 
 def square(lon0, lat0, size=0.1):
@@ -188,20 +190,22 @@ def inside_point(index):
 
 
 def test_track_inside_district_is_tier_inside_with_zero_distance(tmp_path):
-    lat, lon = inside_point(2)
+    lat, lon = inside_point(IDX[504])
     events, pairs, unmapped, ctx = build_from(tmp_path, storm("S1", 2015, "INSIDER", lat, lon))
     row = pairs[(pairs["event_id"] == "S1") & (pairs["district_code"] == 504)]
     assert len(row) == 1
     assert row.iloc[0]["rule_tier"] == "inside" and row.iloc[0]["min_distance_km"] == 0.0
     # The two neighbouring squares are only about 53 km away, so they are "near", never "inside".
+    neighbours = {PROJECT[IDX[504] - 1][0], PROJECT[IDX[504] + 1][0]}
     others = pairs[pairs["district_code"] != 504]
-    assert set(others["district_code"]) == {503, 505} and (others["rule_tier"] == "near").all()
-    assert events.iloc[0]["mapping_status"] == "mapped" and events.iloc[0]["affected_district_codes"] == "503;504;505"
+    assert set(others["district_code"]) == neighbours and (others["rule_tier"] == "near").all()
+    expected_codes = ";".join(str(x) for x in sorted(neighbours | {504}))
+    assert events.iloc[0]["mapping_status"] == "mapped" and events.iloc[0]["affected_district_codes"] == expected_codes
 
 
 def test_threshold_controls_which_districts_are_affected(tmp_path):
     # 0.54 degrees north of district index 5 (code 510): about 60 km from it, neighbours about 80 km.
-    rows = storm("S2", 2016, "NEARBY", 16.05 + 0.54, district_lon0(5) + 0.05)
+    rows = storm("S2", 2016, "NEARBY", 16.05 + 0.54, district_lon0(IDX[510]) + 0.05)
     _, p100, _, _ = build_from(tmp_path, rows, distance_km=100.0)
     assert 510 in set(p100["district_code"])
     near = p100[p100["district_code"] == 510].iloc[0]
@@ -213,8 +217,8 @@ def test_threshold_controls_which_districts_are_affected(tmp_path):
 
 
 def test_pairs_are_one_per_event_and_district_and_checks_pass(tmp_path):
-    lat, lon = inside_point(3)
-    rows = storm("S1", 2015, "A", lat, lon) + storm("S3", 2017, "B", 16.0, district_lon0(3) + 0.05)
+    lat, lon = inside_point(IDX[505])
+    rows = storm("S1", 2015, "A", lat, lon) + storm("S3", 2017, "B", 16.0, district_lon0(IDX[505]) + 0.05)
     events, pairs, _, _ = build_from(tmp_path, rows)
     assert not pairs.duplicated(["event_id", "district_code"]).any()
     assert all(ok for _, ok, _ in c.validate(events, pairs))
@@ -228,7 +232,7 @@ def test_far_storm_is_unmapped_with_reason(tmp_path):
 
 
 def test_weak_storm_never_cs_is_unmapped_even_if_over_a_district(tmp_path):
-    lat, lon = inside_point(2)
+    lat, lon = inside_point(IDX[504])
     events, pairs, unmapped, _ = build_from(tmp_path, storm("S5", 2015, "WEAK", lat, lon, grade="DD", wind=25))
     assert len(pairs) == 0
     assert events.iloc[0]["mapping_status"] == "unmapped_never_reached_cyclonic_storm_grade"
@@ -237,7 +241,7 @@ def test_weak_storm_never_cs_is_unmapped_even_if_over_a_district(tmp_path):
 
 def test_storm_without_imd_positions_is_listed_not_dropped(tmp_path):
     blank = [["S6", 2015, "NOPOS", f"2015-10-10 {h:02d}:00:00", "BB", "", "", "", "", ""] for h in (0, 6)]
-    events, pairs, unmapped, ctx = build_from(tmp_path, blank + storm("S1", 2015, "OK", *inside_point(2)))
+    events, pairs, unmapped, ctx = build_from(tmp_path, blank + storm("S1", 2015, "OK", *inside_point(IDX[504])))
     assert "S6" not in set(events["event_id"])
     row = unmapped[unmapped["event_id"] == "S6"]
     assert list(row["mapping_status"]) == ["unmapped_no_imd_track_positions"]
@@ -246,25 +250,25 @@ def test_storm_without_imd_positions_is_listed_not_dropped(tmp_path):
 
 def test_arabian_sea_only_storm_is_not_in_catalogue(tmp_path):
     events, _, unmapped, _ = build_from(
-        tmp_path, storm("S7", 2015, "ARAB", 16.0, 70.0, subbasin="AS") + storm("S1", 2015, "OK", *inside_point(2)))
+        tmp_path, storm("S7", 2015, "ARAB", 16.0, 70.0, subbasin="AS") + storm("S1", 2015, "OK", *inside_point(IDX[504])))
     assert "S7" not in set(events["event_id"]) and "S7" not in set(unmapped["event_id"])
 
 
 def test_storms_before_start_year_are_excluded(tmp_path):
-    rows = storm("OLD", 1985, "OLD", *inside_point(2)) + storm("NEW", 2015, "NEW", *inside_point(2))
+    rows = storm("OLD", 1985, "OLD", *inside_point(IDX[504])) + storm("NEW", 2015, "NEW", *inside_point(IDX[504]))
     events, _, _, _ = build_from(tmp_path, rows, start_year=1990)
     assert list(events["event_id"]) == ["NEW"]
 
 
 def test_missing_wind_and_pressure_are_not_filled(tmp_path):
-    rows = storm("S8", 2015, "NOWIND", *inside_point(2), wind="", pres="")
+    rows = storm("S8", 2015, "NOWIND", *inside_point(IDX[504]), wind="", pres="")
     events, pairs, _, _ = build_from(tmp_path, rows)
     assert np.isnan(events.iloc[0]["max_imd_wind_kt"]) and np.isnan(events.iloc[0]["min_imd_pressure_hpa"])
     assert np.isnan(pairs.iloc[0]["max_imd_wind_kt_within"])
 
 
 def test_event_summary_fields(tmp_path):
-    rows = storm("S9", 2018, "SUMMARY", *inside_point(2), grade="SCS", wind=60, pres=980, n=3)
+    rows = storm("S9", 2018, "SUMMARY", *inside_point(IDX[504]), grade="SCS", wind=60, pres=980, n=3)
     events, _, _, _ = build_from(tmp_path, rows)
     e = events.iloc[0]
     assert e["n_imd_points"] == 3 and e["n_cs_or_above_points"] == 3
@@ -276,26 +280,26 @@ def test_event_summary_fields(tmp_path):
 # ---------- input guards ----------
 
 def test_wrong_units_rejected(tmp_path):
-    tracks, boundaries, districts = write_inputs(tmp_path, storm("S1", 2015, "A", *inside_point(2)))
+    tracks, boundaries, districts = write_inputs(tmp_path, storm("S1", 2015, "A", *inside_point(IDX[504])))
     tracks.write_text(tracks.read_text().replace("kts", "m/s"), encoding="utf-8")
     with pytest.raises(ValueError, match="Unexpected source units"):
         c.build(tracks, boundaries, districts)
 
 
 def test_non_numeric_value_in_numeric_column_rejected(tmp_path):
-    rows = storm("S1", 2015, "A", *inside_point(2), wind="fast")
+    rows = storm("S1", 2015, "A", *inside_point(IDX[504]), wind="fast")
     with pytest.raises(ValueError, match="Non-numeric"):
         build_from(tmp_path, rows)
 
 
 def test_duplicate_time_rows_rejected(tmp_path):
-    rows = storm("S1", 2015, "A", *inside_point(2), n=1) * 2
+    rows = storm("S1", 2015, "A", *inside_point(IDX[504]), n=1) * 2
     with pytest.raises(ValueError, match="Duplicate"):
         build_from(tmp_path, rows)
 
 
 def test_missing_boundary_district_rejected(tmp_path):
-    tracks, boundaries, districts = write_inputs(tmp_path, storm("S1", 2015, "A", *inside_point(2)))
+    tracks, boundaries, districts = write_inputs(tmp_path, storm("S1", 2015, "A", *inside_point(IDX[504])))
     gj = json.loads(boundaries.read_text())
     gj["features"] = gj["features"][:-1]
     boundaries.write_text(json.dumps(gj))
@@ -304,7 +308,7 @@ def test_missing_boundary_district_rejected(tmp_path):
 
 
 def test_boundary_outside_andhra_pradesh_rejected(tmp_path):
-    tracks, boundaries, districts = write_inputs(tmp_path, storm("S1", 2015, "A", *inside_point(2)))
+    tracks, boundaries, districts = write_inputs(tmp_path, storm("S1", 2015, "A", *inside_point(IDX[504])))
     gj = json.loads(boundaries.read_text())
     gj["features"][0]["geometry"]["coordinates"] = square(70.0, 25.0)
     boundaries.write_text(json.dumps(gj))
@@ -313,7 +317,7 @@ def test_boundary_outside_andhra_pradesh_rejected(tmp_path):
 
 
 def test_district_file_with_duplicate_codes_rejected(tmp_path):
-    tracks, boundaries, districts = write_inputs(tmp_path, storm("S1", 2015, "A", *inside_point(2)))
+    tracks, boundaries, districts = write_inputs(tmp_path, storm("S1", 2015, "A", *inside_point(IDX[504])))
     pd.DataFrame([(1, "GUNTUR"), (1, "KRISHNA")], columns=["district_code", "district_name"]).to_csv(districts, index=False)
     with pytest.raises(ValueError):
         c.build(tracks, boundaries, districts)
@@ -322,7 +326,7 @@ def test_district_file_with_duplicate_codes_rejected(tmp_path):
 # ---------- validation function catches problems ----------
 
 def test_validate_detects_duplicate_pairs_and_unknown_events(tmp_path):
-    events, pairs, _, _ = build_from(tmp_path, storm("S1", 2015, "A", *inside_point(2)))
+    events, pairs, _, _ = build_from(tmp_path, storm("S1", 2015, "A", *inside_point(IDX[504])))
     assert all(ok for _, ok, _ in c.validate(events, pairs))
     bad = pd.concat([pairs, pairs], ignore_index=True)
     assert not dict((n, ok) for n, ok, _ in c.validate(events, bad))["pair_key_unique"]
@@ -332,12 +336,150 @@ def test_validate_detects_duplicate_pairs_and_unknown_events(tmp_path):
 
 def test_spot_check_table_flags_missing_and_found_events(tmp_path):
     # Index 0 is ANANTAPURAMU, far from the expected VISAKHAPATNAM (index 10), so the expectation fails.
-    events, pairs, _, _ = build_from(tmp_path, storm("S1", 2014, "HUDHUD", 16.0, district_lon0(0) + 0.05))
+    events, pairs, _, _ = build_from(tmp_path, storm("S1", 2014, "HUDHUD", 16.0, district_lon0(IDX[502]) + 0.05))
     table = c.spot_checks(events, pairs)
     hudhud = table[table["event"] == "HUDHUD"].iloc[0]
     assert bool(hudhud["found_in_catalogue"]) and not bool(hudhud["all_expected_found"])
     # Index 10 is VISAKHAPATNAM, so the same storm placed there meets the expectation.
-    events, pairs, _, _ = build_from(tmp_path, storm("S1", 2014, "HUDHUD", 16.0, district_lon0(10) + 0.05))
+    events, pairs, _, _ = build_from(tmp_path, storm("S1", 2014, "HUDHUD", 16.0, district_lon0(IDX[520]) + 0.05))
     hudhud = c.spot_checks(events, pairs).query("event == 'HUDHUD'").iloc[0]
     assert bool(hudhud["all_expected_found"]) and hudhud["closest_expected_distance_km"] == 0.0
     assert not table[table["event"] == "PHETHAI"].iloc[0]["found_in_catalogue"]
+
+
+# ---------- review fixes: threshold, cap and input validation ----------
+
+@pytest.mark.parametrize("bad", [0, -5, float("nan"), float("inf")])
+def test_non_positive_or_non_finite_threshold_rejected(tmp_path, bad):
+    with pytest.raises(ValueError, match="distance_km"):
+        build_from(tmp_path, storm("S1", 2015, "A", *inside_point(IDX[504])), distance_km=bad)
+
+
+def test_threshold_above_default_cap_is_honoured_not_truncated(tmp_path):
+    # The storm sits about 272 km north of the district squares (lat 18.5 vs top edge 16.05).
+    rows = storm("S2", 2016, "FAR", 18.5, district_lon0(IDX[510]) + 0.05)
+    _, p_default, _, _ = build_from(tmp_path, rows)
+    _, p_250, _, _ = build_from(tmp_path, rows, distance_km=250.0)
+    _, p_300, _, _ = build_from(tmp_path, rows, distance_km=300.0)
+    assert len(p_default) == 0 and len(p_250) == 0
+    row = p_300[p_300["district_code"] == 510].iloc[0]
+    assert 270 < row["min_distance_km"] < 275 and row["distance_threshold_km"] == 300.0
+
+
+# ---------- review fixes: names ----------
+
+def test_pick_name_uses_real_name_even_if_first_rows_are_unnamed():
+    assert c.pick_name(pd.Series(["UNNAMED", "UNNAMED", "KAVYA", "KAVYA", "KAVYA"])) == "KAVYA"
+    assert c.pick_name(pd.Series(["NOT_NAMED", ""])) == "UNNAMED"
+    assert c.pick_name(pd.Series(["UNNAMED"])) == "UNNAMED"
+    # a tie is broken alphabetically so that the result never depends on row order
+    assert c.pick_name(pd.Series(["BETA", "ALPHA"])) == c.pick_name(pd.Series(["ALPHA", "BETA"])) == "ALPHA"
+
+
+def test_storm_named_after_first_rows_gets_its_name_in_catalogue(tmp_path):
+    rows = storm("S1", 2015, "UNNAMED", *inside_point(IDX[504]), n=1, start_hour=0)
+    rows += storm("S1", 2015, "LATER", *inside_point(IDX[504]), n=2, start_hour=6)
+    events, _, _, _ = build_from(tmp_path, rows)
+    assert events.iloc[0]["name"] == "LATER"
+
+
+def test_storm_id_with_two_seasons_rejected(tmp_path):
+    rows = storm("S1", 2015, "A", *inside_point(IDX[504]), n=1) + storm("S1", 2016, "A", *inside_point(IDX[504]), n=1, start_hour=6)
+    with pytest.raises(ValueError, match="more than one season"):
+        build_from(tmp_path, rows)
+
+
+# ---------- review fixes: skipped gaps and observed-only values ----------
+
+def test_skipped_long_gaps_are_counted():
+    s = c.sample_track(pts([
+        (16.0, 80.0, "2020-01-01 00:00", 40, "CS"), (16.0, 81.0, "2020-01-02 00:00", 40, "CS"),   # 24 h gap, skipped
+        (16.0, 81.2, "2020-01-02 06:00", 40, "CS"),                                                # 6 h, interpolated
+    ]))
+    assert s.attrs["skipped_long_gaps"] == 1
+    ok = c.sample_track(pts([(16.0, 80.0, "2020-01-01 00:00", 40, "CS"), (16.0, 80.5, "2020-01-01 06:00", 40, "CS")]))
+    assert ok.attrs["skipped_long_gaps"] == 0
+
+
+def test_events_table_reports_skipped_segments(tmp_path):
+    rows = (storm("S1", 2015, "GAPPY", 18.5, 80.0, n=1, start_hour=0)
+            + [["S1", 2015, "GAPPY", "2015-10-12 00:00:00", "BB", 18.5, 80.5, "CS", 40, 990]])  # 48 h later
+    events, _, _, ctx = build_from(tmp_path, rows)
+    assert events.iloc[0]["n_cs_segments_not_interpolated"] == 1
+    assert ctx["events_with_skipped_long_gaps"] == 1 and ctx["cs_segments_not_interpolated"] == 1
+
+
+def test_peak_wind_and_closest_flag_use_observed_points_only(tmp_path):
+    k = IDX[510]
+    lon0 = district_lon0(k)
+    # Two observed CS points about 0.45 degrees either side of the square: wind 40 west, 90 east.
+    rows = [
+        ["S1", 2015, "BORROW", "2015-10-10 00:00:00", "BB", 16.0, lon0 - 0.45, "CS", 40, 990],
+        ["S1", 2015, "BORROW", "2015-10-10 06:00:00", "BB", 16.0, lon0 + 0.55, "VSCS", 90, 960],
+    ]
+    # With a 30 km threshold no observed point is within range; only interpolated samples reach the square.
+    _, pairs, _, _ = build_from(tmp_path, rows, distance_km=30.0)
+    row = pairs[pairs["district_code"] == 510].iloc[0]
+    assert row["rule_tier"] == "inside" and row["n_imd_points_within"] == 0
+    assert np.isnan(row["max_imd_wind_kt_within"])      # borrowed wind is not reported as observed
+    assert not row["closest_point_is_observed"]
+    # With a 100 km threshold both observed points count, so the observed maximum is reported.
+    _, pairs100, _, _ = build_from(tmp_path, rows, distance_km=100.0)
+    assert pairs100[pairs100["district_code"] == 510].iloc[0]["max_imd_wind_kt_within"] == 90.0
+
+
+# ---------- review fixes: validation and spot checks ----------
+
+def test_validate_rejects_district_code_outside_project_list(tmp_path):
+    events, pairs, _, _ = build_from(tmp_path, storm("S1", 2015, "A", *inside_point(IDX[504])))
+    assert all(ok for _, ok, _ in c.validate(events, pairs, project_codes=PROJECT_CODES))
+    bad = pairs.assign(district_code=999)
+    result = {n: ok for n, ok, _ in c.validate(events, bad, project_codes=PROJECT_CODES)}
+    assert not result["district_codes_valid"]
+
+
+def test_validate_runs_pair_checks_on_empty_map(tmp_path):
+    events, pairs, _, _ = build_from(tmp_path, storm("S4", 2015, "FAR", 18.5, 80.0))
+    assert len(pairs) == 0
+    names = [n for n, _, _ in c.validate(events, pairs, project_codes=PROJECT_CODES)]
+    for expected in ("pair_key_unique", "district_codes_valid", "affected_counts_agree", "affected_codes_agree"):
+        assert expected in names
+    # An empty map must still contradict a catalogue that claims affected districts.
+    claims = events.assign(n_affected_districts=2, affected_district_codes="504;505", mapping_status="mapped")
+    result = {n: ok for n, ok, _ in c.validate(claims, pairs, project_codes=PROJECT_CODES)}
+    assert not result["affected_counts_agree"] and not result["affected_codes_agree"]
+
+
+def test_validate_distances_check_can_fail(tmp_path):
+    events, pairs, _, _ = build_from(tmp_path, storm("S1", 2015, "A", *inside_point(IDX[504])))
+    too_far = pairs.assign(min_distance_km=pairs["distance_threshold_km"] + 1, rule_tier="near")
+    assert not {n: ok for n, ok, _ in c.validate(events, too_far)}["distances_valid"]
+    negative = pairs.assign(min_distance_km=-1.0)
+    assert not {n: ok for n, ok, _ in c.validate(events, negative)}["distances_valid"]
+
+
+def test_validate_detects_catalogue_codes_that_differ_from_map(tmp_path):
+    events, pairs, _, _ = build_from(tmp_path, storm("S1", 2015, "A", *inside_point(IDX[504])))
+    tampered = events.assign(affected_district_codes="999;998;997")
+    assert not {n: ok for n, ok, _ in c.validate(tampered, pairs)}["affected_codes_agree"]
+
+
+def test_spot_check_matches_compound_names_and_sets_status(tmp_path):
+    rows = storm("S1", 2021, "GULAB:SHAHEEN-GU", 16.0, district_lon0(IDX[519]) + 0.05)
+    events, pairs, _, _ = build_from(tmp_path, rows)
+    table = c.spot_checks(events, pairs, start_year=1990).set_index("event")
+    assert table.loc["GULAB", "status"] == "pass" and bool(table.loc["GULAB", "found_in_catalogue"])
+    assert table.loc["HUDHUD", "status"] == "not_in_catalogue"
+    # wrong district -> fail
+    rows = storm("S1", 2021, "GULAB:SHAHEEN-GU", 16.0, district_lon0(IDX[502]) + 0.05)
+    events, pairs, _, _ = build_from(tmp_path, rows)
+    assert c.spot_checks(events, pairs).set_index("event").loc["GULAB", "status"] == "fail"
+
+
+def test_spot_checks_before_start_year_are_skipped_not_failed(tmp_path):
+    events, pairs, _, _ = build_from(tmp_path, storm("S1", 2023, "MICHAUNG", *inside_point(IDX[506])), start_year=2015)
+    table = c.spot_checks(events, pairs, start_year=2015).set_index("event")
+    assert table.loc["LAILA", "status"] == "skipped_before_start_year"     # 2010
+    assert table.loc["HUDHUD", "status"] == "skipped_before_start_year"    # 2014
+    assert table.loc["MICHAUNG", "status"] == "pass"
+    assert not table["status"].isin(["fail"]).any()
