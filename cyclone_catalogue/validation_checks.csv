@@ -1,5 +1,6 @@
 check,status,detail
-event_key_unique,PASS,247 events
+events_within_catalogue_radius,PASS,every event came within 300 km of an AP district (any IMD grade)
+event_key_unique,PASS,131 events
 pair_key_unique,PASS,122 event-district pairs
 pairs_reference_catalogue,PASS,every mapped event is in the catalogue
 district_codes_valid,PASS,"12 district codes appear, all in the 13 project codes"

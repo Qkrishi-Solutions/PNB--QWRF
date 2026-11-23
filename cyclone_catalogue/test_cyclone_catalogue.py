@@ -54,10 +54,13 @@ def write_inputs(tmp_path, rows):
     boundaries = tmp_path / "boundaries.geojson"
     boundaries.write_text(json.dumps({"type": "FeatureCollection", "features": features}), encoding="utf-8")
 
+    # The last two columns are the IBTrACS merged LAT/LON (not IMD). A row given with only the ten
+    # IMD columns gets blank merged positions.
     header = ["SID", "SEASON", "NAME", "ISO_TIME", "SUBBASIN", "NEWDELHI_LAT", "NEWDELHI_LON",
-              "NEWDELHI_GRADE", "NEWDELHI_WIND", "NEWDELHI_PRES"]
-    units = [" ", " ", " ", " ", " ", "degrees_north", "degrees_east", " ", "kts", "mb"]
-    lines = [",".join(header), ",".join(units)] + [",".join(str(v) for v in r) for r in rows]
+              "NEWDELHI_GRADE", "NEWDELHI_WIND", "NEWDELHI_PRES", "LAT", "LON"]
+    units = [" ", " ", " ", " ", " ", "degrees_north", "degrees_east", " ", "kts", "mb", "degrees_north", "degrees_east"]
+    padded = [list(r) + [""] * (12 - len(r)) for r in rows]
+    lines = [",".join(header), ",".join(units)] + [",".join(str(v) for v in r) for r in padded]
     tracks = tmp_path / "tracks.csv"
     tracks.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return tracks, boundaries, districts
@@ -663,3 +666,142 @@ def test_boundary_with_unsupported_geometry_type_rejected(tmp_path):
     boundaries.write_text(json.dumps(gj))
     with pytest.raises(ValueError, match="Unsupported geometry"):
         c.build(tracks, boundaries, districts)
+
+
+# ---------- Andhra Pradesh focus: only storms that came near AP are catalogued ----------
+# Test districts sit at about 16 N. Storms at 18.5 N are about 272 km north of them, at 20.0 N about 439 km.
+
+def test_storm_far_from_ap_is_excluded_from_the_catalogue(tmp_path):
+    rows = storm("NEAR", 2015, "NEAR", *inside_point(IDX[504])) + storm("FAR", 2016, "FAR", 20.0, 80.0)
+    events, pairs, unmapped, ctx = build_from(tmp_path, rows)
+    assert list(events["event_id"]) == ["NEAR"]
+    assert "FAR" not in set(unmapped["event_id"]) and "FAR" not in set(pairs["event_id"])
+    assert ctx["bay_of_bengal_imd_storms_outside_radius_excluded"] == 1 and ctx["bay_of_bengal_storms_with_imd_positions"] == 2
+
+
+def test_storm_within_the_radius_but_beyond_the_threshold_is_catalogued_as_unmapped(tmp_path):
+    events, pairs, unmapped, _ = build_from(tmp_path, storm("MID", 2016, "MID", 18.5, 80.0))   # about 272 km
+    assert list(events["event_id"]) == ["MID"] and len(pairs) == 0
+    assert events.iloc[0]["mapping_status"] == "unmapped_no_project_district_within_threshold"
+    assert 270 < events.iloc[0]["min_distance_any_grade_km"] < 275
+    row = unmapped.iloc[0]
+    assert row["closest_approach_basis"] == "imd_any_grade" and 270 < row["closest_approach_km"] < 275
+
+
+def test_radius_option_changes_which_storms_are_catalogued(tmp_path):
+    rows = storm("MID", 2016, "MID", 18.5, 80.0)
+    assert len(build_from(tmp_path, rows, catalogue_radius_km=250.0)[0]) == 0
+    assert len(build_from(tmp_path, rows, catalogue_radius_km=300.0)[0]) == 1
+    assert len(build_from(tmp_path, storm("FAR", 2016, "FAR", 20.0, 80.0), catalogue_radius_km=500.0)[0]) == 1
+
+
+def test_any_grade_counts_for_ap_relevance_so_a_depression_near_ap_is_catalogued(tmp_path):
+    rows = storm("DEP", 2016, "DEP", 16.4, district_lon0(IDX[510]) + 0.05, grade="D", wind=25) \
+        + storm("DEPFAR", 2016, "DEPFAR", 20.0, 80.0, grade="D", wind=25)
+    events, pairs, _, _ = build_from(tmp_path, rows)
+    assert list(events["event_id"]) == ["DEP"] and len(pairs) == 0
+    assert events.iloc[0]["mapping_status"] == "unmapped_never_reached_cyclonic_storm"
+
+
+def test_catalogue_radius_must_be_positive_and_not_smaller_than_the_threshold(tmp_path):
+    rows = storm("S1", 2015, "A", *inside_point(IDX[504]))
+    with pytest.raises(ValueError, match="at least distance_km"):
+        build_from(tmp_path, rows, distance_km=100.0, catalogue_radius_km=50.0)
+    for bad in (0, -1, float("nan"), float("inf")):
+        with pytest.raises(ValueError, match="catalogue_radius_km"):
+            build_from(tmp_path, rows, catalogue_radius_km=bad)
+
+
+def test_every_catalogued_event_records_its_closest_approach(tmp_path):
+    events, _, _, _ = build_from(tmp_path, storm("S1", 2015, "A", *inside_point(IDX[504])) + storm("S2", 2016, "B", 18.5, 80.0))
+    assert events.set_index("event_id").loc["S1", "min_distance_any_grade_km"] == 0.0
+    assert (events["min_distance_any_grade_km"] <= 300.1).all()
+
+
+def test_radius_sensitivity_is_monotonic_and_in_the_summary(tmp_path):
+    rows = (storm("A", 2015, "A", *inside_point(IDX[504])) + storm("B", 2016, "B", 18.5, 80.0)
+            + storm("C", 2017, "C", 20.0, 80.0))
+    events, pairs, unmapped, ctx = build_from(tmp_path, rows)
+    by_radius = ctx["catalogue_events_by_radius"]
+    assert by_radius == {150: 1, 200: 1, 300: 2, 500: 3}
+    summary = c.run_summary(ctx, events, pairs, unmapped)
+    got = summary[summary["section"] == "catalogue_radius_sensitivity"].set_index("metric")["value"].to_dict()
+    assert got == {"imd_events_within_150_km": 1, "imd_events_within_200_km": 1,
+                   "imd_events_within_300_km": 2, "imd_events_within_500_km": 3}
+
+
+# ---------- storms without IMD positions: relevance from the merged track, never used to map ----------
+
+def no_imd_rows(sid, season, merged_lat, merged_lon, n=2):
+    """Bay of Bengal storm with blank IMD fields and an IBTrACS merged position."""
+    return [[sid, season, "NOIMD", f"{season}-10-10 {6 * k:02d}:00:00", "BB", "", "", "", "", "", merged_lat, merged_lon]
+            for k in range(n)]
+
+
+def test_no_imd_storm_near_ap_is_listed_with_merged_track_basis_and_is_not_mapped(tmp_path):
+    rows = no_imd_rows("N1", 2016, 16.0, district_lon0(IDX[510]) + 0.05) + storm("OK", 2015, "OK", *inside_point(IDX[504]))
+    events, pairs, unmapped, ctx = build_from(tmp_path, rows)
+    assert "N1" not in set(events["event_id"]) and "N1" not in set(pairs["event_id"])    # merged data never maps
+    row = unmapped[unmapped["event_id"] == "N1"].iloc[0]
+    assert row["mapping_status"] == "unmapped_no_imd_track_positions"
+    assert row["closest_approach_basis"] == "ibtracs_merged_track_not_imd" and row["closest_approach_km"] == 0.0
+    assert ctx["no_imd_storms_listed_with_merged_track_within_radius"] == 1
+
+
+def test_no_imd_storm_far_from_ap_is_counted_not_listed(tmp_path):
+    rows = no_imd_rows("N2", 2016, 20.0, 80.0) + storm("OK", 2015, "OK", *inside_point(IDX[504]))
+    _, _, unmapped, ctx = build_from(tmp_path, rows)
+    assert "N2" not in set(unmapped["event_id"])
+    assert ctx["no_imd_storms_far_from_ap_not_listed"] == 1 and ctx["no_imd_storms_listed_with_merged_track_within_radius"] == 0
+
+
+def test_no_imd_storm_beyond_the_distance_cap_is_far_not_unknown(tmp_path):
+    # 30 N is more than 1,500 km from the test districts: beyond every computed distance (inf), so far, not unknown.
+    rows = no_imd_rows("N4", 2016, 30.0, 80.0) + storm("OK", 2015, "OK", *inside_point(IDX[504]))
+    _, _, unmapped, ctx = build_from(tmp_path, rows)
+    assert "N4" not in set(unmapped["event_id"])
+    assert ctx["no_imd_storms_far_from_ap_not_listed"] == 1 and ctx["no_imd_storms_listed_relevance_unknown"] == 0
+
+
+def test_no_imd_storm_with_no_position_at_all_is_listed_as_relevance_unknown(tmp_path):
+    blank = [["N3", 2016, "NOPOS", f"2016-10-10 {6 * k:02d}:00:00", "BB", "", "", "", "", ""] for k in range(2)]
+    _, _, unmapped, ctx = build_from(tmp_path, blank + storm("OK", 2015, "OK", *inside_point(IDX[504])))
+    row = unmapped[unmapped["event_id"] == "N3"].iloc[0]
+    assert row["closest_approach_basis"] == "none_available" and np.isnan(row["closest_approach_km"])
+    assert ctx["no_imd_storms_listed_relevance_unknown"] == 1
+
+
+def test_unmapped_columns_are_stable_even_when_everything_is_empty(tmp_path):
+    _, _, unmapped, _ = build_from(tmp_path, storm("FAR", 2016, "FAR", 20.0, 80.0))
+    assert list(unmapped.columns) == c.UNMAPPED_COLUMNS and len(unmapped) == 0
+
+
+def test_merged_columns_are_optional_in_the_source_file(tmp_path):
+    tracks, boundaries, districts = write_inputs(tmp_path, storm("S1", 2015, "A", *inside_point(IDX[504])))
+    text = tracks.read_text().splitlines()
+    tracks.write_text("\n".join(",".join(line.split(",")[:10]) for line in text) + "\n", encoding="utf-8")  # drop LAT, LON
+    events, _, _, _ = c.build(tracks, boundaries, districts)
+    assert list(events["event_id"]) == ["S1"]
+
+
+# ---------- validation of the radius ----------
+
+def test_validate_radius_check_can_fail(tmp_path):
+    events, pairs, _, _ = build_from(tmp_path, storm("S1", 2015, "A", *inside_point(IDX[504])))
+    assert {n: ok for n, ok, _ in c.validate(events, pairs, catalogue_radius_km=300.0)}["events_within_catalogue_radius"]
+    assert not {n: ok for n, ok, _ in c.validate(events.assign(min_distance_any_grade_km=400.0), pairs,
+                                                 catalogue_radius_km=300.0)}["events_within_catalogue_radius"]
+    assert not {n: ok for n, ok, _ in c.validate(events.assign(min_distance_any_grade_km=np.nan), pairs,
+                                                 catalogue_radius_km=300.0)}["events_within_catalogue_radius"]
+
+
+def test_main_exposes_the_radius_option_and_writes_ap_only_outputs(monkeypatch, tmp_path):
+    rows = storm("S1", 2015, "A", *inside_point(IDX[504])) + storm("FAR", 2016, "FAR", 20.0, 80.0)
+    out = run_main(monkeypatch, tmp_path, rows, "--catalogue-radius-km", "300")
+    events = pd.read_csv(out / "cyclone_events_v1.csv")
+    assert list(events["event_id"]) == ["S1"]
+    checks = pd.read_csv(out / "validation_checks.csv").set_index("check")
+    assert checks.loc["events_within_catalogue_radius", "status"] == "PASS"
+    (tmp_path / "second").mkdir()
+    with pytest.raises(ValueError, match="at least distance_km"):
+        run_main(monkeypatch, tmp_path / "second", rows, "--distance-km", "100", "--catalogue-radius-km", "50")

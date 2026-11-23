@@ -229,10 +229,20 @@ def pick_name(names):
 
 
 def load_tracks(path, start_year):
-    """IMD track rows. Returns (imd_points, storm_info) as DataFrames."""
+    """Track rows. Returns (imd_points, storm_info, merged_positions) as DataFrames.
+
+    `merged_positions` holds the IBTrACS merged LAT/LON of every row. These are NOT IMD
+    positions. They are used only to say whether a storm that has no IMD positions came near
+    Andhra Pradesh, and never to map it.
+    """
     use = ["SID", "SEASON", "NAME", "ISO_TIME", "SUBBASIN", "NEWDELHI_LAT", "NEWDELHI_LON",
            "NEWDELHI_GRADE", "NEWDELHI_WIND", "NEWDELHI_PRES"]
-    raw = pd.read_csv(path, skiprows=[1], usecols=use, dtype=str, keep_default_na=False)
+    optional = ["LAT", "LON"]
+    raw = pd.read_csv(path, skiprows=[1], usecols=lambda col: col in use + optional, dtype=str,
+                      keep_default_na=False)
+    for col in optional:
+        if col not in raw.columns:
+            raw[col] = ""
     units = pd.read_csv(path, nrows=1, usecols=["NEWDELHI_WIND", "NEWDELHI_PRES", "NEWDELHI_LAT"], dtype=str).iloc[0]
     if units["NEWDELHI_WIND"].strip() != "kts" or units["NEWDELHI_PRES"].strip() != "mb":
         raise ValueError(f"Unexpected source units: {units.to_dict()}")
@@ -242,7 +252,7 @@ def load_tracks(path, start_year):
     if raw.duplicated(["SID", "ISO_TIME"]).any():
         raise ValueError("Duplicate (SID, ISO_TIME) rows in the track file.")
 
-    for col in ["NEWDELHI_LAT", "NEWDELHI_LON", "NEWDELHI_WIND", "NEWDELHI_PRES"]:
+    for col in ["NEWDELHI_LAT", "NEWDELHI_LON", "NEWDELHI_WIND", "NEWDELHI_PRES", "LAT", "LON"]:
         numeric = pd.to_numeric(raw[col].replace("", np.nan), errors="coerce")
         if (numeric.isna() & raw[col].ne("")).any():
             raise ValueError(f"Non-numeric, non-blank values in {col}")
@@ -260,7 +270,8 @@ def load_tracks(path, start_year):
     )
     imd = raw[raw["NEWDELHI_LAT"].notna() & raw["NEWDELHI_LON"].notna()].copy()
     imd = imd.sort_values(["SID", "time"]).reset_index(drop=True)
-    return imd, storm_info
+    merged = raw.loc[raw["LAT"].notna() & raw["LON"].notna(), ["SID", "LAT", "LON"]].copy()
+    return imd, storm_info, merged
 
 
 # ---------------------------------------------------------
@@ -318,27 +329,86 @@ def sample_track(points):
 EVENT_COLUMNS = [
     "event_id", "season", "name", "first_time_utc", "last_time_utc", "n_imd_points", "n_cs_or_above_points",
     "n_cs_points_by_wind_only", "n_cs_segments_not_interpolated", "grades_observed", "max_imd_wind_kt", "min_imd_pressure_hpa",
-    "subbasins_visited", "n_affected_districts", "affected_district_codes", "mapping_status", "source",
+    "subbasins_visited", "min_distance_any_grade_km", "n_affected_districts", "affected_district_codes",
+    "mapping_status", "source",
 ]
 PAIR_OUTPUT_COLUMNS = [
     "event_id", "season", "name", "district_code", "district_name", "rule_tier", "min_distance_km",
     "distance_threshold_km", "n_imd_points_within", "first_time_within_utc", "time_at_closest_utc",
     "grade_at_closest", "closest_point_is_observed", "max_imd_wind_kt_within",
 ]
-def build(tracks_path, boundaries_path, districts_path, distance_km=100.0, start_year=1990):
+UNMAPPED_COLUMNS = [
+    "event_id", "season", "name", "n_cs_or_above_points", "max_imd_wind_kt",
+    "closest_approach_km", "closest_approach_basis", "mapping_status",
+]
+RADIUS_SENSITIVITY_KM = (150, 200, 300, 500)
+DEFAULT_CATALOGUE_RADIUS_KM = 300.0
+
+
+def round_up_tenth(value):
+    """Round a distance UP to 0.1 km (a positive distance never becomes 0.0)."""
+    return math.ceil(value * 10 - 1e-9) / 10 if value > 0 else 0.0
+
+
+def min_distance_to_districts(lons, lats, districts, cap_km):
+    """Smallest distance (km) from any point to any district polygon.
+
+    Returns NaN if there are no valid points and +inf if every point is farther than `cap_km`
+    (a bounding-box prefilter skips points that cannot be within the cap).
+    """
+    lons, lats = np.asarray(lons, float), np.asarray(lats, float)
+    valid = np.isfinite(lons) & np.isfinite(lats)
+    if not valid.any():
+        return np.nan
+    lons, lats = lons[valid], lats[valid]
+    best = np.inf
+    for _, polygons, lat0 in districts.values():
+        px, py = to_xy(lons, lats, lat0)
+        xmin = min(r[:, 0].min() for p in polygons for r in p) - cap_km
+        xmax = max(r[:, 0].max() for p in polygons for r in p) + cap_km
+        ymin = min(r[:, 1].min() for p in polygons for r in p) - cap_km
+        ymax = max(r[:, 1].max() for p in polygons for r in p) + cap_km
+        box = (px >= xmin) & (px <= xmax) & (py >= ymin) & (py <= ymax)
+        if box.any():
+            best = min(best, float(distance_to_district(px[box], py[box], polygons).min()))
+    return best if best <= cap_km else np.inf
+
+
+def build(tracks_path, boundaries_path, districts_path, distance_km=100.0, start_year=1990,
+          catalogue_radius_km=DEFAULT_CATALOGUE_RADIUS_KM):
+    """Build the catalogue.
+
+    The catalogue is Andhra Pradesh focused: a Bay of Bengal storm is catalogued only if some IMD
+    track point (any grade) came within `catalogue_radius_km` of an AP district. Storms with no IMD
+    positions cannot be assessed with IMD data; they are listed as unmapped when their IBTrACS merged
+    track (not IMD) came within the radius, or when no position exists at all.
+    """
     if not (distance_km > 0 and np.isfinite(distance_km)):
         raise ValueError("distance_km must be a positive number.")
+    if not (catalogue_radius_km > 0 and np.isfinite(catalogue_radius_km)):
+        raise ValueError("catalogue_radius_km must be a positive number.")
+    if catalogue_radius_km < distance_km:
+        raise ValueError("catalogue_radius_km must be at least distance_km, otherwise an event could be "
+                         "mapped to a district and still be outside the catalogue.")
     # Distances are computed up to this cap. It follows the requested threshold, so a
     # threshold above DISTANCE_CAP_KM is honoured and never silently truncated.
     cap_km = max(DISTANCE_CAP_KM, float(distance_km))
     project_codes = load_project_districts(districts_path)
     districts = load_district_polygons(boundaries_path, project_codes)
-    imd, storm_info = load_tracks(tracks_path, start_year)
+    imd, storm_info, merged = load_tracks(tracks_path, start_year)
 
     bb_storms = set(storm_info.loc[storm_info["subbasins"].str.contains("BB"), "SID"])
     imd_storms = set(imd["SID"])
-    catalogue_ids = sorted(bb_storms & imd_storms)
     info = storm_info.set_index("SID")
+
+    # Andhra Pradesh relevance: closest approach of any IMD point (any grade) to any AP district.
+    radius_cap = max(float(catalogue_radius_km), max(RADIUS_SENSITIVITY_KM))
+    closest_any = {}
+    for sid, group in imd[imd["SID"].isin(bb_storms)].groupby("SID"):
+        closest_any[sid] = min_distance_to_districts(group["NEWDELHI_LON"], group["NEWDELHI_LAT"], districts, radius_cap)
+    catalogue_ids = sorted(s for s, d in closest_any.items() if d <= catalogue_radius_km)
+    radius_sensitivity = {km: int(sum(1 for d in closest_any.values() if d <= km)) for km in RADIUS_SENSITIVITY_KM}
+    bb_imd_storms = len(closest_any)
 
     events, pairs = [], []
     sensitivity = {km: set() for km in SENSITIVITY_KM}
@@ -388,7 +458,7 @@ def build(tracks_path, boundaries_path, districts_path, distance_km=100.0, start
                     "rule_tier": "inside" if min_d == 0.0 else "near",
                     # Rounded UP to 0.1 km so that a positive distance never shows as 0.0
                     # (tier and threshold decisions above use the unrounded value).
-                    "min_distance_km": math.ceil(min_d * 10 - 1e-9) / 10 if min_d > 0 else 0.0,
+                    "min_distance_km": round_up_tenth(min_d),
                     "distance_threshold_km": distance_km,
                     "n_imd_points_within": int(samples.iloc[within]["original"].sum()),
                     "first_time_within_utc": samples.iloc[within]["time"].min().strftime("%Y-%m-%d %H:%M"),
@@ -418,6 +488,7 @@ def build(tracks_path, boundaries_path, districts_path, distance_km=100.0, start
             "max_imd_wind_kt": float(wind.max()) if wind.notna().any() else np.nan,
             "min_imd_pressure_hpa": float(pres.min()) if pres.notna().any() else np.nan,
             "subbasins_visited": info.loc[sid, "subbasins"],
+            "min_distance_any_grade_km": round_up_tenth(closest_any[sid]),
             "n_affected_districts": len(affected),
             "affected_district_codes": ";".join(str(c) for c in sorted(affected)),
             "mapping_status": status,
@@ -430,14 +501,35 @@ def build(tracks_path, boundaries_path, districts_path, distance_km=100.0, start
     if len(pairs_df):
         pairs_df = pairs_df.sort_values(["event_id", "district_code"]).reset_index(drop=True)
     unmapped_df = events_df.loc[events_df["mapping_status"] != "mapped",
-                                ["event_id", "season", "name", "n_cs_or_above_points", "max_imd_wind_kt", "mapping_status"]]
-    # Bay of Bengal storms with no IMD positions cannot enter the catalogue or be mapped;
-    # list them so that nothing is silently dropped.
-    no_positions = storm_info[storm_info["SID"].isin(bb_storms - imd_storms)].rename(
-        columns={"SID": "event_id"})[["event_id", "season", "name"]]
-    no_positions = no_positions.assign(
-        n_cs_or_above_points=np.nan, max_imd_wind_kt=np.nan, mapping_status="unmapped_no_imd_track_positions")
-    unmapped_df = pd.concat([unmapped_df, no_positions], ignore_index=True).sort_values("event_id")
+                                ["event_id", "season", "name", "n_cs_or_above_points", "max_imd_wind_kt",
+                                 "min_distance_any_grade_km", "mapping_status"]].rename(
+        columns={"min_distance_any_grade_km": "closest_approach_km"})
+    unmapped_df = unmapped_df.assign(closest_approach_basis="imd_any_grade")
+
+    # Bay of Bengal storms with no IMD positions cannot be graded or mapped. Their IBTrACS merged
+    # track (NOT IMD data) tells whether they came near Andhra Pradesh. List those within the
+    # catalogue radius, and those with no usable position at all (relevance unknown); count the
+    # rest as far from AP. Nothing is dropped silently.
+    no_imd = sorted(bb_storms - imd_storms)
+    merged_by_sid = {sid: g for sid, g in merged[merged["SID"].isin(no_imd)].groupby("SID")}
+    rows, far_without_imd = [], 0
+    for sid in no_imd:
+        g = merged_by_sid.get(sid)
+        d = min_distance_to_districts(g["LON"], g["LAT"], districts, radius_cap) if g is not None else np.nan
+        # NaN means no usable position (relevance unknown). +inf means every position is beyond
+        # the distance cap, which is also beyond the radius, so such a storm is simply far from AP.
+        if not np.isnan(d) and d > catalogue_radius_km:
+            far_without_imd += 1
+            continue
+        rows.append({
+            "event_id": sid, "season": int(info.loc[sid, "season"]), "name": info.loc[sid, "name"],
+            "n_cs_or_above_points": np.nan, "max_imd_wind_kt": np.nan,
+            "closest_approach_km": round_up_tenth(d) if np.isfinite(d) else np.nan,
+            "closest_approach_basis": "ibtracs_merged_track_not_imd" if np.isfinite(d) else "none_available",
+            "mapping_status": "unmapped_no_imd_track_positions",
+        })
+    no_positions = pd.DataFrame(rows, columns=UNMAPPED_COLUMNS)
+    unmapped_df = pd.concat([unmapped_df[UNMAPPED_COLUMNS], no_positions], ignore_index=True).sort_values("event_id")
     # Grade versus wind. Blank-grade points with wind >= 34 kt DO count as Cyclonic Storm or above
     # (see cs_or_above_mask); report how many. Points with a non-blank grade below CS but wind
     # >= 34 kt are NOT used (the grade decides); report those too.
@@ -448,7 +540,17 @@ def build(tracks_path, boundaries_path, districts_path, distance_km=100.0, start
     context = {
         "storms_in_file_from_start_year": int(len(storm_info)),
         "storms_with_imd_positions": len(imd_storms),
+        "bay_of_bengal_storms_with_imd_positions": bb_imd_storms,
         "bay_of_bengal_storms_without_imd_positions": len(bb_storms - imd_storms),
+        "catalogue_radius_km": float(catalogue_radius_km),
+        "bay_of_bengal_imd_storms_outside_radius_excluded": bb_imd_storms - len(events_df),
+        "catalogue_events_by_radius": radius_sensitivity,
+        "no_imd_storms_listed_near_ap_or_unknown": len(no_positions),
+        "no_imd_storms_listed_with_merged_track_within_radius": int(
+            (no_positions["closest_approach_basis"] == "ibtracs_merged_track_not_imd").sum()),
+        "no_imd_storms_listed_relevance_unknown": int(
+            (no_positions["closest_approach_basis"] == "none_available").sum()),
+        "no_imd_storms_far_from_ap_not_listed": far_without_imd,
         "catalogue_events": len(events_df),
         "sensitivity_pairs": {km: len(v) for km, v in sensitivity.items()},
         "sensitivity_events": {km: len({e for e, _ in v}) for km, v in sensitivity.items()},
@@ -466,14 +568,21 @@ def build(tracks_path, boundaries_path, districts_path, distance_km=100.0, start
 PAIR_COLUMNS = ["event_id", "district_code", "rule_tier", "min_distance_km", "distance_threshold_km"]
 
 
-def validate(events_df, pairs_df, project_codes=None, districts_n=13):
+def validate(events_df, pairs_df, project_codes=None, districts_n=13, catalogue_radius_km=None):
     """Return a list of (check, passed, detail).
 
     Every check always runs. An empty map is not skipped: the catalogue must then
     agree that no event has an affected district. `project_codes` is the set of valid
-    district codes; without it only the number of distinct codes is checked.
+    district codes; without it only the number of distinct codes is checked. With
+    `catalogue_radius_km`, every event must have come within that radius of an AP district.
     """
     checks = []
+    if catalogue_radius_km is not None:
+        closest = pd.to_numeric(events_df["min_distance_any_grade_km"], errors="coerce")
+        # distances are rounded up to 0.1 km, so allow that margin
+        checks.append(("events_within_catalogue_radius",
+                       bool((np.isfinite(closest) & (closest <= catalogue_radius_km + 0.1 + 1e-9)).all()),
+                       f"every event came within {catalogue_radius_km:g} km of an AP district (any IMD grade)"))
     n_pairs = len(pairs_df)
     if n_pairs == 0:
         pairs_df = pd.DataFrame({c: pd.Series(dtype=object) for c in PAIR_COLUMNS})
@@ -583,8 +692,13 @@ def run_summary(ctx, events_df, pairs_df, unmapped_df):
         rows.append({"section": section, "metric": metric, "value": value})
 
     for key in ("storms_in_file_from_start_year", "storms_with_imd_positions",
-                "bay_of_bengal_storms_without_imd_positions", "catalogue_events"):
+                "bay_of_bengal_storms_with_imd_positions", "bay_of_bengal_storms_without_imd_positions",
+                "catalogue_radius_km", "bay_of_bengal_imd_storms_outside_radius_excluded", "catalogue_events",
+                "no_imd_storms_listed_with_merged_track_within_radius", "no_imd_storms_listed_relevance_unknown",
+                "no_imd_storms_far_from_ap_not_listed"):
         add("catalogue", key, ctx[key])
+    for km in sorted(ctx["catalogue_events_by_radius"]):
+        add("catalogue_radius_sensitivity", f"imd_events_within_{km}_km", ctx["catalogue_events_by_radius"][km])
     status = events_df["mapping_status"].value_counts()
     for key in ("mapped", "unmapped_never_reached_cyclonic_storm",
                 "unmapped_no_project_district_within_threshold"):
@@ -627,13 +741,18 @@ def main():
                         help="affected-district threshold in km (any positive value; distances are computed up to "
                              "max(200, this value))")
     parser.add_argument("--start-year", type=int, default=1990)
+    parser.add_argument("--catalogue-radius-km", type=float, default=DEFAULT_CATALOGUE_RADIUS_KM,
+                        help="Andhra Pradesh focus: catalogue only storms whose IMD track (any grade) came "
+                             "within this distance of an AP district; must be at least --distance-km")
     parser.add_argument("--strict-spot-checks", action="store_true",
                         help="exit with an error when a spot check does not match its (unverified) expectation; "
                              "by default a mismatch is only printed as a warning")
     a = parser.parse_args()
 
-    events, pairs, unmapped, ctx = build(a.tracks, a.boundaries, a.districts, a.distance_km, a.start_year)
-    checks = validate(events, pairs, project_codes=set(load_project_districts(a.districts).values()))
+    events, pairs, unmapped, ctx = build(a.tracks, a.boundaries, a.districts, a.distance_km, a.start_year,
+                                         a.catalogue_radius_km)
+    checks = validate(events, pairs, project_codes=set(load_project_districts(a.districts).values()),
+                      catalogue_radius_km=a.catalogue_radius_km)
     failed = [c for c in checks if not c[1]]
     out = Path(a.outdir)
     out.mkdir(parents=True, exist_ok=True)
