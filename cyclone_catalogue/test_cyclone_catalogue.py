@@ -235,7 +235,7 @@ def test_weak_storm_never_cs_is_unmapped_even_if_over_a_district(tmp_path):
     lat, lon = inside_point(IDX[504])
     events, pairs, unmapped, _ = build_from(tmp_path, storm("S5", 2015, "WEAK", lat, lon, grade="DD", wind=25))
     assert len(pairs) == 0
-    assert events.iloc[0]["mapping_status"] == "unmapped_never_reached_cyclonic_storm_grade"
+    assert events.iloc[0]["mapping_status"] == "unmapped_never_reached_cyclonic_storm"
     assert events.iloc[0]["n_cs_or_above_points"] == 0
 
 
@@ -335,12 +335,12 @@ def test_validate_detects_duplicate_pairs_and_unknown_events(tmp_path):
 
 
 def test_spot_check_table_flags_missing_and_found_events(tmp_path):
-    # Index 0 is ANANTAPURAMU, far from the expected VISAKHAPATNAM (index 10), so the expectation fails.
+    # A storm placed in ANANTAPURAMU (502) is far from the expected VISAKHAPATNAM (520), so the check fails.
     events, pairs, _, _ = build_from(tmp_path, storm("S1", 2014, "HUDHUD", 16.0, district_lon0(IDX[502]) + 0.05))
     table = c.spot_checks(events, pairs)
     hudhud = table[table["event"] == "HUDHUD"].iloc[0]
     assert bool(hudhud["found_in_catalogue"]) and not bool(hudhud["all_expected_found"])
-    # Index 10 is VISAKHAPATNAM, so the same storm placed there meets the expectation.
+    # The same storm placed in VISAKHAPATNAM (520) meets the expectation.
     events, pairs, _, _ = build_from(tmp_path, storm("S1", 2014, "HUDHUD", 16.0, district_lon0(IDX[520]) + 0.05))
     hudhud = c.spot_checks(events, pairs).query("event == 'HUDHUD'").iloc[0]
     assert bool(hudhud["all_expected_found"]) and hudhud["closest_expected_distance_km"] == 0.0
@@ -483,3 +483,183 @@ def test_spot_checks_before_start_year_are_skipped_not_failed(tmp_path):
     assert table.loc["HUDHUD", "status"] == "skipped_before_start_year"    # 2014
     assert table.loc["MICHAUNG", "status"] == "pass"
     assert not table["status"].isin(["fail"]).any()
+
+
+# ---------- second review: spot checks are unverified and non-fatal by default ----------
+
+def run_main(monkeypatch, tmp_path, rows, *extra):
+    tracks, boundaries, districts = write_inputs(tmp_path, rows)
+    out = tmp_path / "out"
+    argv = ["build_cyclone_catalogue.py", "--tracks", str(tracks), "--boundaries", str(boundaries),
+            "--districts", str(districts), "--outdir", str(out), *extra]
+    monkeypatch.setattr(sys, "argv", argv)
+    c.main()
+    return out
+
+
+def test_spot_check_mismatch_only_warns_by_default(monkeypatch, tmp_path, capsys):
+    # HUDHUD placed in ANANTAPURAMU: valid data, but not where the (unverified) expectation says.
+    rows = storm("S1", 2014, "HUDHUD", 16.0, district_lon0(IDX[502]) + 0.05)
+    out = run_main(monkeypatch, tmp_path, rows)           # must not raise SystemExit
+    assert "WARNING: Spot check did not match" in capsys.readouterr().out
+    table = pd.read_csv(out / "cyclone_spot_checks_v1.csv").set_index("event")
+    assert table.loc["HUDHUD", "status"] == "fail"
+    assert (out / "validation_checks.csv").exists() and (out / "cyclone_run_summary_v1.csv").exists()
+
+
+def test_strict_flag_makes_spot_check_mismatch_fatal(monkeypatch, tmp_path):
+    rows = storm("S1", 2014, "HUDHUD", 16.0, district_lon0(IDX[502]) + 0.05)
+    with pytest.raises(SystemExit, match="Spot check did not match"):
+        run_main(monkeypatch, tmp_path, rows, "--strict-spot-checks")
+
+
+def test_spot_check_csv_labels_expectations_as_unverified(monkeypatch, tmp_path):
+    out = run_main(monkeypatch, tmp_path, storm("S1", 2014, "HUDHUD", 16.0, district_lon0(IDX[520]) + 0.05))
+    table = pd.read_csv(out / "cyclone_spot_checks_v1.csv")
+    assert (table["expectation_verified"] == False).all()  # noqa: E712
+    assert table["expectation_source"].str.contains("unverified").all()
+
+
+def test_two_events_with_the_same_name_and_season_are_ambiguous(tmp_path):
+    rows = (storm("A1", 2018, "TITLI", 16.0, district_lon0(IDX[519]) + 0.05)
+            + storm("A2", 2018, "TITLI", 18.5, 80.0))           # second fragment maps to nothing
+    events, pairs, _, _ = build_from(tmp_path, rows)
+    titli = c.spot_checks(events, pairs).set_index("event").loc["TITLI"]
+    assert titli["status"] == "ambiguous_multiple_events" and titli["n_matching_events"] == 2
+    assert "SRIKAKULAM" in titli["found_districts"]               # both events are considered, not just the first
+
+
+# ---------- second review: rounding, empty input, grade versus wind ----------
+
+def test_tiny_outside_distance_is_rounded_up_not_to_zero(tmp_path):
+    # 0.03 km east of the east edge of the square (lon0 + 0.1).
+    k = IDX[510]
+    lon = district_lon0(k) + 0.1 + 0.03 / KM_PER_DEG_LON
+    events, pairs, _, _ = build_from(tmp_path, storm("S1", 2015, "EDGE", 16.0, lon, n=1), distance_km=10.0)
+    row = pairs[pairs["district_code"] == 510].iloc[0]
+    assert row["rule_tier"] == "near" and row["min_distance_km"] == 0.1
+    assert all(ok for _, ok, _ in c.validate(events, pairs, project_codes=PROJECT_CODES))
+
+
+def test_track_exactly_on_a_boundary_is_inside_with_zero_distance(tmp_path):
+    k = IDX[510]
+    events, pairs, _, _ = build_from(tmp_path, storm("S1", 2015, "ONEDGE", 16.0, district_lon0(k), n=1), distance_km=10.0)
+    row = pairs[pairs["district_code"] == 510].iloc[0]
+    assert row["rule_tier"] == "inside" and row["min_distance_km"] == 0.0
+    assert all(ok for _, ok, _ in c.validate(events, pairs, project_codes=PROJECT_CODES))
+
+
+def test_distance_check_allows_only_the_rounding_margin():
+    events = pd.DataFrame([{"event_id": "E", "n_affected_districts": 1, "affected_district_codes": "510",
+                            "mapping_status": "mapped", "subbasins_visited": "BB"}])
+    pairs = pd.DataFrame([{"event_id": "E", "district_code": 510, "rule_tier": "near",
+                           "min_distance_km": 50.1, "distance_threshold_km": 50.06}])
+    assert {n: ok for n, ok, _ in c.validate(events, pairs)}["distances_valid"]
+    assert not {n: ok for n, ok, _ in c.validate(events, pairs.assign(min_distance_km=50.3))}["distances_valid"]
+
+
+def test_empty_catalogue_writes_empty_outputs_instead_of_crashing(monkeypatch, tmp_path):
+    out = run_main(monkeypatch, tmp_path, storm("S1", 2015, "A", *inside_point(IDX[504])), "--start-year", "2100")
+    events = pd.read_csv(out / "cyclone_events_v1.csv")
+    pairs = pd.read_csv(out / "cyclone_district_map_v1.csv")
+    assert list(events.columns) == c.EVENT_COLUMNS and len(events) == 0
+    assert list(pairs.columns) == c.PAIR_OUTPUT_COLUMNS and len(pairs) == 0
+    checks = pd.read_csv(out / "validation_checks.csv")
+    assert (checks["status"] == "PASS").all()
+    spot = pd.read_csv(out / "cyclone_spot_checks_v1.csv")
+    assert (spot["status"] == "skipped_before_start_year").all()
+
+
+def test_grade_decides_when_present_and_wind_only_when_grade_is_blank(tmp_path):
+    # Two CS points, one blank-grade point at 35 kt (counts by wind), one grade D at 40 kt (grade wins,
+    # reported but not used), one DD at 30 kt (below both).
+    rows = (storm("S1", 2015, "GRADES", *inside_point(IDX[504]), grade="CS", wind=40, n=2)
+            + [["S1", 2015, "GRADES", "2015-10-11 00:00:00", "BB", 16.0, 79.0, "D", 40, 990],
+               ["S1", 2015, "GRADES", "2015-10-11 06:00:00", "BB", 16.0, 79.0, "", 35, 990],
+               ["S1", 2015, "GRADES", "2015-10-11 12:00:00", "BB", 16.0, 79.0, "DD", 30, 990]])
+    events, _, _, ctx = build_from(tmp_path, rows)
+    assert ctx["points_cs_by_wind_only_blank_grade"] == 1 and ctx["events_with_points_cs_by_wind_only"] == 1
+    assert ctx["points_wind_ge_34kt_with_grade_below_cs_not_used"] == 1
+    assert ctx["events_with_wind_ge_34kt_grade_below_cs_not_used"] == 1
+    assert events.iloc[0]["n_cs_or_above_points"] == 3 and events.iloc[0]["n_cs_points_by_wind_only"] == 1
+
+
+@pytest.mark.parametrize("grade,wind,expected", [
+    ("", 34, True), ("", 127, True), ("", 33.9, False), ("", np.nan, False),   # blank grade: wind decides, missing is not CS
+    ("D", 80, False), ("DD", 50, False), ("L", 60, False),                      # a present low grade always wins
+    ("CS", np.nan, True), ("CS", 20, True), ("SUCS", 130, True),                # a CS-or-above grade needs no wind
+])
+def test_cs_or_above_mask_rule(grade, wind, expected):
+    frame = pd.DataFrame({"grade": [grade], "NEWDELHI_WIND": [wind]})
+    assert bool(c.cs_or_above_mask(frame).iloc[0]) is expected
+
+
+def test_blank_grade_storm_with_high_wind_is_mapped_and_labelled_by_wind(tmp_path):
+    # Like the early-1990s rows of the source file: no grade at all, but a strong IMD wind.
+    rows = storm("OLD1", 1991, "UNNAMED", *inside_point(IDX[510]), grade="", wind=100, n=3)
+    events, pairs, unmapped, _ = build_from(tmp_path, rows)
+    e = events.iloc[0]
+    assert e["mapping_status"] == "mapped" and e["n_cs_points_by_wind_only"] == 3 and len(unmapped) == 0
+    row = pairs[pairs["district_code"] == 510].iloc[0]
+    assert row["rule_tier"] == "inside" and row["grade_at_closest"] == c.WIND_BASIS_LABEL
+    assert row["max_imd_wind_kt_within"] == 100.0
+
+
+def test_blank_grade_storm_with_weak_or_missing_wind_stays_unmapped(tmp_path):
+    rows = (storm("W1", 1991, "WEAK", *inside_point(IDX[510]), grade="", wind=30, n=2)
+            + storm("W2", 1991, "NOWIND", *inside_point(IDX[510]), grade="", wind="", n=2))
+    events, pairs, unmapped, _ = build_from(tmp_path, rows)
+    assert len(pairs) == 0
+    assert set(events["mapping_status"]) == {"unmapped_never_reached_cyclonic_storm"}
+
+
+def test_run_summary_numbers_come_from_the_outputs(tmp_path):
+    rows = storm("S1", 2016, "A", *inside_point(IDX[504])) + storm("S4", 2016, "FAR", 18.5, 80.0)
+    events, pairs, unmapped, ctx = build_from(tmp_path, rows)
+    summary = c.run_summary(ctx, events, pairs, unmapped).set_index("metric")["value"]
+    assert summary["catalogue_events"] == 2 and summary["events_mapped"] == 1
+    assert summary["event_district_pairs"] == len(pairs)
+    assert summary["pairs_inside"] + summary["pairs_near"] == len(pairs)
+    assert summary["pairs_closest_point_observed"] + summary["pairs_closest_point_interpolated"] == len(pairs)
+    assert summary["pairs_within_100_km"] == len(pairs)
+    assert summary["pairs_within_50_km"] <= summary["pairs_within_100_km"] <= summary["pairs_within_150_km"]
+    assert summary["mapped_events_2015_to_2019"] == 1 and summary["events_2015_to_2019"] == 2
+
+
+# ---------- second review: projection and boundary guards ----------
+
+def test_distance_uses_a_projection_centred_on_the_district(tmp_path):
+    """A district near 19 N must not be measured with the 16 N scale (that over-states east-west distances by 1.7 percent)."""
+    tracks, boundaries, districts = write_inputs(tmp_path, storm("S1", 2015, "A", *inside_point(IDX[504])))
+    gj = json.loads(boundaries.read_text())
+    for feature in gj["features"]:
+        if feature["properties"]["shapeName"] == "Srikakulam":
+            feature["geometry"]["coordinates"] = square(80.0, 19.0, 0.1)   # square at about 19.05 N
+    boundaries.write_text(json.dumps(gj))
+    project_codes = c.load_project_districts(districts)
+    name, polygons, lat0 = c.load_district_polygons(boundaries, project_codes)[519]
+    assert name == "SRIKAKULAM" and lat0 == pytest.approx(19.04, abs=0.02)
+    east_deg = 100.0 / (c.KM_PER_DEG * math.cos(math.radians(19.05)))       # a true 100 km east of the east edge
+    x, y = c.to_xy([80.1 + east_deg], [19.05], lat0)
+    assert c.distance_to_district(x, y, polygons)[0] == pytest.approx(100.0, abs=0.5)
+    x16, y16 = c.to_xy([80.1 + east_deg], [19.05])                          # fixed 16 N scale, for contrast
+    fixed = c.distance_to_district(x16, y16, c.polygons_from_geometry({"type": "Polygon", "coordinates": square(80.0, 19.0, 0.1)}))[0]
+    assert fixed > 101.0
+
+
+def test_boundary_file_with_a_duplicated_district_name_rejected(tmp_path):
+    tracks, boundaries, districts = write_inputs(tmp_path, storm("S1", 2015, "A", *inside_point(IDX[504])))
+    gj = json.loads(boundaries.read_text())
+    gj["features"].append(dict(gj["features"][0]))                          # same shapeName twice
+    boundaries.write_text(json.dumps(gj))
+    with pytest.raises(ValueError, match="duplicated"):
+        c.build(tracks, boundaries, districts)
+
+
+def test_boundary_with_unsupported_geometry_type_rejected(tmp_path):
+    tracks, boundaries, districts = write_inputs(tmp_path, storm("S1", 2015, "A", *inside_point(IDX[504])))
+    gj = json.loads(boundaries.read_text())
+    gj["features"][0]["geometry"] = {"type": "Point", "coordinates": [80.0, 16.0]}
+    boundaries.write_text(json.dumps(gj))
+    with pytest.raises(ValueError, match="Unsupported geometry"):
+        c.build(tracks, boundaries, districts)

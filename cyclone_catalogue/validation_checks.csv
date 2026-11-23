@@ -1,9 +1,9 @@
 check,status,detail
 event_key_unique,PASS,247 events
-pair_key_unique,PASS,110 event-district pairs
+pair_key_unique,PASS,122 event-district pairs
 pairs_reference_catalogue,PASS,every mapped event is in the catalogue
 district_codes_valid,PASS,"12 district codes appear, all in the 13 project codes"
-distances_valid,PASS,"finite, non-negative and within each pair's threshold"
+distances_valid,PASS,"finite, non-negative and within each pair's threshold (distances are rounded up to 0.1 km)"
 inside_means_zero_distance,PASS,tier agrees with distance
 affected_counts_agree,PASS,catalogue counts match the map
 affected_codes_agree,PASS,catalogue district codes match the map
