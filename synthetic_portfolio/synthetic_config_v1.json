@@ -1,0 +1,321 @@
+{
+  "config_version": "1.0",
+  "label": "SYNTHETIC - not PNB data",
+  "seed": 42,
+  "total_accounts": 5000,
+  "reporting_date": "2026-10-31",
+  "open_date_range": [
+    "2020-06-27",
+    "2025-03-17"
+  ],
+  "accounts_per_branch": 60,
+  "zone": "Hyderabad",
+  "district_population_2011": {
+    "ANANTAPURAMU": 4081148,
+    "CHITTOOR": 4174064,
+    "YSR": 2882469,
+    "EAST GODAVARI": 5154296,
+    "GUNTUR": 4887813,
+    "KRISHNA": 4517398,
+    "KURNOOL": 4053463,
+    "SPR NELLORE": 2963557,
+    "PRAKASAM": 3397448,
+    "SRIKAKULAM": 2703114,
+    "VISAKHAPATNAM": 4290589,
+    "VIZIANAGARAM": 2344474,
+    "WEST GODAVARI": 3936966
+  },
+  "city_of_district": {
+    "ANANTAPURAMU": "Anantapur",
+    "CHITTOOR": "Chittoor",
+    "YSR": "Kadapa",
+    "EAST GODAVARI": "Kakinada",
+    "GUNTUR": "Guntur",
+    "KRISHNA": "Vijayawada",
+    "KURNOOL": "Kurnool",
+    "SPR NELLORE": "Nellore",
+    "PRAKASAM": "Ongole",
+    "SRIKAKULAM": "Srikakulam",
+    "VISAKHAPATNAM": "Visakhapatnam",
+    "VIZIANAGARAM": "Vizianagaram",
+    "WEST GODAVARI": "Eluru"
+  },
+  "circle_of_district": {
+    "KRISHNA": "Vijayawada",
+    "GUNTUR": "Vijayawada",
+    "WEST GODAVARI": "Vijayawada",
+    "PRAKASAM": "Vijayawada",
+    "VISAKHAPATNAM": "Visakhapatnam",
+    "VIZIANAGARAM": "Visakhapatnam",
+    "SRIKAKULAM": "Visakhapatnam",
+    "EAST GODAVARI": "Visakhapatnam",
+    "SPR NELLORE": "Tirupati",
+    "CHITTOOR": "Tirupati",
+    "YSR": "Tirupati",
+    "ANANTAPURAMU": "Tirupati",
+    "KURNOOL": "Tirupati"
+  },
+  "product_mix_percent": [
+    {
+      "scheme code": "WC204",
+      "facility type": "Working Capital",
+      "agri sector": "Non-Agri",
+      "weight": 16
+    },
+    {
+      "scheme code": "WC204",
+      "facility type": "Cash Credit",
+      "agri sector": "Non-Agri",
+      "weight": 12
+    },
+    {
+      "scheme code": "MSME05",
+      "facility type": "Overdraft",
+      "agri sector": "Non-Agri",
+      "weight": 8
+    },
+    {
+      "scheme code": "KCC02",
+      "facility type": "Kisan Credit Card",
+      "agri sector": "Crop Production",
+      "weight": 4
+    },
+    {
+      "scheme code": "KCC02",
+      "facility type": "Kisan Credit Card",
+      "agri sector": "Horticulture",
+      "weight": 8
+    },
+    {
+      "scheme code": "KCC02",
+      "facility type": "Kisan Credit Card",
+      "agri sector": "Dairy & Animal Husbandry",
+      "weight": 4
+    },
+    {
+      "scheme code": "KCC02",
+      "facility type": "Kisan Credit Card",
+      "agri sector": "Poultry",
+      "weight": 4
+    },
+    {
+      "scheme code": "AGRI01",
+      "facility type": "Cash Credit",
+      "agri sector": "Irrigation",
+      "weight": 4
+    },
+    {
+      "scheme code": "AGRI01",
+      "facility type": "Cash Credit",
+      "agri sector": "Dairy & Animal Husbandry",
+      "weight": 4
+    },
+    {
+      "scheme code": "AGRI01",
+      "facility type": "Cash Credit",
+      "agri sector": "Poultry",
+      "weight": 4
+    },
+    {
+      "scheme code": "AGRI01",
+      "facility type": "Cash Credit",
+      "agri sector": "Horticulture",
+      "weight": 4
+    },
+    {
+      "scheme code": "AGRI09",
+      "facility type": "Cash Credit",
+      "agri sector": "Horticulture",
+      "weight": 4
+    },
+    {
+      "scheme code": "AGRI09",
+      "facility type": "Overdraft",
+      "agri sector": "Farm Mechanization",
+      "weight": 4
+    },
+    {
+      "scheme code": "TL101",
+      "facility type": "Term Loan",
+      "agri sector": "Dairy & Animal Husbandry",
+      "weight": 8
+    },
+    {
+      "scheme code": "TL101",
+      "facility type": "Term Loan",
+      "agri sector": "Horticulture",
+      "weight": 4
+    },
+    {
+      "scheme code": "TL101",
+      "facility type": "Term Loan",
+      "agri sector": "Irrigation",
+      "weight": 4
+    },
+    {
+      "scheme code": "TL101",
+      "facility type": "Term Loan",
+      "agri sector": "Farm Mechanization",
+      "weight": 4
+    }
+  ],
+  "asset_class_percent": {
+    "Standard": 36,
+    "SMA 0": 20,
+    "SMA 1": 16,
+    "SMA 2": 12,
+    "NPA": 16
+  },
+  "sanction_amount_weights": {
+    "100000": 5,
+    "250000": 2,
+    "500000": 3,
+    "750000": 4,
+    "1000000": 3,
+    "1500000": 3,
+    "2500000": 5
+  },
+  "interest_rate_range": [
+    7.22,
+    12.59
+  ],
+  "outstanding_to_sanction_range": [
+    0.203,
+    0.95
+  ],
+  "dpd_range": {
+    "Standard": [
+      0,
+      0
+    ],
+    "SMA 0": [
+      1,
+      30
+    ],
+    "SMA 1": [
+      31,
+      60
+    ],
+    "SMA 2": [
+      61,
+      90
+    ],
+    "NPA": [
+      91,
+      365
+    ]
+  },
+  "overdue_to_outstanding_range": {
+    "Standard": [
+      0.0,
+      0.0
+    ],
+    "SMA 0": [
+      0.012,
+      0.044
+    ],
+    "SMA 1": [
+      0.051,
+      0.084
+    ],
+    "SMA 2": [
+      0.17,
+      0.211
+    ],
+    "NPA": [
+      0.28,
+      0.448
+    ]
+  },
+  "customers_with_two_accounts_percent": 5,
+  "customer_name_blank_percent": 0,
+  "place_name_lists": {
+    "given_names": [
+      "Ravi",
+      "Suresh",
+      "Venkata",
+      "Srinivas",
+      "Lakshmi",
+      "Padma",
+      "Anil",
+      "Kiran",
+      "Sai",
+      "Madhavi",
+      "Naresh",
+      "Ramesh",
+      "Sunitha",
+      "Hari",
+      "Mohan",
+      "Prasad",
+      "Anjali",
+      "Bhaskar",
+      "Chandra",
+      "Durga",
+      "Gopal",
+      "Harish",
+      "Jyothi",
+      "Kavitha",
+      "Mahesh",
+      "Nagaraju",
+      "Pavan",
+      "Rajesh",
+      "Sravani",
+      "Uma"
+    ],
+    "surnames": [
+      "Naidu",
+      "Rao",
+      "Chowdary",
+      "Varma",
+      "Raju",
+      "Sastry",
+      "Goud",
+      "Yadav",
+      "Setty",
+      "Murthy",
+      "Babu",
+      "Kumar",
+      "Devi",
+      "Reddy",
+      "Patnaik",
+      "Das",
+      "Nayak",
+      "Prasad",
+      "Sharma",
+      "Rani"
+    ],
+    "house": [
+      "H.No",
+      "Plot",
+      "D.No",
+      "Flat"
+    ],
+    "area": [
+      "Gandhi Nagar",
+      "Nehru Road",
+      "Market Street",
+      "Temple Street",
+      "Station Road",
+      "Ambedkar Colony",
+      "Main Bazaar",
+      "Shanti Nagar",
+      "Lakshmi Nagar",
+      "Industrial Area"
+    ],
+    "locality": [
+      "Ward 1",
+      "Ward 2",
+      "Ward 3",
+      "Ward 4",
+      "Ward 5",
+      "Ward 6",
+      "Ward 7",
+      "Ward 8"
+    ]
+  },
+  "t5_tolerance_pp": {
+    "small_district_rows": 150,
+    "small": 10,
+    "large": 5
+  }
+}

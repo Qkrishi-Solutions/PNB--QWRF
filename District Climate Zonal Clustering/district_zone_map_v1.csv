@@ -1,0 +1,14 @@
+district_code,district_name,cluster_id,climate_zone,selected_k
+502,ANANTAPURAMU,2,Climate Zone 3,3
+503,CHITTOOR,0,Climate Zone 1,3
+504,YSR,2,Climate Zone 3,3
+505,EAST GODAVARI,1,Climate Zone 2,3
+506,GUNTUR,2,Climate Zone 3,3
+510,KRISHNA,1,Climate Zone 2,3
+511,KURNOOL,2,Climate Zone 3,3
+515,SPR NELLORE,0,Climate Zone 1,3
+517,PRAKASAM,2,Climate Zone 3,3
+519,SRIKAKULAM,1,Climate Zone 2,3
+520,VISAKHAPATNAM,1,Climate Zone 2,3
+521,VIZIANAGARAM,1,Climate Zone 2,3
+523,WEST GODAVARI,1,Climate Zone 2,3

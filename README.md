@@ -120,3 +120,24 @@ Do not commit client data, credentials or Gurobi licence files.
 - India Meteorological Department (IMD) gridded rainfall.
 - ERA5-Land, Copernicus Climate Change Service (C3S) / ECMWF.
 
+## Setup and tests
+
+### Requirements
+- Python 3.12
+- UV (recommended)
+- Dependencies listed in the root requirements.txt
+
+### Install and run tests
+
+Run all four test suites using:
+
+`uv run --python 3.12 --with-requirements requirements.txt python run_tests.py`
+
+The test runner executes:
+
+1. address_expansion/tests
+2. financial_data_validation/tests
+3. synthetic_portfolio/tests
+4. synthetic_training_dataset/tests
+
+The runner stops and returns a non-zero exit code if any suite fails. A successful run prints ALL TEST SUITES PASSED.
