@@ -1,0 +1,43 @@
+section,key,value
+meta,label,SYNTHETIC - not PNB data
+meta,seed,42
+meta,rows,5000
+meta,config_sha256,899e1ef32d2f8689766e2bd78834562f0a306d3334bfbdb0840f9569449a401d
+meta,output_sha256,18912212d3a6c0716867a3cf282f10dd5393a8976243404fde8d2657abd39dd0
+accounts_by_district,ANANTAPURAMU,413
+accounts_by_district,CHITTOOR,423
+accounts_by_district,EAST GODAVARI,522
+accounts_by_district,GUNTUR,495
+accounts_by_district,KRISHNA,457
+accounts_by_district,KURNOOL,410
+accounts_by_district,PRAKASAM,344
+accounts_by_district,SPR NELLORE,300
+accounts_by_district,SRIKAKULAM,274
+accounts_by_district,VISAKHAPATNAM,434
+accounts_by_district,VIZIANAGARAM,237
+accounts_by_district,WEST GODAVARI,399
+accounts_by_district,YSR,292
+accounts_by_asset_class,Standard,1799
+accounts_by_asset_class,SMA 0,999
+accounts_by_asset_class,SMA 1,802
+accounts_by_asset_class,NPA,799
+accounts_by_asset_class,SMA 2,601
+accounts_by_product,AGRI01 | Cash Credit | Dairy & Animal Husbandry,204
+accounts_by_product,AGRI01 | Cash Credit | Horticulture,197
+accounts_by_product,AGRI01 | Cash Credit | Irrigation,203
+accounts_by_product,AGRI01 | Cash Credit | Poultry,204
+accounts_by_product,AGRI09 | Cash Credit | Horticulture,198
+accounts_by_product,AGRI09 | Overdraft | Farm Mechanization,198
+accounts_by_product,KCC02 | Kisan Credit Card | Crop Production,201
+accounts_by_product,KCC02 | Kisan Credit Card | Dairy & Animal Husbandry,201
+accounts_by_product,KCC02 | Kisan Credit Card | Horticulture,400
+accounts_by_product,KCC02 | Kisan Credit Card | Poultry,202
+accounts_by_product,MSME05 | Overdraft | Non-Agri,400
+accounts_by_product,TL101 | Term Loan | Dairy & Animal Husbandry,399
+accounts_by_product,TL101 | Term Loan | Farm Mechanization,199
+accounts_by_product,TL101 | Term Loan | Horticulture,199
+accounts_by_product,TL101 | Term Loan | Irrigation,199
+accounts_by_product,WC204 | Cash Credit | Non-Agri,598
+accounts_by_product,WC204 | Working Capital | Non-Agri,798
+meta,branches,85
+meta,customers,4761

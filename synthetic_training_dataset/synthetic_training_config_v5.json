@@ -1,0 +1,173 @@
+{
+  "config_version": "5.0",
+  "dataset_version": "v5",
+  "label": "SYNTHETIC - not PNB data",
+  "seed": 2026,
+  "base_config": "../synthetic_portfolio/synthetic_config_v1.json",
+  "total_accounts": 11000,
+  "anomaly_method": "loyo",
+  "snapshots": [
+    {
+      "year": 2015,
+      "split": "train",
+      "accounts": 3333
+    },
+    {
+      "year": 2016,
+      "split": "train",
+      "accounts": 3334
+    },
+    {
+      "year": 2017,
+      "split": "train",
+      "accounts": 3333
+    },
+    {
+      "year": 2018,
+      "split": "test",
+      "accounts": 500
+    },
+    {
+      "year": 2019,
+      "split": "test",
+      "accounts": 500
+    }
+  ],
+  "reporting_month_day": "10-31",
+  "open_date_start": "2015-01-01",
+  "min_account_age_days": 90,
+  "allowed_agri_sectors": [
+    "Crop Production",
+    "Fisheries",
+    "Poultry",
+    "Dairy & Animal Husbandry"
+  ],
+  "include_synthetic_flag": false,
+  "rank_within_snapshot_year": true,
+  "pnb_layout_includes_insurance": true,
+  "insurance_output_fields": [
+    "crop_insurance_available",
+    "insurance_start_date",
+    "insurance_end_date"
+  ],
+  "asset_class_percent_override": {
+    "Standard": 30,
+    "SMA 0": 20,
+    "SMA 1": 18,
+    "SMA 2": 16,
+    "NPA": 16
+  },
+  "product_mix_percent_override": [
+    {
+      "scheme code": "KCC02",
+      "facility type": "Kisan Credit Card",
+      "agri sector": "Crop Production",
+      "weight": 45
+    },
+    {
+      "scheme code": "KCC02",
+      "facility type": "Kisan Credit Card",
+      "agri sector": "Fisheries",
+      "weight": 6
+    },
+    {
+      "scheme code": "AGRI01",
+      "facility type": "Cash Credit",
+      "agri sector": "Fisheries",
+      "weight": 6
+    },
+    {
+      "scheme code": "TL101",
+      "facility type": "Term Loan",
+      "agri sector": "Fisheries",
+      "weight": 8
+    },
+    {
+      "scheme code": "KCC02",
+      "facility type": "Kisan Credit Card",
+      "agri sector": "Poultry",
+      "weight": 5
+    },
+    {
+      "scheme code": "AGRI01",
+      "facility type": "Cash Credit",
+      "agri sector": "Poultry",
+      "weight": 5
+    },
+    {
+      "scheme code": "KCC02",
+      "facility type": "Kisan Credit Card",
+      "agri sector": "Dairy & Animal Husbandry",
+      "weight": 8
+    },
+    {
+      "scheme code": "AGRI01",
+      "facility type": "Cash Credit",
+      "agri sector": "Dairy & Animal Husbandry",
+      "weight": 7
+    },
+    {
+      "scheme code": "TL101",
+      "facility type": "Term Loan",
+      "agri sector": "Dairy & Animal Husbandry",
+      "weight": 10
+    }
+  ],
+  "weather_feature_columns": [
+    "kharif__rain_sum",
+    "kharif__longest_dry",
+    "annual_crop__hot_days",
+    "kharif__tmax_mean",
+    "kharif__dtr_mean",
+    "ne__rainy_days"
+  ],
+  "weather_stress_signs": {
+    "kharif__rain_sum": -1,
+    "kharif__longest_dry": 1,
+    "annual_crop__hot_days": 1,
+    "kharif__tmax_mean": 1
+  },
+  "anomaly_z_clip": 3.0,
+  "sector_weather_sensitivity": {
+    "Crop Production": 1.0,
+    "Fisheries": 0.6,
+    "Dairy & Animal Husbandry": 0.3,
+    "Poultry": 0.2
+  },
+  "insurance": {
+    "availability_probability": {
+      "Crop Production": 0.7,
+      "Fisheries": 0.4,
+      "Dairy & Animal Husbandry": 0.15,
+      "Poultry": 0.15
+    },
+    "status_percent": {
+      "Active": 70,
+      "Expired": 22,
+      "Pending": 8
+    },
+    "term_days": 364,
+    "pending_start_within_days": 45,
+    "minimal": true
+  },
+  "risk_score": {
+    "weather": 0.6,
+    "yield_shortfall": 0.4,
+    "uninsured_agri": 0.5,
+    "expired_policy": 0.4,
+    "coverage_shortfall": 0.0,
+    "log_sanction": 0.15,
+    "interest_rate": 0.2,
+    "account_age": 0.1,
+    "noise_sd": 0.25
+  },
+  "split_rule": "out-of-time: train 2015-2017, test 2018-2019; every date inside 2015-2019",
+  "date_window": {
+    "start": "2015-01-01",
+    "end": "2019-12-31"
+  },
+  "drop_columns": [
+    "insurance_days_to_expiry",
+    "insurance_coverage_ratio"
+  ]
+}
