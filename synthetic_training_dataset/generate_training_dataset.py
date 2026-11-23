@@ -14,6 +14,7 @@ import argparse
 import hashlib
 import json
 import logging
+import re
 import sys
 from pathlib import Path
 
@@ -107,8 +108,10 @@ def load_district_codes(path: Path) -> dict[str, int]:
     """``{DISTRICT NAME: district_code}`` from the weather file."""
     frame = pd.read_csv(path, usecols=["district_code", "district_name"])
     frame = frame.drop_duplicates()
-    return {str(n).upper(): int(c) for c, n in zip(frame.district_code, frame.district_name, strict=True)}
-
+    return {
+        re.sub(r"\s+", " ", str(n).upper()).strip(): int(c)
+        for c, n in zip(frame["district_code"], frame["district_name"], strict=True)
+    }
 
 def load_crop_table(path: Path, years: list[int]) -> pd.DataFrame:
     """Crop rows usable for assignment, with the forward-chaining yield z-score."""
@@ -168,33 +171,64 @@ def make_insurance(
     ins = cfg["insurance"]
     blank = dict.fromkeys(INSURANCE_COLUMNS)
     sector = row["agri sector"]
+
     if rng.random() >= ins["availability_probability"][sector]:
-        blank.update(crop_insurance_available="N", insurance_coverage_status="Not Insured",
-                     insurance_claim_status="No Claim")
+        blank.update(
+            crop_insurance_available="N",
+            insurance_coverage_status="Not Insured",
+            insurance_claim_status="No Claim",
+        )
         return blank
 
     rep = pd.Timestamp(row["reporting_date"])
     opened = pd.Timestamp(row["account open date"])
     term = int(ins["term_days"])
     status = _status_draw(rng, ins["status_percent"])
+
     if status == "Active":
         start = rep - pd.Timedelta(days=int(rng.integers(1, term + 1)))
         start = max(start, opened)
         end = start + pd.Timedelta(days=term)
+
     elif status == "Expired":
         room = max(2, min(300, (rep - opened).days - 30))
         end = rep - pd.Timedelta(days=int(rng.integers(1, room)))
         start = max(opened, end - pd.Timedelta(days=term))
+
     else:
-        start = rep + pd.Timedelta(days=int(rng.integers(1, int(ins["pending_start_within_days"]) + 1)))
+        start = rep + pd.Timedelta(
+            days=int(
+                rng.integers(
+                    1,
+                    int(ins["pending_start_within_days"]) + 1,
+                )
+            )
+        )
         end = start + pd.Timedelta(days=term)
 
-    window_end = cfg.get("date_window", {}).get("end")
+    # Keep insurance dates within the configured date window.
+    date_window = cfg.get("date_window", {})
+    window_start = date_window.get("start")
+    window_end = date_window.get("end")
+
+    if window_start:
+        start = max(start, pd.Timestamp(window_start))
+
     if window_end:
         end = min(end, pd.Timestamp(window_end))
+
+    # Do not generate an insured policy with an invalid date range.
+    if end <= start:
+        blank.update(
+            crop_insurance_available="N",
+            insurance_coverage_status="Not Insured",
+            insurance_claim_status="No Claim",
+        )
+        return blank
+
     if ins.get("minimal", False):
-        # v5: only insured Y/N, start date and end date are written. The coverage
-        # status is kept internally (it feeds the risk score) but is not an output.
+        # Only insured flag, start date and end date are written.
+        # Coverage status is retained internally for risk scoring.
         return dict(
             crop_insurance_available="Y",
             insurance_start_date=start.strftime("%Y-%m-%d"),
@@ -203,13 +237,19 @@ def make_insurance(
         )
 
     lo, hi = ins["insured_to_sanction_range"]
-    amount = round(float(row["sanction amount"]) * float(rng.uniform(lo, hi)))
+    amount = round(
+        float(row["sanction amount"]) * float(rng.uniform(lo, hi))
+    )
+
     plo, phi = ins["premium_to_insured_range"]
     premium = round(amount * float(rng.uniform(plo, phi)))
+
     out = dict(
         crop_insurance_available="Y",
         insurance_policy_id=f"SYN-POL-{int(rng.integers(10**7, 10**8))}",
-        insurance_scheme=ins["scheme_by_sector"].get(sector, ins["default_scheme"]),
+        insurance_scheme=ins["scheme_by_sector"].get(
+            sector, ins["default_scheme"]
+        ),
         insurance_amount=amount,
         insurance_premium=premium,
         insurance_start_date=start.strftime("%Y-%m-%d"),
@@ -221,31 +261,53 @@ def make_insurance(
         insurance_payout_amount=None,
         insurance_payout_date=None,
     )
+
     covered = status in ("Active", "Expired")
     sens = cfg["sector_weather_sensitivity"][sector]
+
     hit = sens * stress > ins["claim_stress_threshold"] or (
         not np.isnan(yield_z) and yield_z <= -1.0
     )
-    if covered and hit and rng.random() < ins["claim_probability_given_stress"]:
+
+    if (
+        covered
+        and hit
+        and rng.random() < ins["claim_probability_given_stress"]
+    ):
         claim_status = _status_draw(rng, ins["claim_status_percent"])
+
         clo, chi = ins["claim_to_insured_range"]
         claim = round(amount * float(rng.uniform(clo, chi)))
-        out.update(insurance_claim_status=claim_status, insurance_claim_amount=claim)
+
+        out.update(
+            insurance_claim_status=claim_status,
+            insurance_claim_amount=claim,
+        )
+
         if claim_status == "Paid":
-            window = (rep - start).days - int(ins["min_days_start_to_payout"])
+            window = (
+                (rep - start).days
+                - int(ins["min_days_start_to_payout"])
+            )
+
             if window > 0:
                 olo, ohi = ins["payout_to_claim_range"]
+
                 pay_date = start + pd.Timedelta(
-                    days=int(ins["min_days_start_to_payout"]) + int(rng.integers(0, window + 1))
+                    days=int(ins["min_days_start_to_payout"])
+                    + int(rng.integers(0, window + 1))
                 )
+
                 out.update(
-                    insurance_payout_amount=round(claim * float(rng.uniform(olo, ohi))),
+                    insurance_payout_amount=round(
+                        claim * float(rng.uniform(olo, ohi))
+                    ),
                     insurance_payout_date=pay_date.strftime("%Y-%m-%d"),
                 )
             else:
                 out["insurance_claim_status"] = "Approved"
-    return out
 
+    return out
 
 # -------------------------------------------------------------------------- build
 def build_dataset(
