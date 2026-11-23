@@ -71,10 +71,45 @@ merged_district_year_v1b.csv
                         |
                         └── Missing-value corrections and final cleaning
                                 └── merged_cleaned_v1d.csv
+```
 
+## Canonical Geography Master (Issue #42)
 
+The canonical geography master unifies all-India postal pincodes, provisional PNB administrative circles and zones, and climate clusters across all 13 Andhra Pradesh districts (`district_code` 502–523):
 
+| Component | Canonical File | Rows | Description |
+|---|---|:---:|---|
+| **Geography Master** | `geography_master/geography_master_v1.csv` | 19,300 | Pincode-grain master lookup connecting pincodes to district codes, provisional PNB circles/zones, and climate zones with nullable integer types (`502`, not `502.0`). |
+| **District Master** | `geography_master/district_geography_master_v1.csv` | 13 | Canonical 13-district summary with provisional administrative and climate assignments and mapped pincode counts. |
+| **Coverage Report** | `geography_master/geography_master_coverage_report_v1.csv` | 18 | Summary metrics, join validation, mapping status counts, and cross-dataset consistency audit. |
+| **Ambiguous Pincodes** | `geography_master/unmatched_ambiguous_pincodes_v1.csv` | 64 | Audit of multi-district and border pincodes left unassigned per the non-guessing policy. |
 
+> **Note on PNB Administrative Divisions:** Banking hierarchy assignments (`pnb_zone_provisional`, `pnb_circle_provisional`) are provisional placeholders derived from loan generator configuration; they will be updated upon ingestion of official PNB administrative branch circulars. Cross-dataset consistency of `district_code` is programmatically verified against weather and yield feature datasets.
+## Canonical Issue Deliverables & Artifact Paths
+
+Canonical locations for foundational feature engineering and data processing deliverables:
+
+| Issue | Component | Canonical Path | Primary Outputs / Scripts | Description |
+|---|---|---|---|---|
+| **Issue 1** | Crop Long Format Dataset | `CropLongFormatv1/` | `crop_long_v1.csv`<br>`crop_restructure_validate.py` | Restructured unpivoted crop-long dataset (1,430 rows × 124 columns), change logs (`v1f_change_log.csv`), and validation reports. |
+| **Issue 2** | Crop Model Eligibility | `CropModelEligibility/` | `crop_model_eligibility_v1.csv`<br>`crop_observation_coverage_summary_v1.csv` | Multi-crop suitability classification, observation coverage thresholds, and evaluation report. |
+| **Issue 6** | Climate Zonal Clustering | `District Climate Zonal Clustering/` | `district_climate_profiles_v1.csv`<br>`district_zone_map_v1.csv`<br>`district_climate_clustering.py` | Long-term district climate profiling, districts grouped by climate-feature similarity (3 zones), and clustering metrics (`clustering_evaluation_v1.csv`). |
+
+> **Note on Issue 1 canonical location and duplicate cleanup:**
+> - Canonical files reside in `CropLongFormatv1/` (`crop_long_v1.csv`).
+> - The legacy duplicate folder `Issues/CropLongFormatv1/` has been resolved on `dev`. Removal on `Main` is queued to take effect when `dev` is released/merged into `Main`.
+> - Checksum verification between `CropLongFormatv1/` and legacy `Issues/CropLongFormatv1/` confirmed 100% byte-level identity across all 8 files (SHA-256):
+>
+> | File | Status | SHA-256 Checksum |
+> |---|:---:|---|
+> | `crop_long_v1.csv` | Byte-identical | `e0e57b0fc90f12498436f081978b6fd26836c8863b202eb2baf6c23c8522f1ad` |
+> | `crop_restructure_validate.py` | Byte-identical | `2a245fd9b7b34aa5e6a418ca94d790a1d0a0e769ee5f1e61c287402ceac86bef` |
+> | `merged_cleaned_v1f.csv` | Byte-identical | `d299847c01b87ea725623aa5192e34e6bd540064323c5fe7a8cecf1410279ab7` |
+> | `v1f_change_log.csv` | Byte-identical | `d9e84dc194d86bd75e45712508a885d5fdcbcef0ba0f287088add727cb17e698` |
+> | `ISSUE_1_CROP_LONG_FORMAT_GUIDE.md` | Byte-identical | `21b459d92f086c2ae442cd4e89db27c97bb3eee8acb3eb6e1227f910b16e26a7` |
+> | `crop_data_validation_report.pdf` | Byte-identical | `95184ad56ca0e0fa44af39c4509a60c4765f4e8f2643c07c1bf1a23657c859ac` |
+> | `QWeatherRiskF_Data_Fixes_Report.pdf` | Byte-identical | `34e11d88f420f799ecd4e859cc4312baa26b5b6fbf99f3224ad7aa00f05b5430` |
+> | `QWeatherRiskF_Verification_and_Fix_Plan.pdf` | Byte-identical | `78196a3269c34f3ee63c6f904f30b82bbbc7e30711bb7c036e8654500fcff325` |
 
 ## Method summary
 
@@ -120,3 +155,24 @@ Do not commit client data, credentials or Gurobi licence files.
 - India Meteorological Department (IMD) gridded rainfall.
 - ERA5-Land, Copernicus Climate Change Service (C3S) / ECMWF.
 
+## Setup and tests
+
+### Requirements
+- Python 3.12
+- UV (recommended)
+- Dependencies listed in the root requirements.txt
+
+### Install and run tests
+
+Run all four test suites using:
+
+`uv run --python 3.12 --with-requirements requirements.txt python run_tests.py`
+
+The test runner executes:
+
+1. address_expansion/tests
+2. financial_data_validation/tests
+3. synthetic_portfolio/tests
+4. synthetic_training_dataset/tests
+
+The runner stops and returns a non-zero exit code if any suite fails. A successful run prints ALL TEST SUITES PASSED.

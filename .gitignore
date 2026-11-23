@@ -9,3 +9,7 @@ __pycache__/
 
 # Private generated financial data
 /data/private/
+.venv/
+__pycache__/
+.pytest_cache/
+*.py[cod]
