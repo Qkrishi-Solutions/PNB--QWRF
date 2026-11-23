@@ -32,5 +32,5 @@
     "imd_warning_district_match", "imd_warning_issue_time", "imd_warning_valid_from",
     "imd_warning_valid_to", "imd_warning_headline", "imd_warning_source_kind", "imd_warning_record_class"
   ],
-  "district_match_values": ["matched", "unmatched"]
+  "district_match_values": ["matched", "unmatched", "outside_project_state"]
 }

@@ -261,11 +261,11 @@ def test_missing_separator_does_not_silently_merge_advisories():
     assert rejects[0]["warning_id"] == "T-1"  # the first advisory is identified, not lost
 
 
-def test_duplicate_warning_id_across_blocks_rejects_later_one():
+def test_duplicate_warning_id_across_blocks_rejects_all_blocks_with_that_id():
     text = GOOD + "\n----------\n" + replace(GOOD, "STATE", "Another State")
     records, rejects = parse_one(text)
-    assert len(records) == 1 and records[0]["state"] == "Andhra Pradesh"
-    assert len(rejects) == 1 and "duplicate warning_id: T-1" in rejects[0]["errors"]
+    assert records == []
+    assert len(rejects) == 2 and all("duplicate warning_id: T-1" in r["errors"] for r in rejects)
 
 
 def test_parse_block_returns_documented_three_values():
@@ -354,10 +354,62 @@ def test_output_names_never_label_real_advisories_as_samples():
     assert all("sample" not in name for name in p.output_names("imd_advisory").values())
 
 
-def test_real_advisories_cannot_be_written_into_committed_samples_folder(tmp_path):
+@pytest.fixture
+def fake_samples(monkeypatch, tmp_path):
+    """Point the 'committed samples folder' at a temp copy, so a broken guard cannot write into the repo."""
+    folder = tmp_path / "samples"
+    folder.mkdir()
+    bundled = folder / "synthetic_imd_advisories.txt"
+    bundled.write_text(SAMPLE.read_text(encoding="utf-8"), encoding="utf-8")
+    monkeypatch.setattr(p, "SAMPLES_DIR", folder)
+    monkeypatch.setattr(p, "BUNDLED_SAMPLE", bundled)
+    return folder, bundled
+
+
+def test_real_advisories_cannot_be_written_into_committed_samples_folder(tmp_path, fake_samples):
+    folder, bundled = fake_samples
     districts = write_districts(tmp_path / "d.csv")
-    with pytest.raises(ValueError, match="Refusing to write real advisories"):
-        p.run(SAMPLE, districts, p.SAMPLES_DIR, "imd_advisory")
+    # even the bundled file may not be written there under the real-advisory label
+    with pytest.raises(ValueError, match="Refusing to write into the committed samples folder"):
+        p.run(bundled, districts, folder, "imd_advisory")
+    assert not any(folder.glob("imd_warnings_*"))
+
+
+def test_real_data_labelled_synthetic_cannot_be_written_into_samples(tmp_path, fake_samples):
+    folder, _ = fake_samples
+    districts = write_districts(tmp_path / "d.csv")
+    real = tmp_path / "real_bulletin.txt"
+    real.write_text(GOOD, encoding="utf-8")                  # ids like T-1, not SYN-
+    with pytest.raises(ValueError, match="Refusing to write into the committed samples folder"):
+        p.run(real, districts, folder, "synthetic_sample")
+    assert not any(folder.glob("imd_warnings_*"))
+
+
+def test_bundled_synthetic_file_may_be_written_into_samples(tmp_path, fake_samples):
+    folder, bundled = fake_samples
+    districts = write_districts(tmp_path / "d.csv")
+    p.run(bundled, districts, folder, "synthetic_sample")
+    assert (folder / "imd_warnings_parsed_sample.csv").exists()
+
+
+def test_synthetic_label_requires_syn_ids_everywhere(tmp_path):
+    districts = write_districts(tmp_path / "d.csv")
+    real = tmp_path / "real_bulletin.txt"
+    real.write_text(GOOD, encoding="utf-8")
+    with pytest.raises(ValueError, match="requires every advisory id to start with"):
+        p.run(real, districts, tmp_path / "out", "synthetic_sample")
+    # the same file under the honest label is fine
+    p.run(real, districts, tmp_path / "out", "imd_advisory")
+    assert (tmp_path / "out" / "imd_warnings_parsed_advisories.csv").exists()
+
+
+def test_synthetic_label_also_checks_rejected_blocks(tmp_path):
+    districts = write_districts(tmp_path / "d.csv")
+    mixed = tmp_path / "mixed.txt"
+    mixed.write_text(replace(GOOD, "ADVISORY-ID", "SYN-1") + "\n----------\n" + without(replace(GOOD, "ADVISORY-ID", "REAL-1"), "VALID TO"),
+                     encoding="utf-8")
+    with pytest.raises(ValueError, match="REAL-1"):
+        p.run(mixed, districts, tmp_path / "out", "synthetic_sample")
 
 
 def test_real_advisory_run_writes_non_sample_files_and_leaves_fixtures_alone(tmp_path):
@@ -375,12 +427,115 @@ def test_real_advisory_run_writes_non_sample_files_and_leaves_fixtures_alone(tmp
 def test_no_repository_csv_outside_this_folder_contains_warning_columns():
     """The guard is not yet called by feature code, so check the data instead:
     no other CSV in the repository may carry imd_warning_ columns."""
-    offenders = []
-    for path in ROOT.rglob("*.csv"):
-        if "imd_warnings" in path.parts or ".claude" in path.parts or ".git" in path.parts:
-            continue
-        with open(path, encoding="utf-8", errors="replace") as handle:
-            header = handle.readline()
-        if p.PREFIX in header:
-            offenders.append(str(path.relative_to(ROOT)))
+    scanned, offenders = p.find_warning_columns(ROOT)
+    assert scanned > 0, "the scan looked at no CSV at all, so it proves nothing"
     assert offenders == []
+
+
+def write_csv(path, header):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(header + "\n1,2\n", encoding="utf-8")
+
+
+def test_scan_finds_warning_columns_even_when_the_checkout_is_under_a_dot_claude_folder(tmp_path):
+    root = tmp_path / ".claude" / "worktrees" / "some_worktree"      # the location that used to hide every file
+    write_csv(root / "data" / "features.csv", "district_code,imd_warning_severity")
+    write_csv(root / "data" / "clean.csv", "district_code,rain")
+    scanned, offenders = p.find_warning_columns(root)
+    assert scanned == 2 and offenders == [str(Path("data") / "features.csv")]
+
+
+def test_scan_excludes_the_warning_folder_by_relative_path_only(tmp_path):
+    root = tmp_path / "imd_warnings" / "repo"                         # an ancestor with that name must not hide files
+    write_csv(root / "imd_warnings" / "samples" / "parsed.csv", "imd_warning_id")   # this folder is allowed
+    write_csv(root / "other" / "leak.csv", "imd_warning_id")
+    scanned, offenders = p.find_warning_columns(root)
+    assert scanned == 1 and offenders == [str(Path("other") / "leak.csv")]
+
+
+def test_scan_ignores_git_internals_and_reports_zero_for_an_empty_tree(tmp_path):
+    write_csv(tmp_path / ".git" / "x.csv", "imd_warning_id")
+    assert p.find_warning_columns(tmp_path) == (0, [])
+
+
+# ---------- second review: duplicate ids, state, names, keywords ----------
+
+def test_duplicate_id_outcome_does_not_depend_on_block_order():
+    bad = without(GOOD, "VALID TO")                                   # invalid, same id T-1
+    for text in (bad + "\n----------\n" + GOOD, GOOD + "\n----------\n" + bad):
+        records, rejects = parse_one(text)
+        assert records == [] and len(rejects) == 2
+
+
+def test_rejected_block_still_reserves_its_id_against_a_later_valid_one():
+    records, rejects = parse_one(without(GOOD, "VALID TO") + "\n----------\n" + GOOD)
+    assert records == []
+    assert all("duplicate warning_id: T-1" in r["errors"] for r in rejects)
+
+
+def test_other_ids_are_unaffected_by_a_duplicate_pair():
+    third = replace(GOOD, "ADVISORY-ID", "T-3")
+    records, rejects = parse_one(GOOD + "\n----------\n" + GOOD + "\n----------\n" + third)
+    assert [r["warning_id"] for r in records] == ["T-3"] and len(rejects) == 2
+
+
+def test_district_in_another_state_is_never_matched():
+    rec = {**valid_record(), "state": "Maharashtra", "districts": ["Guntur", "Pune"]}
+    rows = p.to_district_rows([rec], PROJECT)
+    assert list(rows["imd_warning_district_match"]) == ["outside_project_state", "outside_project_state"]
+    assert (rows["imd_warning_district_code"] == "").all()
+
+
+@pytest.mark.parametrize("state", ["Andhra Pradesh", "ANDHRA PRADESH", "andhra  pradesh", " Andhra Pradesh "])
+def test_state_spelling_variants_match_the_project_state(state):
+    rec = {**valid_record(), "state": state, "districts": ["Guntur"]}
+    assert p.to_district_rows([rec], PROJECT).loc[0, "imd_warning_district_match"] == "matched"
+
+
+def test_telangana_is_not_the_project_state():
+    rec = {**valid_record(), "state": "Telangana", "districts": ["Guntur"]}
+    assert p.to_district_rows([rec], PROJECT).loc[0, "imd_warning_district_match"] == "outside_project_state"
+
+
+def test_repeated_unmatched_names_are_collapsed_and_reported():
+    rec = {**valid_record(), "districts": ["Hyderabad", "hyderabad", "HYDERABAD.", "Guntur"]}
+    rows = p.to_district_rows([rec], PROJECT)
+    assert list(rows["imd_warning_district_raw"]) == ["Hyderabad", "Guntur"]
+    assert [name for _, name in rows.attrs["collapsed_duplicates"]] == ["hyderabad", "HYDERABAD."]
+
+
+PROJECT_FULL = {
+    p.clean_name("ANANTAPURAMU"): (502, "ANANTAPURAMU"), p.clean_name("SPR NELLORE"): (515, "SPR NELLORE"),
+    p.clean_name("YSR"): (504, "YSR"), p.clean_name("EAST GODAVARI"): (505, "EAST GODAVARI"),
+    p.clean_name("WEST GODAVARI"): (523, "WEST GODAVARI"), p.clean_name("VISAKHAPATNAM"): (520, "VISAKHAPATNAM"),
+}
+
+
+@pytest.mark.parametrize("raw,code", [
+    ("Y.S.R. Kadapa", 504), ("Y S R Kadapa", 504), ("YSR Kadapa", 504), ("Y.S.R.", 504),
+    ("Ananthapur", 502), ("Ananthapuramu", 502), ("S.P.S.R. Nellore", 515), ("Vizag", 520),
+    ("E. Godavari", 505), ("W Godavari", 523),
+])
+def test_more_district_spellings_match(raw, code):
+    hit = p.lookup_district(raw, PROJECT_FULL)
+    assert hit is not None and hit[0] == code
+
+
+def test_project_name_that_equals_an_alias_key_is_not_silently_remapped(tmp_path):
+    csv_path = write_districts(tmp_path / "d.csv", [(999, "NELLORE"), (515, "SPR NELLORE")])
+    project = p.load_project_districts(csv_path)
+    assert set(project) == {"NELLORE", "SPR NELLORE"}                     # keys are cleaned, not aliased
+    assert p.lookup_district("Nellore", project)[0] == 999                # an exact project name wins over the alias
+    assert p.lookup_district("SPSR Nellore", project)[0] == 515           # the alias still works for other spellings
+
+
+@pytest.mark.parametrize("phrase,expected", [
+    ("Strong surface winds", "strong_wind"), ("Gusty winds expected", "strong_wind"), ("Gale warning", "strong_wind"),
+    ("Flash flood warning", "flood"), ("Thunder and lightning", "thunderstorm"), ("Severe heat-wave", "heat_wave"),
+    ("Cold-wave conditions", "cold_wave"), ("Very heavy rainfall", "heavy_rain"),
+    ("Anticyclonic circulation", "other"),            # not a cyclone: keywords match from the start of a word
+    ("Light surface winds", "other"), ("Hot and humid conditions", "other"), ("Storm surge", "other"),
+    ("August heavy rain", "heavy_rain"),              # 'august' contains 'gust' but is not a wind keyword
+])
+def test_extended_keywords_and_word_boundaries(phrase, expected):
+    assert p.classify_type(phrase) == expected
