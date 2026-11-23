@@ -1,13 +1,19 @@
-metric,value
-total_pincodes_evaluated,19300.0
-pincodes_mapped_to_ap_district,1207.0
-pincodes_ambiguous_within_ap_district,18.0
-pincodes_ambiguous_border_state,46.0
-pincodes_outside_project_scope,18029.0
-unique_project_districts_mapped,13.0
-pnb_zones_represented,1.0
-pnb_circles_represented,3.0
-climate_zones_represented,3.0
-min_pincodes_per_district,52.0
-max_pincodes_per_district,126.0
-mean_pincodes_per_district,92.84615384615384
+category,metric,value
+pincode_mapping,total_pincodes_evaluated,19300
+pincode_mapping,pincodes_mapped_to_ap_district,1207
+pincode_mapping,pincodes_ambiguous_within_ap_district,18
+pincode_mapping,pincodes_ambiguous_border_state,46
+pincode_mapping,pincodes_outside_project_scope,18029
+administrative_coverage,unique_project_districts_mapped,13
+administrative_coverage,pnb_zones_represented,1
+administrative_coverage,pnb_circles_represented,3
+administrative_coverage,climate_zones_represented,3
+administrative_coverage,min_pincodes_per_district,52
+administrative_coverage,max_pincodes_per_district,126
+administrative_coverage,mean_pincodes_per_district,92.85
+cross_dataset_consistency,dataset_weather_anomalies_v1_district_match,13/13 canonical districts (rows=25350)
+cross_dataset_consistency,dataset_district_weather_normals_v1_district_match,13/13 canonical districts (rows=5070)
+cross_dataset_consistency,dataset_yield_anomalies_v1_district_match,13/13 canonical districts (rows=1430)
+cross_dataset_consistency,dataset_district_crop_yield_normals_v1_district_match,13/13 canonical districts (rows=1430)
+cross_dataset_consistency,dataset_district_zone_map_v1_district_match,13/13 canonical districts (rows=13)
+cross_dataset_consistency,dataset_pincode_reference_v1_district_match,13/13 canonical districts (rows=19300)

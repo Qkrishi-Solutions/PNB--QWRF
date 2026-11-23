@@ -1,4 +1,4 @@
-district_code,district_name,state_code,state_name,pnb_zone,pnb_circle,cluster_id,climate_zone,n_pincodes_mapped
+district_code,district_name,state_code,state_name,pnb_zone_provisional,pnb_circle_provisional,cluster_id,climate_zone,n_pincodes_mapped
 502,ANANTAPURAMU,1,ANDHRA PRADESH,Hyderabad,Tirupati,2,Climate Zone 3,93
 503,CHITTOOR,1,ANDHRA PRADESH,Hyderabad,Tirupati,0,Climate Zone 1,99
 504,YSR,1,ANDHRA PRADESH,Hyderabad,Tirupati,2,Climate Zone 3,83
