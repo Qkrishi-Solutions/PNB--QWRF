@@ -1,0 +1,14 @@
+district_code,district_name,state_code,state_name,pnb_zone_provisional,pnb_circle_provisional,cluster_id,climate_zone,n_pincodes_mapped
+502,ANANTAPURAMU,1,ANDHRA PRADESH,Hyderabad,Tirupati,2,Climate Zone 3,93
+503,CHITTOOR,1,ANDHRA PRADESH,Hyderabad,Tirupati,0,Climate Zone 1,99
+504,YSR,1,ANDHRA PRADESH,Hyderabad,Tirupati,2,Climate Zone 3,83
+505,EAST GODAVARI,1,ANDHRA PRADESH,Hyderabad,Visakhapatnam,1,Climate Zone 2,126
+506,GUNTUR,1,ANDHRA PRADESH,Hyderabad,Vijayawada,2,Climate Zone 3,112
+510,KRISHNA,1,ANDHRA PRADESH,Hyderabad,Vijayawada,1,Climate Zone 2,118
+511,KURNOOL,1,ANDHRA PRADESH,Hyderabad,Tirupati,2,Climate Zone 3,85
+515,SPR NELLORE,1,ANDHRA PRADESH,Hyderabad,Tirupati,0,Climate Zone 1,81
+517,PRAKASAM,1,ANDHRA PRADESH,Hyderabad,Vijayawada,2,Climate Zone 3,101
+519,SRIKAKULAM,1,ANDHRA PRADESH,Hyderabad,Visakhapatnam,1,Climate Zone 2,63
+520,VISAKHAPATNAM,1,ANDHRA PRADESH,Hyderabad,Visakhapatnam,1,Climate Zone 2,83
+521,VIZIANAGARAM,1,ANDHRA PRADESH,Hyderabad,Visakhapatnam,1,Climate Zone 2,52
+523,WEST GODAVARI,1,ANDHRA PRADESH,Hyderabad,Vijayawada,1,Climate Zone 2,111
