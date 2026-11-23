@@ -1,0 +1,6 @@
+event,season,expected_districts,note,found_in_catalogue,found_districts,all_expected_found,closest_expected_distance_km
+HUDHUD,2014,VISAKHAPATNAM,landfall near Visakhapatnam,True,EAST GODAVARI;SRIKAKULAM;VISAKHAPATNAM;VIZIANAGARAM,True,0.0
+PHETHAI,2018,EAST GODAVARI,landfall near Kakinada,True,EAST GODAVARI;KRISHNA;VISAKHAPATNAM;WEST GODAVARI,True,0.0
+MICHAUNG,2023,GUNTUR,landfall near Bapatla (then in Guntur),True,CHITTOOR;GUNTUR;KRISHNA;PRAKASAM;SPR NELLORE;WEST GODAVARI;YSR,True,0.0
+LAILA,2010,GUNTUR,landfall near Bapatla,True,EAST GODAVARI;GUNTUR;KRISHNA;PRAKASAM;SPR NELLORE;WEST GODAVARI,True,0.0
+TITLI,2018,SRIKAKULAM,landfall near the Odisha-Srikakulam coast,True,SRIKAKULAM;VIZIANAGARAM,True,0.0

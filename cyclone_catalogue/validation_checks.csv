@@ -1,0 +1,10 @@
+check,status,detail
+event_key_unique,PASS,247 events
+pair_key_unique,PASS,110 event-district pairs
+pairs_reference_catalogue,PASS,every mapped event is in the catalogue
+district_codes_valid,PASS,12 districts appear
+distances_within_threshold,PASS,all pairs within the threshold
+inside_means_zero_distance,PASS,tier agrees with distance
+affected_counts_agree,PASS,catalogue counts match the map
+mapped_status_consistent,PASS,status mapped iff at least one district
+only_bay_of_bengal_events,PASS,every event has a Bay of Bengal point
