@@ -81,9 +81,23 @@ Canonical locations for foundational feature engineering and data processing del
 |---|---|---|---|---|
 | **Issue 1** | Crop Long Format Dataset | `CropLongFormatv1/` | `crop_long_v1.csv`<br>`crop_restructure_validate.py` | Restructured unpivoted crop-long dataset (1,430 rows × 124 columns), change logs (`v1f_change_log.csv`), and validation reports. |
 | **Issue 2** | Crop Model Eligibility | `CropModelEligibility/` | `crop_model_eligibility_v1.csv`<br>`crop_observation_coverage_summary_v1.csv` | Multi-crop suitability classification, observation coverage thresholds, and evaluation report. |
-| **Issue 6** | Climate Zonal Clustering | `District Climate Zonal Clustering/` | `district_climate_profiles_v1.csv`<br>`district_zone_map_v1.csv`<br>`district_climate_clustering.py` | Long-term district climate profiling, zone boundary mapping (Coastal vs. Rayalaseema), and clustering metrics (`clustering_evaluation_v1.csv`). |
+| **Issue 6** | Climate Zonal Clustering | `District Climate Zonal Clustering/` | `district_climate_profiles_v1.csv`<br>`district_zone_map_v1.csv`<br>`district_climate_clustering.py` | Long-term district climate profiling, districts grouped by climate-feature similarity (3 zones), and clustering metrics (`clustering_evaluation_v1.csv`). |
 
-> **Note on Issue 1 canonical location:** The legacy duplicate folder previously located under the `Issues` directory has been removed. All downstream pipelines must reference `CropLongFormatv1/crop_long_v1.csv`.
+> **Note on Issue 1 canonical location and duplicate cleanup:**
+> - Canonical files reside in `CropLongFormatv1/` (`crop_long_v1.csv`).
+> - The legacy duplicate folder `Issues/CropLongFormatv1/` has been resolved on `dev`. Removal on `Main` is queued to take effect when `dev` is released/merged into `Main`.
+> - Checksum verification between `CropLongFormatv1/` and legacy `Issues/CropLongFormatv1/` confirmed 100% byte-level identity across all 8 files (SHA-256):
+>
+> | File | Status | SHA-256 Checksum |
+> |---|:---:|---|
+> | `crop_long_v1.csv` | Byte-identical | `e0e57b0fc90f12498436f081978b6fd26836c8863b202eb2baf6c23c8522f1ad` |
+> | `crop_restructure_validate.py` | Byte-identical | `2a245fd9b7b34aa5e6a418ca94d790a1d0a0e769ee5f1e61c287402ceac86bef` |
+> | `merged_cleaned_v1f.csv` | Byte-identical | `d299847c01b87ea725623aa5192e34e6bd540064323c5fe7a8cecf1410279ab7` |
+> | `v1f_change_log.csv` | Byte-identical | `d9e84dc194d86bd75e45712508a885d5fdcbcef0ba0f287088add727cb17e698` |
+> | `ISSUE_1_CROP_LONG_FORMAT_GUIDE.md` | Byte-identical | `21b459d92f086c2ae442cd4e89db27c97bb3eee8acb3eb6e1227f910b16e26a7` |
+> | `crop_data_validation_report.pdf` | Byte-identical | `95184ad56ca0e0fa44af39c4509a60c4765f4e8f2643c07c1bf1a23657c859ac` |
+> | `QWeatherRiskF_Data_Fixes_Report.pdf` | Byte-identical | `34e11d88f420f799ecd4e859cc4312baa26b5b6fbf99f3224ad7aa00f05b5430` |
+> | `QWeatherRiskF_Verification_and_Fix_Plan.pdf` | Byte-identical | `78196a3269c34f3ee63c6f904f30b82bbbc7e30711bb7c036e8654500fcff325` |
 
 ## Method summary
 
