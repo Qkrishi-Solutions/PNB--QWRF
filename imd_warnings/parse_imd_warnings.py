@@ -28,13 +28,13 @@ SCHEMA_PATH = HERE / "imd_warning_schema_v1.json"
 IST = timezone(timedelta(hours=5, minutes=30))
 UTC = timezone.utc
 
-# Explicit keyword table; first match wins. Unknown phrases become "other".
+# Explicit keyword table. "heavy rain" also covers "very heavy rain" and
+# "extremely heavy rain" (substring match). A phrase must resolve to exactly
+# one hazard type; anything else becomes "other" (the raw phrase is kept).
 TYPE_KEYWORDS = [
     ("cyclone", "cyclone"),
     ("cyclonic", "cyclone"),
     ("heavy rain", "heavy_rain"),
-    ("very heavy rain", "heavy_rain"),
-    ("extremely heavy rain", "heavy_rain"),
     ("heat wave", "heat_wave"),
     ("heatwave", "heat_wave"),
     ("cold wave", "cold_wave"),
@@ -44,6 +44,10 @@ TYPE_KEYWORDS = [
     ("squall", "strong_wind"),
     ("flood", "flood"),
 ]
+# A cyclone warning normally comes with strong winds, so "cyclone" absorbs
+# "strong_wind" (and nothing else).
+SUBSUMES = {"cyclone": {"strong_wind"}}
+NEGATION = re.compile(r"\b(no|not|nil|without|withdrawn|cancelled|canceled)\b", re.IGNORECASE)
 
 # IMD / project spellings that differ from the project district names
 # (same four India Post mappings as address_expansion/ plus common IMD forms).
@@ -98,26 +102,56 @@ def assert_not_in_feature_frame(columns):
 # Field parsing
 # ---------------------------------------------------------
 
+TIME_PATTERN = re.compile(
+    r"\s*(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})(?::(\d{2}))?\s*"
+    r"(IST|UTC|Z|[+-]\d{2}:?\d{2})\s*"
+)
+
+
 def parse_time(text):
-    """Parse 'YYYY-MM-DD HH:MM IST|UTC' to an aware datetime; None if invalid."""
-    match = re.fullmatch(
-        r"\s*(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})\s*(IST|UTC)\s*", text or ""
-    )
+    """Parse 'YYYY-MM-DD HH:MM[:SS] <zone>' to an IST-aware datetime.
+
+    The zone is mandatory (IST, UTC, Z or a numeric offset such as +05:30);
+    a time without a zone is rejected, never assumed. Returns None if invalid.
+    """
+    match = TIME_PATTERN.fullmatch(text or "")
     if not match:
         return None
+    day, hhmm, seconds, zone = match.groups()
     try:
-        naive = datetime.strptime(f"{match.group(1)} {match.group(2)}", "%Y-%m-%d %H:%M")
+        naive = datetime.strptime(f"{day} {hhmm}:{seconds or '00'}", "%Y-%m-%d %H:%M:%S")
     except ValueError:
         return None
-    return naive.replace(tzinfo=IST if match.group(3) == "IST" else UTC).astimezone(IST)
+    if zone == "IST":
+        tz = IST
+    elif zone in ("UTC", "Z"):
+        tz = UTC
+    else:
+        digits = zone[1:].replace(":", "")
+        hours, minutes = int(digits[:2]), int(digits[2:])
+        if hours > 14 or minutes > 59:
+            return None
+        offset = timedelta(hours=hours, minutes=minutes)
+        tz = timezone(offset if zone[0] == "+" else -offset)
+    return naive.replace(tzinfo=tz).astimezone(IST)
 
 
 def classify_type(phrase):
+    """Map an advisory phrase to one hazard type, or `other`.
+
+    `other` is returned when nothing matches, when the phrase is negated
+    ("no heavy rain expected"), or when it names more than one hazard
+    ("thunderstorm with heavy rain"). The raw phrase is stored separately so
+    nothing is lost; multiple hazards are not collapsed onto the first match.
+    """
     lowered = (phrase or "").lower()
-    for keyword, warning_type in TYPE_KEYWORDS:
-        if keyword in lowered:
-            return warning_type
-    return "other"
+    if NEGATION.search(lowered):
+        return "other"
+    found = {warning_type for keyword, warning_type in TYPE_KEYWORDS if keyword in lowered}
+    for absorber, absorbed in SUBSUMES.items():
+        if absorber in found:
+            found -= absorbed
+    return found.pop() if len(found) == 1 else "other"
 
 
 def normalise_district(name):
@@ -141,7 +175,13 @@ def split_blocks(text):
 
 
 def parse_block(lines, source_kind, schema):
-    """Return (record or None, errors). Never fills in a missing value."""
+    """Return (record or None, errors, warning_id).
+
+    `record` is None when there are any errors; `warning_id` is returned in
+    both cases so a rejected block can still be identified. Never fills in a
+    missing value. A repeated key rejects the block (this is what a missing
+    `----------` separator between two advisories looks like).
+    """
     raw = {}
     errors = []
     for line in lines:
@@ -149,7 +189,11 @@ def parse_block(lines, source_kind, schema):
             errors.append(f"unparseable line: {line.strip()[:60]}")
             continue
         key, value = line.split(":", 1)
-        raw[key.strip().upper()] = value.strip()
+        key = key.strip().upper()
+        if key in raw:
+            errors.append(f"duplicate field: {key} (missing separator between advisories?)")
+            continue
+        raw[key] = value.strip()
 
     unknown = set(raw) - set(REQUIRED_KEYS) - set(OPTIONAL_KEYS)
     for key in sorted(unknown):
@@ -162,6 +206,7 @@ def parse_block(lines, source_kind, schema):
     record = {"warning_id": raw.get("ADVISORY-ID", "")}
     record["state"] = raw.get("STATE", "")
     record["warning_type"] = classify_type(raw.get("WARNING", "")) if raw.get("WARNING") else ""
+    record["warning_phrase"] = raw.get("WARNING", "")
 
     colour = raw.get("COLOUR CODE", "").strip().lower()
     if raw.get("COLOUR CODE") and colour not in schema["severity_levels"]:
@@ -189,24 +234,31 @@ def parse_block(lines, source_kind, schema):
 
     record["headline"] = raw.get("HEADLINE", "")
     record["source_kind"] = source_kind
-    return (None if errors else record), errors, record
+    return (None if errors else record), errors, record["warning_id"]
 
 
 def parse_advisories(text, source_kind="imd_advisory", schema=None):
-    """Parse all blocks. Returns (records, rejects); rejects keep their reasons."""
+    """Parse all blocks. Returns (records, rejects); rejects keep their reasons.
+
+    A `warning_id` that appears more than once is ambiguous: the first
+    occurrence is kept and every later one is rejected.
+    """
     schema = schema or load_schema()
     if source_kind not in schema["source_kinds"]:
         raise ValueError(f"source_kind must be one of {schema['source_kinds']}")
-    records, rejects = [], []
+    records, rejects, seen = [], [], set()
     for lines in split_blocks(text):
-        record, errors, partial = parse_block(lines, source_kind, schema)
+        record, errors, warning_id = parse_block(lines, source_kind, schema)
+        if record is not None and warning_id in seen:
+            record, errors = None, [f"duplicate warning_id: {warning_id}"]
         if record is None:
             rejects.append({
-                "warning_id": partial.get("warning_id", ""),
+                "warning_id": warning_id,
                 "errors": "; ".join(errors),
                 "block": " | ".join(line.strip() for line in lines),
             })
         else:
+            seen.add(warning_id)
             records.append(record)
     return records, rejects
 
@@ -255,21 +307,37 @@ def validate_record(record, schema=None):
 
 def load_project_districts(path):
     frame = pd.read_csv(path, usecols=["district_code", "district_name"]).drop_duplicates()
+    keys = [normalise_district(name) for name in frame.district_name]
+    if len(set(keys)) != len(keys) or frame.district_code.duplicated().any():
+        raise ValueError(
+            "District file must map each district name to exactly one code "
+            "and each code to one name."
+        )
     return {
-        normalise_district(name): (int(code), str(name))
-        for code, name in zip(frame.district_code, frame.district_name, strict=True)
+        key: (int(code), str(name))
+        for key, code, name in zip(keys, frame.district_code, frame.district_name, strict=True)
     }
 
 
 def to_district_rows(records, project_districts, schema=None):
     schema = schema or load_schema()
     rows = []
+    collapsed = []
     for rec in records:
+        seen_codes = set()
         for raw_name in rec["districts"]:
             hit = project_districts.get(normalise_district(raw_name))
+            if hit and hit[0] in seen_codes:
+                # Same district listed twice under different spellings
+                # (for example "Kadapa, YSR Kadapa"): keep one row, report it.
+                collapsed.append((rec["warning_id"], raw_name))
+                continue
+            if hit:
+                seen_codes.add(hit[0])
             rows.append({
                 "imd_warning_id": rec["warning_id"],
                 "imd_warning_type": rec["warning_type"],
+                "imd_warning_phrase": rec.get("warning_phrase", ""),
                 "imd_warning_severity": rec["severity"],
                 "imd_warning_state": rec["state"],
                 "imd_warning_district_raw": raw_name,
@@ -283,11 +351,32 @@ def to_district_rows(records, project_districts, schema=None):
                 "imd_warning_source_kind": rec["source_kind"],
                 "imd_warning_record_class": schema["record_class"],
             })
-    return pd.DataFrame(rows, columns=schema["district_output_columns"])
+    frame = pd.DataFrame(rows, columns=schema["district_output_columns"])
+    frame.attrs["collapsed_duplicates"] = collapsed
+    return frame
+
+
+SAMPLES_DIR = HERE / "samples"
+
+
+def output_names(source_kind):
+    """Output filenames; real advisories are never labelled as samples."""
+    tag = "sample" if source_kind == "synthetic_sample" else "advisories"
+    return {
+        "parsed": f"imd_warnings_parsed_{tag}.csv",
+        "rejected": f"imd_warnings_rejected_{tag}.csv",
+        "records": f"imd_warnings_records_{tag}.json",
+    }
 
 
 def run(input_path, districts_path, outdir, source_kind):
     schema = load_schema()
+    if source_kind != "synthetic_sample" and Path(outdir).resolve() == SAMPLES_DIR.resolve():
+        raise ValueError(
+            "Refusing to write real advisories into the committed samples folder; "
+            "choose another --outdir (and do not commit real data)."
+        )
+    names = output_names(source_kind)
     text = Path(input_path).read_text(encoding="utf-8")
     records, rejects = parse_advisories(text, source_kind, schema)
 
@@ -301,13 +390,11 @@ def run(input_path, districts_path, outdir, source_kind):
 
     outdir = Path(outdir)
     outdir.mkdir(parents=True, exist_ok=True)
-    rows.to_csv(outdir / "imd_warnings_parsed_sample.csv", index=False)
+    rows.to_csv(outdir / names["parsed"], index=False)
     pd.DataFrame(rejects, columns=["warning_id", "errors", "block"]).to_csv(
-        outdir / "imd_warnings_rejected_sample.csv", index=False
+        outdir / names["rejected"], index=False
     )
-    (outdir / "imd_warnings_records_sample.json").write_text(
-        json.dumps(records, indent=2), encoding="utf-8"
-    )
+    (outdir / names["records"]).write_text(json.dumps(records, indent=2), encoding="utf-8")
 
     unmatched = rows[rows["imd_warning_district_match"] == "unmatched"]
     print("IMD WARNING PARSE COMPLETED")
@@ -318,6 +405,9 @@ def run(input_path, districts_path, outdir, source_kind):
     print(f"District rows: {len(rows)} (matched {len(rows) - len(unmatched)}, unmatched {len(unmatched)})")
     if len(unmatched):
         print("Unmatched districts:", ", ".join(sorted(set(unmatched["imd_warning_district_raw"]))))
+    collapsed = rows.attrs.get("collapsed_duplicates", [])
+    if collapsed:
+        print(f"Duplicate district entries collapsed: {len(collapsed)} {collapsed}")
     print(f"Outputs saved to: {outdir.resolve()}")
 
 

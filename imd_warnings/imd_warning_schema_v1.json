@@ -15,7 +15,8 @@
   "time_zone": "Asia/Kolkata (+05:30); all times are stored as ISO 8601 with an explicit offset",
   "fields": [
     {"name": "warning_id", "type": "string", "required": true, "description": "Identifier as given in the advisory."},
-    {"name": "warning_type", "type": "enum", "enum_ref": "warning_types", "required": true, "description": "Mapped from the advisory phrase by an explicit keyword table; unknown phrases map to `other`, never guessed."},
+    {"name": "warning_type", "type": "enum", "enum_ref": "warning_types", "required": true, "description": "Mapped from the advisory phrase by an explicit keyword table. Unknown, negated and multi-hazard phrases map to `other`, never guessed (a cyclone phrase also naming strong winds stays `cyclone`)."},
+    {"name": "warning_phrase", "type": "string", "required": false, "description": "Hazard phrase exactly as written in the advisory. Kept so that `other` (unknown, negated or multi-hazard phrases) loses no information."},
     {"name": "severity", "type": "enum", "enum_ref": "severity_levels", "required": true, "description": "IMD colour code."},
     {"name": "state", "type": "string", "required": true, "description": "State named in the advisory."},
     {"name": "districts", "type": "list[string]", "required": true, "min_items": 1, "description": "Districts exactly as written in the advisory."},
@@ -26,7 +27,7 @@
     {"name": "source_kind", "type": "enum", "enum_ref": "source_kinds", "required": true, "description": "`synthetic_sample` for test data, `imd_advisory` for real advisories."}
   ],
   "district_output_columns": [
-    "imd_warning_id", "imd_warning_type", "imd_warning_severity", "imd_warning_state",
+    "imd_warning_id", "imd_warning_type", "imd_warning_phrase", "imd_warning_severity", "imd_warning_state",
     "imd_warning_district_raw", "imd_warning_district_code", "imd_warning_district_name",
     "imd_warning_district_match", "imd_warning_issue_time", "imd_warning_valid_from",
     "imd_warning_valid_to", "imd_warning_headline", "imd_warning_source_kind", "imd_warning_record_class"

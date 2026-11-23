@@ -3,6 +3,7 @@
     "warning_id": "SYN-0001",
     "state": "Andhra Pradesh",
     "warning_type": "heavy_rain",
+    "warning_phrase": "Heavy rainfall",
     "severity": "orange",
     "districts": [
       "Srikakulam",
@@ -19,6 +20,7 @@
     "warning_id": "SYN-0002",
     "state": "Andhra Pradesh",
     "warning_type": "cyclone",
+    "warning_phrase": "Cyclonic circulation with strong winds",
     "severity": "red",
     "districts": [
       "East Godavari",
@@ -35,6 +37,7 @@
     "warning_id": "SYN-0003",
     "state": "Andhra Pradesh",
     "warning_type": "heat_wave",
+    "warning_phrase": "Heat wave conditions",
     "severity": "yellow",
     "districts": [
       "Anantapur",
@@ -51,6 +54,7 @@
     "warning_id": "SYN-0004",
     "state": "Andhra Pradesh",
     "warning_type": "thunderstorm",
+    "warning_phrase": "Thunderstorm with lightning",
     "severity": "yellow",
     "districts": [
       "Nellore",
@@ -68,6 +72,7 @@
     "warning_id": "SYN-0005",
     "state": "Andhra Pradesh",
     "warning_type": "other",
+    "warning_phrase": "Dense fog",
     "severity": "green",
     "districts": [
       "Chittoor"
