@@ -288,9 +288,13 @@ def select_features_for_fold(
                 break
 
         candidate["rejected_for_multicollinearity"] = redundant
+        candidate["dropped_for_max_features"] = False
 
-        if not redundant and len(selected) < MAX_FEATURES:
-            selected.append(candidate)
+        if not redundant:
+            if len(selected) < MAX_FEATURES:
+                selected.append(candidate)
+            else:
+                candidate["dropped_for_max_features"] = True
 
     status = (
         "selected"
@@ -344,6 +348,7 @@ def build_crop_feature_report(
         "max_paired_n": np.nan,
         "folds_passing_screen": 0,
         "folds_rejected_multicollinearity": 0,
+        "folds_dropped_for_max_features": 0,
         "selected_in_heldout_years": "",
     }
 
@@ -359,12 +364,6 @@ def build_crop_feature_report(
         )
 
         consensus_row = consensus_df[consensus_df["crop"].eq(crop)].iloc[0]
-
-        stable = {
-            item.split(":")[0]
-            for item in str(consensus_row["selection_frequency"]).split(";")
-            if item and item != "nan"
-        }
 
         for feature in feature_columns:
 
@@ -401,6 +400,9 @@ def build_crop_feature_report(
                     "folds_rejected_multicollinearity": int(
                         subset["rejected_for_multicollinearity"].sum()
                     ),
+                    "folds_dropped_for_max_features": int(
+                        subset["dropped_for_max_features"].sum()
+                    ),
                     "selected_in_heldout_years": ";".join(
                         str(int(y))
                         for y in sorted(
@@ -423,10 +425,10 @@ def build_crop_feature_report(
                 "scorable_loyo_folds": n_folds,
                 "folds_evaluated": n_evaluated,
                 "folds_selected": n_selected,
-                "selection_frequency": (
+                "selection_frequency_fraction": (
                     n_selected / n_folds if n_folds else np.nan
                 ),
-                "is_stable_predictor": feature in stable,
+                "is_stable_predictor": n_selected >= MIN_STABLE,
                 **stats,
                 "crop_selection_status": consensus_row["selection_status"],
                 "interpretation": "statistical_association_only",
@@ -457,7 +459,12 @@ def build_crop_feature_report(
                 "feature"
             ]
         )
-        if expected != actual:
+        # The consensus file lists at most MAX_FEATURES names but its
+        # stable_predictor_count is untruncated; v1 must match both.
+        if (
+            len(actual) != int(row.stable_predictor_count)
+            or not expected.issubset(actual)
+        ):
             raise ValueError(
                 "crop_feature_selection_v1: stable predictors differ from "
                 f"consensus for {row.crop}."
@@ -579,6 +586,13 @@ def run_feature_selection(
                 for item in selected
             ]
 
+            # Measured, not asserted: any row shared by the training
+            # frame passed to the scorer and the held-out frame.
+            heldout_rows_in_training = bool(
+                training_data.index.intersection(heldout_data.index).size
+                or (training_data["year"] == heldout_year).any()
+            )
+
             training_years = ";".join(
                 map(
                     str,
@@ -614,7 +628,7 @@ def run_feature_selection(
                 "training_sample_count": len(training_data),
                 "heldout_sample_count": len(heldout_data),
                 "heldout_label_available": bool(len(heldout_data)),
-                "heldout_features_used_in_selection": False,
+                "heldout_features_used_in_selection": heldout_rows_in_training,
                 "validation_status": (
                     "scorable"
                     if len(heldout_data)
@@ -632,6 +646,13 @@ def run_feature_selection(
                 item["rejected_for_multicollinearity"] = (
                     item.get(
                         "rejected_for_multicollinearity",
+                        False
+                    )
+                )
+
+                item["dropped_for_max_features"] = (
+                    item.get(
+                        "dropped_for_max_features",
                         False
                     )
                 )
@@ -734,8 +755,10 @@ def run_feature_selection(
 
         (
             "weather_feature_count",
-            len(feature_columns) == 78,
-            f"{len(feature_columns)} unique features; expected 78"
+            len(feature_columns) == weather["weather_column"].nunique()
+            and len(feature_columns) == 78,
+            f"{len(feature_columns)} unique features; expected 78 "
+            f"(source file has {weather['weather_column'].nunique()})"
         ),
 
         (
@@ -764,7 +787,10 @@ def run_feature_selection(
                     if value
                 ]
                 for row in fold_df.itertuples()
-            ),
+            )
+            and not validation_df[
+                "heldout_features_used_in_selection"
+            ].any(),
             "Held-out year excluded from every crop-fold training set"
         ),
 
@@ -778,8 +804,12 @@ def run_feature_selection(
 
         (
             "missing_values_not_imputed",
-            True,
-            "Pairwise-complete observations only; no imputation"
+            int(weather_wide[feature_columns].notna().sum().sum())
+            == int(weather["anomaly_z"].notna().sum())
+            and int(merged["yield_anomaly_zscore"].notna().sum())
+            == int(yield_data["yield_anomaly_zscore"].notna().sum()),
+            "Non-missing counts unchanged by pivot/merge; "
+            "pairwise-complete observations only; no imputation"
         ),
 
         (
@@ -792,8 +822,14 @@ def run_feature_selection(
 
         (
             "scorable_years",
-            scorable_years == [2017, 2018, 2019],
-            f"Usable target years: {scorable_years}"
+            len(scorable_years) > 0
+            and set(scorable_years).issubset(
+                set(weather["year"].astype(int))
+            )
+            and scorable_years == sorted(
+                eligible_data["year"].astype(int).unique()
+            ),
+            f"Usable target years derived from inputs: {scorable_years}"
         )
 
     ]
