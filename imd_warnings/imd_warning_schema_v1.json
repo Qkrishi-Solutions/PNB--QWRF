@@ -1,0 +1,35 @@
+{
+  "schema_name": "imd_warning",
+  "schema_version": "1.0",
+  "description": "Structured record for one official IMD warning (operational input). One record per warning; district-level output rows are derived from `districts`. These records are NOT model features and must never be joined into feature tables (see README).",
+  "record_class": "official_warning",
+  "column_prefix": "imd_warning_",
+  "warning_types": ["heavy_rain", "cyclone", "heat_wave", "cold_wave", "thunderstorm", "strong_wind", "flood", "other"],
+  "severity_levels": {
+    "green": "No warning",
+    "yellow": "Be aware",
+    "orange": "Be prepared",
+    "red": "Take action"
+  },
+  "source_kinds": ["imd_advisory", "synthetic_sample"],
+  "time_zone": "Asia/Kolkata (+05:30); all times are stored as ISO 8601 with an explicit offset",
+  "fields": [
+    {"name": "warning_id", "type": "string", "required": true, "description": "Identifier as given in the advisory."},
+    {"name": "warning_type", "type": "enum", "enum_ref": "warning_types", "required": true, "description": "Mapped from the advisory phrase by an explicit keyword table; unknown phrases map to `other`, never guessed."},
+    {"name": "severity", "type": "enum", "enum_ref": "severity_levels", "required": true, "description": "IMD colour code."},
+    {"name": "state", "type": "string", "required": true, "description": "State named in the advisory."},
+    {"name": "districts", "type": "list[string]", "required": true, "min_items": 1, "description": "Districts exactly as written in the advisory."},
+    {"name": "issue_time", "type": "datetime", "required": true, "description": "When the advisory was issued."},
+    {"name": "valid_from", "type": "datetime", "required": true, "description": "Start of validity."},
+    {"name": "valid_to", "type": "datetime", "required": true, "description": "End of validity. Must be after valid_from. Never defaulted when missing."},
+    {"name": "headline", "type": "string", "required": false, "description": "Free-text headline; may be blank."},
+    {"name": "source_kind", "type": "enum", "enum_ref": "source_kinds", "required": true, "description": "`synthetic_sample` for test data, `imd_advisory` for real advisories."}
+  ],
+  "district_output_columns": [
+    "imd_warning_id", "imd_warning_type", "imd_warning_severity", "imd_warning_state",
+    "imd_warning_district_raw", "imd_warning_district_code", "imd_warning_district_name",
+    "imd_warning_district_match", "imd_warning_issue_time", "imd_warning_valid_from",
+    "imd_warning_valid_to", "imd_warning_headline", "imd_warning_source_kind", "imd_warning_record_class"
+  ],
+  "district_match_values": ["matched", "unmatched"]
+}

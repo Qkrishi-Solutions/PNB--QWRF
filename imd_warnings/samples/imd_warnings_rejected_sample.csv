@@ -1,0 +1,4 @@
+warning_id,errors,block
+SYN-0006,missing required field: VALID TO,ADVISORY-ID: SYN-0006 | ISSUED: 2025-07-01 10:00 IST | STATE: Andhra Pradesh | WARNING: Heavy rainfall | COLOUR CODE: Orange | DISTRICTS: Guntur | VALID FROM: 2025-07-02 08:30 IST
+SYN-0007,invalid colour code: Purple,ADVISORY-ID: SYN-0007 | ISSUED: 2025-07-01 10:00 IST | STATE: Andhra Pradesh | WARNING: Heavy rainfall | COLOUR CODE: Purple | DISTRICTS: Guntur | VALID FROM: 2025-07-02 08:30 IST | VALID TO: 2025-07-03 08:30 IST
+SYN-0008,valid_to must be after valid_from,ADVISORY-ID: SYN-0008 | ISSUED: 2025-07-01 10:00 IST | STATE: Andhra Pradesh | WARNING: Flood | COLOUR CODE: Red | DISTRICTS: Krishna | VALID FROM: 2025-07-03 08:30 IST | VALID TO: 2025-07-02 08:30 IST

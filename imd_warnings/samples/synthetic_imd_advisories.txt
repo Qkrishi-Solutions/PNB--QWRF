@@ -1,0 +1,87 @@
+# SYNTHETIC SAMPLE ADVISORIES. Written for testing the parser. They are NOT real IMD advisories
+# and describe no real event. Format is the simplified format documented in ../README.md.
+# Blocks are separated by a line of dashes.
+
+ADVISORY-ID: SYN-0001
+ISSUED: 2025-10-27 14:30 IST
+STATE: Andhra Pradesh
+WARNING: Heavy rainfall
+COLOUR CODE: Orange
+DISTRICTS: Srikakulam, Vizianagaram, Visakhapatnam
+VALID FROM: 2025-10-28 08:30 IST
+VALID TO: 2025-10-29 08:30 IST
+HEADLINE: Heavy rainfall likely at isolated places
+
+----------
+ADVISORY-ID: SYN-0002
+ISSUED: 2025-10-27 14:30 IST
+STATE: Andhra Pradesh
+WARNING: Cyclonic circulation with strong winds
+COLOUR CODE: Red
+DISTRICTS: East Godavari, West Godavari, Krishna
+VALID FROM: 2025-10-28 20:00 IST
+VALID TO: 2025-10-30 08:30 IST
+HEADLINE: Take action in coastal districts
+
+----------
+ADVISORY-ID: SYN-0003
+ISSUED: 2025-04-20 09:00 UTC
+STATE: Andhra Pradesh
+WARNING: Heat wave conditions
+COLOUR CODE: Yellow
+DISTRICTS: Anantapur, Kurnool, Kadapa
+VALID FROM: 2025-04-21 08:30 IST
+VALID TO: 2025-04-22 08:30 IST
+
+----------
+ADVISORY-ID: SYN-0004
+ISSUED: 2025-06-11 17:00 IST
+STATE: Andhra Pradesh
+WARNING: Thunderstorm with lightning
+COLOUR CODE: Yellow
+DISTRICTS: Nellore, Prakasam, Guntur, Hyderabad
+VALID FROM: 2025-06-12 08:30 IST
+VALID TO: 2025-06-13 08:30 IST
+HEADLINE: Includes a district outside the project (unmatched on purpose)
+
+----------
+ADVISORY-ID: SYN-0005
+ISSUED: 2025-11-02 10:00 IST
+STATE: Andhra Pradesh
+WARNING: Dense fog
+COLOUR CODE: Green
+DISTRICTS: Chittoor
+VALID FROM: 2025-11-03 08:30 IST
+VALID TO: 2025-11-04 08:30 IST
+HEADLINE: Unrecognised phrase maps to type other, not guessed
+
+----------
+# Intentionally invalid advisories (must be rejected with reasons, never repaired):
+
+ADVISORY-ID: SYN-0006
+ISSUED: 2025-07-01 10:00 IST
+STATE: Andhra Pradesh
+WARNING: Heavy rainfall
+COLOUR CODE: Orange
+DISTRICTS: Guntur
+VALID FROM: 2025-07-02 08:30 IST
+
+----------
+ADVISORY-ID: SYN-0007
+ISSUED: 2025-07-01 10:00 IST
+STATE: Andhra Pradesh
+WARNING: Heavy rainfall
+COLOUR CODE: Purple
+DISTRICTS: Guntur
+VALID FROM: 2025-07-02 08:30 IST
+VALID TO: 2025-07-03 08:30 IST
+
+----------
+ADVISORY-ID: SYN-0008
+ISSUED: 2025-07-01 10:00 IST
+STATE: Andhra Pradesh
+WARNING: Flood
+COLOUR CODE: Red
+DISTRICTS: Krishna
+VALID FROM: 2025-07-03 08:30 IST
+VALID TO: 2025-07-02 08:30 IST

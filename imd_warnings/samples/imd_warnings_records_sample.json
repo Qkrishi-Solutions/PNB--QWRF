@@ -1,0 +1,81 @@
+[
+  {
+    "warning_id": "SYN-0001",
+    "state": "Andhra Pradesh",
+    "warning_type": "heavy_rain",
+    "severity": "orange",
+    "districts": [
+      "Srikakulam",
+      "Vizianagaram",
+      "Visakhapatnam"
+    ],
+    "issue_time": "2025-10-27T14:30:00+05:30",
+    "valid_from": "2025-10-28T08:30:00+05:30",
+    "valid_to": "2025-10-29T08:30:00+05:30",
+    "headline": "Heavy rainfall likely at isolated places",
+    "source_kind": "synthetic_sample"
+  },
+  {
+    "warning_id": "SYN-0002",
+    "state": "Andhra Pradesh",
+    "warning_type": "cyclone",
+    "severity": "red",
+    "districts": [
+      "East Godavari",
+      "West Godavari",
+      "Krishna"
+    ],
+    "issue_time": "2025-10-27T14:30:00+05:30",
+    "valid_from": "2025-10-28T20:00:00+05:30",
+    "valid_to": "2025-10-30T08:30:00+05:30",
+    "headline": "Take action in coastal districts",
+    "source_kind": "synthetic_sample"
+  },
+  {
+    "warning_id": "SYN-0003",
+    "state": "Andhra Pradesh",
+    "warning_type": "heat_wave",
+    "severity": "yellow",
+    "districts": [
+      "Anantapur",
+      "Kurnool",
+      "Kadapa"
+    ],
+    "issue_time": "2025-04-20T14:30:00+05:30",
+    "valid_from": "2025-04-21T08:30:00+05:30",
+    "valid_to": "2025-04-22T08:30:00+05:30",
+    "headline": "",
+    "source_kind": "synthetic_sample"
+  },
+  {
+    "warning_id": "SYN-0004",
+    "state": "Andhra Pradesh",
+    "warning_type": "thunderstorm",
+    "severity": "yellow",
+    "districts": [
+      "Nellore",
+      "Prakasam",
+      "Guntur",
+      "Hyderabad"
+    ],
+    "issue_time": "2025-06-11T17:00:00+05:30",
+    "valid_from": "2025-06-12T08:30:00+05:30",
+    "valid_to": "2025-06-13T08:30:00+05:30",
+    "headline": "Includes a district outside the project (unmatched on purpose)",
+    "source_kind": "synthetic_sample"
+  },
+  {
+    "warning_id": "SYN-0005",
+    "state": "Andhra Pradesh",
+    "warning_type": "other",
+    "severity": "green",
+    "districts": [
+      "Chittoor"
+    ],
+    "issue_time": "2025-11-02T10:00:00+05:30",
+    "valid_from": "2025-11-03T08:30:00+05:30",
+    "valid_to": "2025-11-04T08:30:00+05:30",
+    "headline": "Unrecognised phrase maps to type other, not guessed",
+    "source_kind": "synthetic_sample"
+  }
+]
