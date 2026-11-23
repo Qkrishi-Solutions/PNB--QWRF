@@ -21,7 +21,7 @@ The investigation produced useful evidence:
 - Additional agricultural observations for 2021–2025 were not independently verified at the individual-value level.
 - An IMD 2020 gridded rainfall NetCDF file was retrieved and inspected at the file and metadata level. Its rainfall values were not fully validated.
 - District and crop crosswalks remain unresolved.
-- The weather compatibility assessment covers all 79 baseline weather features, but no feature has been verified as compatible with an additional source.
+- The baseline weather feature inventory contains 78 features. Compatibility with additional weather sources has not been established by a reproducible assessment table in this repository.
 - No additional data were ingested, no district-level weather aggregation was performed, and Issues #3, #4 and #5 were not rerun on an extended dataset.
 
 The existing baseline was preserved. No synthetic or fabricated observations were introduced, and missing values were not silently imputed or replaced with zero.
@@ -41,7 +41,7 @@ The existing baseline remains the reference dataset for this investigation.
 | District–crop combinations | 286 |
 | Weather district-year observations | 65 |
 | Weather indicators | 78 |
-| Weather feature inventory | 79, including `rain_valid_area_fraction` |
+| Weather feature inventory | 78 |
 
 The original agricultural baseline file was recorded with the following SHA-256:
 
@@ -65,36 +65,37 @@ ICRISAT access was unsuccessful during the investigation because of a transport-
 
 The DES APY portal was reachable, and year and district selection options were observed. However, controlled retrieval of a complete, data-bearing result for the required outside-baseline district and crop combinations was not conclusively completed. One observed submission returned “No Data Found.”
 
-### 3.2 Selected 2020–21 agricultural area records
+### 3.2 Selected 2020?21 agricultural area records
 
-A total of **728 selected 2020–21 agricultural area records** were audited across the investigation phases:
+Earlier investigation notes report **728 selected 2020?21 agricultural area records** across the following phases:
 
-- 140 records from Phase 15D/15D.1.
-- 84 records from Phase 15E.2/15E.3.
-- 504 records from Phase 15F/15F.1.
+- 140 records attributed to Phase 15D/15D.1.
+- 84 records attributed to Phase 15E.2/15E.3.
+- 504 records attributed to Phase 15F/15F.1.
 
-These selected area records were visually checked against source-rendered PDF pages, and source-total checks passed in the previous phase audits where performed.
+**Reproducibility limitation:** The phase-level audit files supporting these counts and their individual record checks are not included in this repository contribution. Consequently, the 728-record count and its phase breakdown are **not reproducible from this repository**.
 
-Important limitations:
+These figures are retained as historical investigation notes, not as independently verifiable repository evidence or ingestion-ready observations.
 
-- These are selected records, not a complete district × crop × season dataset.
-- Andhra Pradesh state totals are separate entities and must not be treated as district observations.
-- Crop and district crosswalks to the existing baseline are unresolved.
-- Their presence does not establish that the records can safely be merged into the existing QWeatherRiskF baseline.
+The records must not be interpreted as complete district ? crop coverage. State totals remain separate from district observations.
+
+Crop and district crosswalks to the existing baseline remain unresolved. The records have not been established as safe to merge into the existing QWeatherRiskF baseline.
 
 ### 3.3 Yield and production sample limitations
 
-The investigation identified 224 selected yield/production sample records.
+Earlier investigation notes report **224 selected yield/production sample records**.
 
-The audit status must be interpreted carefully:
+The recorded audit notes state:
 
-- The previous audit verdict was “ACCEPT WITH CORRECTIONS.”
+- The previous audit verdict was ?ACCEPT WITH CORRECTIONS.?
 - Only 6 records were independently visually rechecked in the later audit.
 - 218 records were not independently rechecked in that audit.
 - 13 numerical checks passed where testable.
 - 5 numerical checks were not testable.
 
-Therefore, the 224 samples must not be described as 224 fully independently verified observations.
+**Reproducibility limitation:** The phase-level audit files supporting the 224-sample count and the above audit breakdown are not included in this repository contribution. These figures and audit outcomes are therefore **not reproducible from this repository**.
+
+They are retained as historical investigation notes only. The 224 samples must not be described as 224 fully independently verified observations or as records cleared for ingestion.
 
 ### 3.4 Later-year agricultural investigation
 
@@ -173,18 +174,11 @@ However:
 
 ### 5.3 Weather compatibility assessment
 
-The corrected weather compatibility assessment represents all **79 baseline weather features**.
+The baseline weather feature inventory contains **78 features**, as recorded in the available inventory artifact.
 
-| Assessment status | Feature rows |
-|---|---:|
-| NOT_TESTED | 241 |
-| INCOMPATIBLE | 40 |
-| VERIFIED_COMPATIBLE | 0 |
-| **Total** | **281** |
+A detailed compatibility assessment table supporting the previously reported 281 assessment rows is not included in this repository contribution. Therefore, the counts of 241 NOT_TESTED, 40 INCOMPATIBLE and 0 VERIFIED_COMPATIBLE are **not reproducible from this repository** and are not presented as verified results here.
 
-A feature was not considered compatible merely because its name or unit appeared similar to a baseline feature.
-
-No additional weather source has passed the required content, unit, temporal-definition, spatial-alignment and schema compatibility checks.
+No additional weather source has been demonstrated to pass the required content, unit, temporal-definition, spatial-alignment and schema compatibility checks.
 
 **Weather extension decision: NO-GO for district-level ingestion at this stage.**
 

@@ -13,8 +13,6 @@
 - `yield_feature_engineering/validation_tables/yield_coverage.csv`
 - `yield_feature_engineering/forward_chaining_validation_report.txt`
 - `yield_feature_engineering/yield_anomalies_forward_chaining_v1.csv`
-- `issue_44_historical_extension/baseline_yield/validation_tables/yield_coverage.csv` (untracked copy; hash-matched to canonical in QA audit)
-- External baseline input (referenced, not modified): `C:\Users\punithaqkrishi\Downloads\crop_long_v1.csv`
 
 ## Matrix (all 13 districts × 22 crop categories)
 
