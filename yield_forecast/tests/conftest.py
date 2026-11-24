@@ -14,7 +14,7 @@ def synthetic_sample_data():
     districts = [502, 503, 505]
     crops = ["rice", "groundnut", "maize"]
     years = [2017, 2018, 2019]
-    
+
     for yr in years:
         for d in districts:
             for c in crops:

@@ -1,16 +1,16 @@
 # Issue #50 — Final Technical Report: Machine Learning Yield Response Estimation
 
-**Project:** PNB QWeatherRiskF (FinQrop Agricultural Risk Platform)  
-**Date:** 24 November 2026  
-**Branch:** `issue-50-yield-forecast`  
-**Target Branch:** `dev`  
-**Operational Taxonomy:** End-of-season retrospective weather–yield response estimation (diagnostic hindcast)  
+**Project:** PNB QWeatherRiskF (FinQrop Agricultural Risk Platform)
+**Date:** 24 November 2026
+**Branch:** `issue-50-yield-forecast`
+**Target Branch:** `dev`
+**Operational Taxonomy:** End-of-season retrospective weather–yield response estimation (diagnostic hindcast)
 
 ---
 
 > [!IMPORTANT]
-> **Mandatory Scientific & Operational Limitation Notice:**  
-> **The current five-year dataset and two held-out test years do not establish generalizable predictive superiority over climatology. The experiment is an exploratory retrospective weather–yield response estimation, not a validated operational early-warning model.**  
+> **Mandatory Scientific & Operational Limitation Notice:**
+> **The current five-year dataset and two held-out test years do not establish generalizable predictive superiority over climatology. The experiment is an exploratory retrospective weather–yield response estimation, not a validated operational early-warning model.**
 > Observed statistical associations between weather indicators and crop yield anomalies are correlational and **do not constitute proof of causation**.
 
 ---
