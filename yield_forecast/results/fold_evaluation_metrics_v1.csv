@@ -1,0 +1,11 @@
+fold,train_years,test_year,n_train,n_test,selected_features,model,mae,rmse,r2,mae_diff_vs_baseline,rmse_diff_vs_baseline
+1,2017,2018,128,128,wanom__rabi_next__rh_mean;wanom__annual_cal__rainy_days;wanom__annual_cal__cold_days,Climatology,1652.9804841686093,4531.070946577896,-1.1288827818087017,0.0,0.0
+1,2017,2018,128,128,wanom__rabi_next__rh_mean;wanom__annual_cal__rainy_days;wanom__annual_cal__cold_days,Ridge,2417.9392896090894,4433.811938446448,-1.0384711138389053,764.9588054404801,-97.25900813144835
+1,2017,2018,128,128,wanom__rabi_next__rh_mean;wanom__annual_cal__rainy_days;wanom__annual_cal__cold_days,RandomForest,1605.8071777470946,4087.159258742724,-0.7321805030889266,-47.17330642151478,-443.9116878351724
+1,2017,2018,128,128,wanom__rabi_next__rh_mean;wanom__annual_cal__rainy_days;wanom__annual_cal__cold_days,XGBoost,1419.160118118922,3888.0463002221004,-0.5675192425039262,-233.82036604968744,-643.024646355796
+1,2017,2018,128,128,wanom__rabi_next__rh_mean;wanom__annual_cal__rainy_days;wanom__annual_cal__cold_days,CatBoost,1388.6962733764285,3918.9952426292566,-0.5925735456540258,-264.28421079218083,-612.0757039486398
+2,2017;2018,2019,256,128,wanom__annual_cal__rainy_days;wanom__ne__rainy_days;wanom__annual_crop__hot_days,Climatology,1030.8463345577522,2857.783811355865,-0.1836992255266401,0.0,0.0
+2,2017;2018,2019,256,128,wanom__annual_cal__rainy_days;wanom__ne__rainy_days;wanom__annual_crop__hot_days,Ridge,1617.8896055256096,3163.7714854549654,-0.45075085443130125,587.0432709678573,305.98767409910033
+2,2017;2018,2019,256,128,wanom__annual_cal__rainy_days;wanom__ne__rainy_days;wanom__annual_crop__hot_days,RandomForest,1280.238119436322,3495.611277904537,-0.7710420943855394,249.39178487856975,637.827466548672
+2,2017;2018,2019,256,128,wanom__annual_cal__rainy_days;wanom__ne__rainy_days;wanom__annual_crop__hot_days,XGBoost,1244.8566222926975,3637.289680792509,-0.9175133708380641,214.01028773494522,779.5058694366439
+2,2017;2018,2019,256,128,wanom__annual_cal__rainy_days;wanom__ne__rainy_days;wanom__annual_crop__hot_days,CatBoost,1347.6686020942163,4110.972481828236,-1.4494679391381484,316.8222675364641,1253.1886704723706

@@ -1,0 +1,84 @@
+{
+  "project": "PNB--QWRF",
+  "issue": 50,
+  "module": "yield_forecast",
+  "version": "1.1.0",
+  "random_seed": 42,
+  "thread_count": 1,
+  "operational_taxonomy": "end_of_season_retrospective_response_estimation_diagnostic_hindcast",
+  "timing_horizon_note": "Weather features span annual and post-monsoon windows contemporaneous with or after crop growth; this pipeline is an exploratory retrospective response estimation, not an advance pre-season operational early-warning forecast.",
+  "target_column": "yield_anomaly_kg_per_ha",
+  "climatology_baseline": {
+    "definition": "Mean historical yield anomaly per crop in training fold; global training mean fallback",
+    "fallback": "global_training_mean"
+  },
+  "feature_selection": {
+    "method": "spearman_correlation_and_collinearity_filter",
+    "correlation_metric": "spearman_rho",
+    "max_features": 3,
+    "max_collinearity": 0.80,
+    "min_observed_fraction": 0.80
+  },
+  "models": {
+    "Ridge": {
+      "alpha": 10.0,
+      "fit_intercept": true,
+      "random_state": 42
+    },
+    "RandomForest": {
+      "n_estimators": 50,
+      "max_depth": 3,
+      "min_samples_leaf": 3,
+      "max_features": "sqrt",
+      "n_jobs": 1,
+      "random_state": 42
+    },
+    "XGBoost": {
+      "n_estimators": 30,
+      "max_depth": 2,
+      "learning_rate": 0.05,
+      "reg_alpha": 1.0,
+      "reg_lambda": 2.0,
+      "subsample": 0.8,
+      "colsample_bytree": 0.8,
+      "n_jobs": 1,
+      "random_state": 42
+    },
+    "CatBoost": {
+      "iterations": 50,
+      "depth": 3,
+      "learning_rate": 0.05,
+      "l2_leaf_reg": 3.0,
+      "thread_count": 1,
+      "random_seed": 42,
+      "verbose": false,
+      "allow_writing_files": false
+    }
+  },
+  "validation": {
+    "method": "forward_chaining",
+    "folds": [
+      {
+        "fold": 1,
+        "train_years": [2017],
+        "test_year": 2018
+      },
+      {
+        "fold": 2,
+        "train_years": [2017, 2018],
+        "test_year": 2019
+      }
+    ]
+  },
+  "prediction_intervals": {
+    "method": "in_sample_residual_quantile",
+    "confidence_level": 0.80,
+    "calibration_status": "uncalibrated_in_sample_exploratory",
+    "note": "Derived from in-sample training residuals due to small time series (T=1 in Fold 1); uncalibrated exploratory uncertainty bounds that do not guarantee nominal out-of-fold coverage."
+  },
+  "mitigations_status": {
+    "extend_history_issue_44": "DEFERRED",
+    "climate_zone_pooling": "PARTIALLY_IMPLEMENTED (categorical feature conditioning; explicit hierarchical pooling deferred)",
+    "shrinkage_toward_trend": "DEFERRED (insufficient time series; baseline acts as shrinkage toward historical crop mean)"
+  }
+}
