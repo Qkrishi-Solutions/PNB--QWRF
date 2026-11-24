@@ -1,16 +1,16 @@
 # Issue #50 — ML Yield-Anomaly Response Estimation Pipeline
 
-**Project:** PNB QWeatherRiskF (FinQrop Agricultural Risk Platform)  
-**Branch:** `issue-50-yield-forecast`  
-**Target PR Branch:** `dev`  
-**Module:** `yield_forecast`  
-**Operational Taxonomy:** End-of-season retrospective weather–yield response estimation (diagnostic hindcast)  
+**Project:** PNB QWeatherRiskF (FinQrop Agricultural Risk Platform)
+**Branch:** `issue-50-yield-forecast`
+**Target PR Branch:** `dev`
+**Module:** `yield_forecast`
+**Operational Taxonomy:** End-of-season retrospective weather–yield response estimation (diagnostic hindcast)
 
 ---
 
 > [!IMPORTANT]
-> **Scientific & Operational Limitation Notice:**  
-> **The current five-year dataset and two held-out test years do not establish generalizable predictive superiority over climatology. The experiment is an exploratory retrospective weather–yield response estimation, not a validated operational early-warning model.**  
+> **Scientific & Operational Limitation Notice:**
+> **The current five-year dataset and two held-out test years do not establish generalizable predictive superiority over climatology. The experiment is an exploratory retrospective weather–yield response estimation, not a validated operational early-warning model.**
 > Furthermore, observed weather/yield empirical associations are correlational and **do not constitute proof of causation**.
 
 ---
