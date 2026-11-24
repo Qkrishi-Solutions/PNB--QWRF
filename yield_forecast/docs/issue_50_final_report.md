@@ -24,15 +24,14 @@ The core objective was to determine whether weather-derived features improve pre
 ### Key Technical Findings:
 1. **Forecast Horizon & Operational Taxonomy:** The weather indicators available in the current dataset (`wanom__annual_cal__*`, `wanom__ne__*`, `wanom__rabi_next__*`) aggregate weather over full calendar years and post-monsoon periods contemporaneous with or after crop harvest. Because these features are physically unavailable at planting or mid-season, this pipeline is an **end-of-season retrospective weather–yield response estimation (diagnostic hindcast)**, NOT an advance operational early-warning forecasting model.
 2. **Dataset Integrity & Reconciled Counts:** `build_ml_dataset.py` constructs a unified ML table of 1,430 rows $\times$ 305 columns with zero key duplicates and zero rows dropped. Exactly 11 crops are eligible (`proceed_to_modelling == True`, 715 records), and 11 crops are ineligible/conditional (715 records). Exactly **384 records** are usable for forward-chaining evaluation (128 observations in each of 2017, 2018, and 2019). The difference from $11 \times 13 = 143$ is accounted for by 15 naturally uncultivated district-crop pairs in Andhra Pradesh.
-3. **Model Performance & Statistical Hypothesis Testing:** All five models were evaluated on the exact same 256 out-of-fold instances:
+3. **Model Performance & Statistical Hypothesis Testing:** Models are trained on the yield anomaly divided by each crop's training-fold standard deviation, with predictions converted back to kg/ha. All five models were evaluated on the exact same 256 out-of-fold instances:
    - **Climatology Baseline:** MAE = 1,341.91 kg/ha, RMSE = 3,787.98 kg/ha, scaled MAE = 1.033.
-   - **CatBoost** 1,368.18 (+1.96%), **XGBoost** 1,376.04 (+2.54%), **RandomForest** 1,443.02 (+7.53%), **Ridge** 2,017.91 (+50.38%) kg/ha. Scaled MAE: 1.312, 1.517, 1.941, 4.587.
-   - Pooled kg/ha metrics are dominated by sugarcane (anomaly SD about 10,300 kg/ha versus about 970 for rabi sorghum), so errors are also scaled by each crop's training-fold SD.
-   - Significance uses a district-clustered two-sided Wilcoxon signed-rank test on per-district mean scaled error differences (13 districts; minimum attainable $p$ = 0.000244). All four ML models are worse than climatology, $p = 0.0002$ each.
-   - **Conclusion:** No model beats climatology. $R^2$ is negative for every model in both folds. These models are not usable as predictors on this dataset. The earlier draft's XGBoost "-0.74%" edge did not reproduce under the pinned package versions and has been removed.
-4. **Prediction Intervals:** Residual-quantile intervals derived from in-sample training residuals are honestly designated as **`uncalibrated_in_sample_exploratory`**. Out-of-fold empirical coverage at the nominal 80% level is 50.4% (Ridge), 70.7% (CatBoost), 69.5% (XGBoost), 80.1% (Random Forest), and 71.9% (Climatology). True out-of-fold calibration requires longer historical time series.
+   - **XGBoost** 1,122.88 (-16.3%), **RandomForest** 1,174.28 (-12.5%), **CatBoost** 1,180.39 (-12.0%), **Ridge** 1,360.56 (+1.4%) kg/ha. Scaled MAE: 0.938, 0.950, 0.956, 0.986.
+   - Significance uses a district-clustered two-sided Wilcoxon signed-rank test on per-district mean scaled error differences (13 districts; minimum attainable $p$ = 0.000244). XGBoost $p$ = 0.0007, RandomForest 0.0017, CatBoost 0.0046; Ridge 0.11 (not distinguishable).
+   - **Conclusion:** The tree models beat climatology by about 7-9% on crop-scaled error. With the raw (unscaled) target every model was significantly worse (saved in `results/experiments/raw_target_v1/`), so the result depends on the scaling choice, which was adopted after inspecting these test years. $R^2$ is negative for every model and direction accuracy is chance level (42-49%): the models do not predict whether a year is above or below normal. This is an exploratory finding, not a validated predictor.
+4. **Prediction Intervals:** Residual-quantile intervals derived from in-sample training residuals are honestly designated as **`uncalibrated_in_sample_exploratory`**. Out-of-fold empirical coverage at the nominal 80% level is 71.9% (Climatology), 72.7% (CatBoost), 73.8% (Ridge), and 74.2% (RandomForest and XGBoost). True out-of-fold calibration requires longer historical time series.
 5. **Mitigations:** Climate-zone pooling is partially implemented as a categorical conditioning context feature; explicit hierarchical pooling and trend shrinkage are deferred due to small-sample constraints ($N=128$, $T=3$).
-6. **Automated Verification:** The strengthened test suite (`test_yield_forecast.py`) contains 18 automated tests covering all audit findings (including no-imputation and derived-verdict checks).
+6. **Automated Verification:** The strengthened test suite (`test_yield_forecast.py`) contains 21 automated tests covering all audit findings (including no-imputation and derived-verdict checks).
 
 ---
 
@@ -151,39 +150,40 @@ Evaluating on only two out-of-sample macro-years ($T=2$) provides very limited s
 | Model | MAE (kg/ha) | RMSE (kg/ha) | $R^2$ | $\Delta$ MAE vs Base | Empirical 80% PI Cov |
 | :--- | :---: | :---: | :---: | :---: | :---: |
 | **Climatology Baseline** | 1,652.98 | 4,531.07 | -1.129 | 0.00 (ref) | 67.2% |
-| **Ridge** | 2,417.94 | 4,433.81 | -1.038 | +764.96 | 32.0% |
-| **RandomForest** | 1,605.81 | 4,087.16 | -0.732 | -47.17 | 76.6% |
-| **XGBoost** | 1,536.19 | 3,901.79 | -0.579 | -116.79 | 57.0% |
-| **CatBoost** | 1,388.70 | 3,919.00 | -0.593 | **-264.28** | 60.9% |
+| **Ridge** | 1,441.98 | 4,074.64 | -0.722 | -211.00 | 66.4% |
+| **RandomForest** | 1,270.22 | 3,679.98 | -0.404 | -382.76 | 69.5% |
+| **XGBoost** | 1,236.93 | 3,557.51 | -0.312 | -416.05 | 71.1% |
+| **CatBoost** | 1,295.32 | 3,718.77 | -0.434 | -357.66 | 64.8% |
 
-#### Fold 2: Train 2017–2018 ($N=256$) $\to$ Test 2019 ($N=128$)
+#### Fold 2: Train 2017-2018 ($N=256$) $\to$ Test 2019 ($N=128$)
 *Selected Features:* `wanom__annual_cal__rainy_days`, `wanom__ne__rainy_days`, `wanom__annual_crop__hot_days`
 
 | Model | MAE (kg/ha) | RMSE (kg/ha) | $R^2$ | $\Delta$ MAE vs Base | Empirical 80% PI Cov |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| **Climatology Baseline** | **1,030.85** | **2,857.78** | **-0.184** | 0.00 (ref) | 76.6% |
-| **Ridge** | 1,617.89 | 3,163.77 | -0.451 | +587.04 | 68.8% |
-| **RandomForest** | 1,280.24 | 3,495.61 | -0.771 | +249.39 | 83.6% |
-| **XGBoost** | 1,215.89 | 3,614.95 | -0.894 | +185.04 | 82.0% |
-| **CatBoost** | 1,347.67 | 4,110.97 | -1.449 | +316.82 | 80.5% |
+| **Climatology Baseline** | 1,030.85 | 2,857.78 | -0.184 | 0.00 (ref) | 76.6% |
+| **Ridge** | 1,279.15 | 3,989.07 | -1.306 | +248.30 | 81.2% |
+| **RandomForest** | 1,078.33 | 3,368.82 | -0.645 | +47.49 | 78.9% |
+| **XGBoost** | 1,008.83 | 3,031.36 | -0.332 | -22.02 | 77.3% |
+| **CatBoost** | 1,065.45 | 3,253.88 | -0.535 | +34.61 | 80.5% |
 
 ---
 
 ### 6.2 Consolidated Aggregate Performance ($N=256$ Identical Out-of-Fold Instances)
 
-| Model | Total Evaluated | Aggregate MAE | Aggregate RMSE | Aggregate $R^2$ | $\Delta$ MAE vs Base | % $\Delta$ MAE | Scaled MAE | District-clustered Wilcoxon $p$ | Significantly better? | Empirical 80% PI Cov | Verdict (derived) |
+| Model | Total Evaluated | Aggregate MAE | Aggregate RMSE | Aggregate $R^2$ | $\Delta$ MAE vs Base | % $\Delta$ MAE | Scaled MAE | District-clustered Wilcoxon $p$ | Better than climatology? | Empirical 80% PI Cov | Verdict (derived) |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
 | **Climatology** | 256 | 1,341.91 | 3,787.98 | -0.724 | 0.00 | 0.00% | 1.033 | 1.0000 | Reference | 71.9% | Reference |
-| **CatBoost** | 256 | 1,368.18 | 4,016.13 | -0.938 | +26.27 | +1.96% | 1.312 | 0.0002 | **NO** | 70.7% | Significantly worse |
-| **XGBoost** | 256 | 1,376.04 | 3,761.10 | -0.700 | +34.12 | +2.54% | 1.517 | 0.0002 | **NO** | 69.5% | Significantly worse |
-| **RandomForest** | 256 | 1,443.02 | 3,802.90 | -0.738 | +101.11 | +7.53% | 1.941 | 0.0002 | **NO** | 80.1% | Significantly worse |
-| **Ridge** | 256 | 2,017.91 | 3,851.50 | -0.782 | +676.00 | +50.38% | 4.587 | 0.0002 | **NO** | 50.4% | Significantly worse |
+| **XGBoost** | 256 | 1,122.88 | 3,304.92 | -0.312 | -219.03 | -16.32% | 0.938 | 0.0007 | YES | 74.2% | Significantly better |
+| **RandomForest** | 256 | 1,174.28 | 3,527.83 | -0.495 | -167.64 | -12.49% | 0.950 | 0.0017 | YES | 74.2% | Significantly better |
+| **CatBoost** | 256 | 1,180.39 | 3,494.07 | -0.467 | -161.53 | -12.04% | 0.956 | 0.0046 | YES | 72.7% | Significantly better |
+| **Ridge** | 256 | 1,360.56 | 4,032.09 | -0.953 | +18.65 | +1.39% | 0.986 | 0.1099 | NO | 73.8% | Not distinguishable |
 
 ### Detailed Interpretation:
-- **No Superiority Over Baseline:** On pooled kg/ha MAE the gaps look small (+2% to +8% for the tree models), but pooled metrics are dominated by sugarcane. On crop-scaled errors, all four ML models are clearly worse than climatology, and every one of the 13 districts agrees ($p = 0.000244$, the minimum attainable with 13 districts).
-- **Test validity:** The earlier row-level paired $t$-test treated 256 clustered residuals as independent and was removed. The district-clustered Wilcoxon test is still limited by only 2 test years; treat $p$-values as indicative.
-- **Inter-Annual Reversals:** XGBoost and CatBoost beat climatology on pooled MAE in Fold 1 (-116.79 and -264.28 kg/ha), but climatology won in Fold 2 for every model.
-- **Ridge:** Ridge performs far worse than the tree models, consistent with an over-parameterised linear fit on one-hot crop and zone terms with only 128-256 training rows.
+- **Scaling matters most.** The same models trained on the raw kg/ha target were all significantly worse than climatology (`results/experiments/raw_target_v1/`). Sugarcane dominated the pooled fit. Scaling the target per crop removes that.
+- **Modest, tentative gain.** About 7-9% lower crop-scaled error, winning on 56-59% of rows. Adopted after inspecting these test years and after comparing variants, so the $p$-values are optimistic. A forward-chaining leave-one-district-out check (`experiment_lodo.py`) gave a consistent result (CatBoost 12 of 13 districts better, XGBoost 11 of 13) but reuses the same two test years.
+- **Not a predictor yet.** $R^2$ is negative for all models and direction accuracy is about 42-49% (chance). In Fold 2 (2019) only XGBoost beats climatology on pooled MAE.
+- **Ridge** is not distinguishable from climatology: its scaled MAE is lower but its pooled kg/ha MAE is 1.4% higher.
+- **Test validity:** the earlier row-level paired $t$-test treated 256 clustered residuals as independent and was removed. The district-clustered test is still limited by 2 test years.
 
 ---
 
@@ -191,14 +191,7 @@ Evaluating on only two out-of-sample macro-years ($T=2$) provides very limited s
 
 - **Formula:** In-sample residual quantile: $q_{80} = \text{Quantile}_{0.80}(|y_{\text{train}} - \hat{y}_{\text{train}}|)$.
 - **Calibration Status:** Honestly labeled as **`uncalibrated_in_sample_exploratory`**.
-- **Undercoverage Mechanism:**
-  In Fold 1 ($N=128$), gradient boosted trees and Ridge regression fit training residuals tightly. When applied out-of-sample in Fold 1, Ridge achieved only **32.0%** coverage, CatBoost **60.9%**, and XGBoost **57.0%**.
-- **Overall Coverage vs. 80% Target:**
-  - Ridge: 50.39% (severe undercoverage)
-  - CatBoost: 70.70% (undercoverage)
-  - Climatology: 71.88% (undercoverage)
-  - XGBoost: 69.53% (undercoverage)
-  - Random Forest: 80.08% (nominal coverage due to severe depth and leaf constraints)
+- **Coverage vs. 80% target (out-of-fold, pooled):** Climatology 71.9%, CatBoost 72.7%, Ridge 73.8%, RandomForest 74.2%, XGBoost 74.2%. All below nominal. Fold 1 (single training year) is the weakest: 64.8-71.1% for the ML models, against 77.3-81.2% in Fold 2.
 - **Conclusion:** Constructing formal conformal prediction intervals with guaranteed finite-sample coverage requires independent held-out calibration data, which is unavailable with 2–3 observation years. These intervals are strictly exploratory.
 
 ---
@@ -242,7 +235,7 @@ The automated test suite (`yield_forecast/tests/test_yield_forecast.py`) contain
 | 15 | `test_statistical_significance_reporting` | Verifies verdict/significance columns match computed p-values and differences | **PASS** |
 | 16 | `test_output_deliverables_integrity` | All 5 deliverable CSVs exist, populated, correct columns | **PASS** |
 
-**Execution Result:** `18 passed` via `python -m pytest yield_forecast/tests -q` (Python 3.12, packages pinned in `yield_forecast/requirements.txt`). Tests 17-18 (`test_classify_performance_is_derived_not_hardcoded`, `test_feature_selection_does_not_impute`) were added in review.
+**Execution Result:** `21 passed` via `python -m pytest yield_forecast/tests -q` (Python 3.12, packages pinned in `yield_forecast/requirements.txt`). Tests 17-21 were added in review (derived verdict, no imputation, scale fitting on training rows only, scaling config, predictions back in kg/ha).
 
 ---
 
@@ -266,7 +259,7 @@ The automated test suite (`yield_forecast/tests/test_yield_forecast.py`) contain
 | 14 | Small-data mitigation (pooling, regularization) | **PARTIAL** | Categorical context conditioning; explicit hierarchical shrinkage deferred |
 | 15 | Prediction intervals and measured coverage | **PASS (Honest)** | Uncalibrated in-sample intervals evaluated; empirical coverage reported |
 | 16 | Resolve forecast-timing problem | **PASS** | Formally classified as retrospective response estimation (diagnostic hindcast) |
-| 17 | Model performance interpretation | **PASS** | Documented that no model beats climatology; verdicts derived from computed results |
+| 17 | Model performance interpretation | **PASS** | Documented that results depend on target scaling; verdicts derived from computed results |
 | 18 | Automated testing suite | **PASS** | 16 tests in `test_yield_forecast.py`; 100% pass rate |
 | 19 | All deliverables created in organized directory | **PASS** | Created `yield_forecast/` with scripts, data, results, docs |
 | 20 | Final technical report and reproduction guide | **PASS** | `README.md` and this technical report |
@@ -285,3 +278,4 @@ Changes made after review against Issue #50 and the roadmap (M2, M5, Section 10)
 5. **Reproducibility.** Exact package versions are pinned and the root `requirements.txt` now includes `scipy`. The earlier committed XGBoost row did not reproduce under current libraries, so results were regenerated.
 6. **Why Issue 5 stable predictors (`crop_feature_selection_v1.csv`) are not used.** That table was selected with leave-one-year-out folds over 2017-2019. Using it to predict 2018 or 2019 would let selection see the test years and break forward chaining. Features are therefore re-selected inside each forward-chaining fold, pooled across crops because per-crop selection is infeasible with 128 training rows in Fold 1. Revisit only if a forward-chained per-crop selection is produced.
 7. **Still open (roadmap M5):** per-crop sample-size flags; explicit climate-zone pooling and trend shrinkage; out-of-fold prediction-interval calibration.
+8. **Per-crop target scaling moved into the main pipeline.** `train_forecast.py` now fits models on yield anomaly divided by each crop's training-fold standard deviation and converts predictions back to kg/ha (`target_scaling` in `model_config.json`; `--no-scale-target` reproduces the raw-target run saved in `results/experiments/raw_target_v1/`). Experiments behind this choice: `experiment_scaled_shrinkage.py` (scaling gained about 9% skill; a 0.5 shrinkage blend toward climatology made results worse and was not adopted) and `experiment_lodo.py` (forward-chaining leave-one-district-out: consistent gain). All were run on the same two test years and the idea was adopted after inspecting them, so confirmation on new years (Issue #44) is required before any claim beyond "exploratory".

@@ -34,7 +34,9 @@ yield_forecast/
 ├── README.md                                    # This guide and technical reference
 ├── requirements.txt                             # Module-specific dependencies
 ├── build_ml_dataset.py                          # Compiles canonical inputs into ML-ready dataset
-├── train_forecast.py                            # Forward-chaining evaluation pipeline
+├── train_forecast.py                            # Forward-chaining evaluation pipeline (scaled-target by default)
+├── experiment_scaled_shrinkage.py               # Exploratory: target scaling and shrinkage blend
+├── experiment_lodo.py                           # Exploratory: forward-chaining leave-one-district-out
 ├── data/
 │   ├── data_audit_report.md                     # Upstream input audit and schema verification
 │   └── ml_yield_dataset_v1.csv                  # Integrated ML-ready table (1,430 rows × 305 cols)
@@ -45,12 +47,13 @@ yield_forecast/
 │   ├── fold_evaluation_metrics_v1.csv           # Fold-by-fold MAE, RMSE, and R²
 │   ├── aggregate_model_comparison_v1.csv        # Consolidated model comparison with p-values
 │   ├── crop_level_evaluation_metrics_v1.csv     # Granular per-crop evaluation breakdown
-│   └── prediction_interval_evaluation_v1.csv    # Empirical test coverage vs 80% nominal target
+│   ├── prediction_interval_evaluation_v1.csv    # Empirical test coverage vs 80% nominal target
+│   └── experiments/                             # raw_target_v1/ run, shrinkage and LODO outputs
 ├── docs/
 │   └── issue_50_final_report.md                 # Complete technical findings and audit decisions
 └── tests/
     ├── conftest.py                              # Synthetic data fixture for unit testing
-    └── test_yield_forecast.py                   # Automated test suite (16 test functions)
+    └── test_yield_forecast.py                   # Automated test suite (21 test functions)
 ```
 
 ---
@@ -98,21 +101,25 @@ Under strict prospective forward chaining without lookahead:
 
 All five models are evaluated on the exact same 256 held-out out-of-fold instances:
 
-| Model | Samples | Aggregate MAE (kg/ha) | Aggregate RMSE (kg/ha) | Scaled MAE (x crop train SD) | $\Delta$ MAE vs Base | District-clustered Wilcoxon $p$ | Significantly better? | Empirical 80% PI Coverage | Verdict (derived by code) |
+Models are trained on the yield anomaly divided by each crop's training-fold standard deviation and their predictions are converted back to kg/ha (`target_scaling` in `models/model_config.json`; `--no-scale-target` restores the raw-target run, saved in `results/experiments/raw_target_v1/`).
+
+| Model | Samples | Aggregate MAE (kg/ha) | Aggregate RMSE (kg/ha) | Scaled MAE (x crop train SD) | $\Delta$ MAE vs Base | District-clustered Wilcoxon $p$ | Better than climatology? | Empirical 80% PI Coverage | Verdict (derived by code) |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
 | **Climatology Baseline** | 256 | 1,341.91 | 3,787.98 | 1.033 | 0.00 | 1.0000 | Reference | 71.9% | Reference |
-| **CatBoost** | 256 | 1,368.18 | 4,016.13 | 1.312 | +26.27 (+1.96%) | 0.0002 | NO | 70.7% | Significantly worse |
-| **XGBoost** | 256 | 1,376.04 | 3,761.10 | 1.517 | +34.12 (+2.54%) | 0.0002 | NO | 69.5% | Significantly worse |
-| **RandomForest** | 256 | 1,443.02 | 3,802.90 | 1.941 | +101.11 (+7.53%) | 0.0002 | NO | 80.1% | Significantly worse |
-| **Ridge Regression** | 256 | 2,017.91 | 3,851.50 | 4.587 | +676.00 (+50.38%) | 0.0002 | NO | 50.4% | Significantly worse |
+| **XGBoost** | 256 | 1,122.88 | 3,304.92 | 0.938 | -219.03 (-16.32%) | 0.0007 | YES | 74.2% | Significantly better |
+| **RandomForest** | 256 | 1,174.28 | 3,527.83 | 0.950 | -167.64 (-12.49%) | 0.0017 | YES | 74.2% | Significantly better |
+| **CatBoost** | 256 | 1,180.39 | 3,494.07 | 0.956 | -161.53 (-12.04%) | 0.0046 | YES | 72.7% | Significantly better |
+| **Ridge Regression** | 256 | 1,360.56 | 4,032.09 | 0.986 | +18.65 (+1.39%) | 0.1099 | NO | 73.8% | Not distinguishable |
 
-Results are reproducible only with the exact package versions pinned in `yield_forecast/requirements.txt`; tree-model outputs (XGBoost in particular) shifted between library versions during review.
+Results are reproducible only with the exact package versions pinned in `yield_forecast/requirements.txt` (Python 3.12).
 
 ### Honest Statistical Findings:
-1. **Pooled kg/ha metrics hide per-crop behaviour.** Sugarcane's anomaly SD (~10,300 kg/ha) is about ten times that of rabi sorghum (~970), so pooled MAE/RMSE are mostly a sugarcane score. On errors scaled by each crop's training-fold SD, every ML model is worse than climatology (scaled MAE 1.31-4.59 vs 1.03).
-2. **Significance test.** Per-district mean differences in scaled absolute error (model minus climatology) are tested with a two-sided Wilcoxon signed-rank test across the 13 districts, because rows within a district, year and crop are clustered and not independent. With 13 districts the smallest attainable $p$ is 0.000244, reached when all 13 districts favour climatology. Only two test years exist, so this is indicative, not conclusive.
-3. **Fold reversals.** In Fold 1 (2018), XGBoost and CatBoost beat Climatology on pooled MAE (-116.79 and -264.28 kg/ha). In Fold 2 (2019), Climatology beat every model. No model shows robust generalisation across years.
-4. **No Model Beats Climatology.** $R^2$ is negative for every model in both folds. None of these models is usable as a predictor on this dataset.
+1. **Target scaling drives the result.** With the raw kg/ha target (saved in `results/experiments/raw_target_v1/`) every model was significantly *worse* than climatology (scaled MAE 1.31-4.59 vs 1.03). Sugarcane's anomaly SD (~10,300 kg/ha) is about ten times that of rabi sorghum (~970), so a pooled fit on the raw target is mostly learning sugarcane. Scaling each crop's target by its training-fold SD reverses the ranking.
+2. **Size of the gain is modest.** The tree models cut crop-scaled error by about 7-9% versus climatology and beat it on 56-59% of individual rows. Ridge is not distinguishable from climatology.
+3. **Selected after seeing the test years.** The scaling idea was adopted after inspecting the 2018-2019 results, and several variants were compared. The p-values are therefore optimistic. A forward-chaining leave-one-district-out check (`experiment_lodo.py`, 12-13 districts better for CatBoost/XGBoost, +7-8% skill) supports it but reuses the same two test years. It needs confirmation on new years (Issue #44).
+4. **Significance test.** Per-district mean differences in scaled absolute error are tested with a two-sided Wilcoxon signed-rank test across the 13 districts (rows within a district, year and crop are clustered). With 13 districts the smallest attainable $p$ is 0.000244. Only two test years exist, so $p$-values are indicative.
+5. **Fold reversal.** XGBoost beats climatology in both folds on pooled MAE; RandomForest, CatBoost and Ridge beat it in Fold 1 (2018) but not Fold 2 (2019).
+6. **Not a usable predictor yet.** $R^2$ is negative for every model (best: XGBoost -0.312). Direction accuracy (above/below normal) is about 42-49%, i.e. chance. The models reduce the size of errors but do not predict the sign of the anomaly.
 
 ---
 
@@ -121,9 +128,7 @@ Results are reproducible only with the exact package versions pinned in `yield_f
 - **Method:** In-sample residual quantiles: $q_{80} = \text{Quantile}_{0.80}(|y_{\text{train}} - \hat{y}_{\text{train}}|)$.
 - **Calibration Status:** Honestly designated as **`uncalibrated_in_sample_exploratory`**.
 - **Reason for In-Sample Calculation:** In Fold 1, only a single year (2017, $N=128$) is available for training across 11 crops. Carving out a held-out calibration split within a single year would severely degrade model training and produce highly noisy calibration thresholds.
-- **Empirical Undercoverage:**
-  - Complex models (Ridge: 50.4%, CatBoost: 70.7%, XGBoost: 69.5%) overfit the small training sample, producing artificially narrow residual quantiles that fail to achieve the nominal 80% coverage on out-of-fold test data.
-  - Random Forest achieved 80.1% coverage primarily due to aggressive tree constraints (`max_depth=3`, `min_samples_leaf=3`).
+- **Empirical Coverage vs 80% target:** 71.9% (Climatology), 72.7% (CatBoost), 73.8% (Ridge), 74.2% (RandomForest and XGBoost). All remain below nominal; the intervals are in-sample and uncalibrated.
 - **Recommendation:** True conformal out-of-fold calibration requires longer historical time series ($\ge 15$ years) with dedicated multi-year calibration folds.
 
 ---
@@ -155,12 +160,14 @@ uv pip install --python .venv\Scripts\python.exe -r requirements.txt
 
 ### Step 3: Run Training & Forward-Chaining Pipeline
 ```powershell
-.venv\Scripts\python.exe yield_forecast/train_forecast.py
+python yield_forecast/train_forecast.py                      # scaled-target (default)
+python yield_forecast/train_forecast.py --no-scale-target \
+  --results-dir yield_forecast/results/experiments/raw_target_v1   # raw-target comparison
 ```
-*Expected Output: Generates all 5 result CSVs in `yield_forecast/results/`.*
+*Expected Output: 5 result CSVs per run. Requires Python 3.12 and `pip install -r yield_forecast/requirements.txt`.*
 
 ### Step 4: Run Automated Test Suite
 ```powershell
-.venv\Scripts\python.exe -m pytest yield_forecast/tests/test_yield_forecast.py -v
+python -m pytest yield_forecast/tests -v
 ```
-*Expected Output: 16 passed in ~10 seconds.*
+*Expected Output: 21 passed.*

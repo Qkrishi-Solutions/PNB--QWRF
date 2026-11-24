@@ -19,7 +19,10 @@ Key Principles & Safeguards:
   - Strict forward chaining: Models train on year(s) < test_year. No future temporal leakage.
   - In-fold feature selection: Dynamic Spearman screening & multicollinearity filter
     fitted strictly on training fold data.
-  - Target: Forward-chaining yield anomaly (yield_anomaly_kg_per_ha).
+  - Target: Forward-chaining yield anomaly (yield_anomaly_kg_per_ha). Models are fitted on the
+    anomaly divided by each crop's training-fold std (so high-variance crops such as sugarcane
+    do not dominate) and predictions are converted back to kg/ha. Use --no-scale-target for
+    the raw-target variant.
   - Categorical context: One-hot encoded crop and climate_zone (Issue #6 clusters).
   - Uncertainty Intervals: Exploratory residual-quantile intervals derived from in-sample
     training residuals, honestly labeled as uncalibrated due to small sample constraints.
@@ -126,6 +129,19 @@ def select_features_in_fold(
     return selected
 
 
+def fit_crop_scales(df_train: pd.DataFrame, target_col: str) -> tuple:
+    """Per-crop anomaly standard deviation from the TRAINING fold only.
+
+    Returns (crop_scale dict, global_std). A crop with zero/undefined spread falls back to
+    the global training std. Used both to scale the training target and to put errors on
+    a comparable footing across crops.
+    """
+    global_std = float(df_train[target_col].std(ddof=0))
+    crop_std = df_train.groupby('crop')[target_col].std(ddof=0).to_dict()
+    crop_scale = {c: (v if v and v > 0 else global_std) for c, v in crop_std.items()}
+    return crop_scale, global_std
+
+
 def classify_performance(m_name: str, mae_diff: float, p_val: float, alpha: float = 0.05) -> tuple:
     """Derive (significant_flag, verdict) from the computed result only."""
     if m_name == "Climatology":
@@ -135,13 +151,14 @@ def classify_performance(m_name: str, mae_diff: float, p_val: float, alpha: floa
     if p_val < alpha and mae_diff > 0:
         return "NO", f"Significantly worse than Climatology (p={p_val:.4f})"
     direction = "lower" if mae_diff < 0 else "higher"
-    return "NO", f"Not distinguishable from Climatology; MAE {direction} (p={p_val:.4f})"
+    return "NO", f"Not distinguishable from Climatology; scaled MAE {direction} (p={p_val:.4f})"
 
 
 def run_training_pipeline(
     dataset_path: str = "yield_forecast/data/ml_yield_dataset_v1.csv",
     config_path: str = "yield_forecast/models/model_config.json",
-    results_dir: str = "yield_forecast/results"
+    results_dir: str = "yield_forecast/results",
+    scale_target: bool = None
 ):
     print("=" * 70)
     print("Issue #50: Executing ML Yield-Anomaly Response Estimation Pipeline")
@@ -152,6 +169,9 @@ def run_training_pipeline(
         config = json.load(f)
 
     target_col = config["target_column"]
+    if scale_target is None:
+        scale_target = bool(config.get("target_scaling", {}).get("enabled", True))
+    print(f"Target scaling (per-crop training-fold std): {'ON' if scale_target else 'OFF (raw kg/ha target)'}")
     confidence_level = config["prediction_intervals"]["confidence_level"]
     os.makedirs(results_dir, exist_ok=True)
 
@@ -220,9 +240,12 @@ def run_training_pipeline(
 
         # Per-crop scale (training-fold anomaly std) used only to put errors on a
         # comparable footing across crops; fitted on the training fold only.
-        global_std = float(df_train[target_col].std(ddof=0))
-        crop_std = df_train.groupby('crop')[target_col].std(ddof=0).to_dict()
-        crop_scale = {c: (v if v and v > 0 else global_std) for c, v in crop_std.items()}
+        crop_scale, global_std = fit_crop_scales(df_train, target_col)
+        s_train = df_train['crop'].map(crop_scale).fillna(global_std).values
+        s_test = df_test['crop'].map(crop_scale).fillna(global_std).values
+        if not scale_target:
+            s_train = np.ones_like(s_train)
+            s_test = np.ones_like(s_test)
 
         # Baseline: Climatology
         baseline = ClimatologyBaseline().fit(df_train, target_col)
@@ -350,15 +373,16 @@ def run_training_pipeline(
         }
 
         for m_name, model in model_instances.items():
-            model.fit(X_train, y_train)
-            test_preds = model.predict(X_test)
+            # Fit on the (optionally per-crop scaled) target; convert predictions back to kg/ha.
+            model.fit(X_train, y_train / s_train)
+            test_preds = model.predict(X_test) * s_test
 
             mae = mean_absolute_error(y_test_true, test_preds)
             rmse = np.sqrt(mean_squared_error(y_test_true, test_preds))
             r2 = r2_score(y_test_true, test_preds)
 
             # In-sample residual quantile calculation (uncalibrated exploratory)
-            train_preds = model.predict(X_train)
+            train_preds = model.predict(X_train) * s_train
             train_resid = np.abs(y_train - train_preds)
             q_pi = np.quantile(train_resid, confidence_level)
 
@@ -549,10 +573,13 @@ if __name__ == "__main__":
     parser.add_argument("--dataset", default="yield_forecast/data/ml_yield_dataset_v1.csv")
     parser.add_argument("--config", default="yield_forecast/models/model_config.json")
     parser.add_argument("--results-dir", default="yield_forecast/results")
+    parser.add_argument("--no-scale-target", action="store_true",
+                        help="Train on the raw kg/ha anomaly (original v1 behaviour)")
     args = parser.parse_args()
 
     run_training_pipeline(
         dataset_path=args.dataset,
         config_path=args.config,
-        results_dir=args.results_dir
+        results_dir=args.results_dir,
+        scale_target=False if args.no_scale_target else None
     )

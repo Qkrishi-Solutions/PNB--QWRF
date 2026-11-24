@@ -338,3 +338,33 @@ def test_output_deliverables_integrity():
     df_agg = pd.read_csv("yield_forecast/results/aggregate_model_comparison_v1.csv")
     expected_models = {"Climatology", "Ridge", "RandomForest", "XGBoost", "CatBoost"}
     assert set(df_agg["model"].unique()) == expected_models, "Not all 5 required models evaluated"
+
+
+def test_fit_crop_scales_uses_training_rows_only_and_falls_back():
+    from yield_forecast.train_forecast import fit_crop_scales
+    tr = pd.DataFrame({
+        "crop": ["a", "a", "a", "b", "b", "c"],
+        "yield_anomaly_kg_per_ha": [1.0, 3.0, 5.0, 10.0, 30.0, 7.0],
+    })
+    scale, gstd = fit_crop_scales(tr, "yield_anomaly_kg_per_ha")
+    assert np.isclose(scale["a"], np.std([1.0, 3.0, 5.0]))
+    assert np.isclose(scale["b"], 10.0)
+    assert scale["c"] == gstd  # single observation -> zero spread -> global fallback
+    assert gstd > 0
+
+
+def test_target_scaling_enabled_in_config_and_documented():
+    with open("yield_forecast/models/model_config.json", encoding="utf-8") as f:
+        cfg = json.load(f)
+    assert cfg["target_scaling"]["enabled"] is True
+    assert cfg["target_scaling"]["method"] == "per_crop_training_fold_std"
+    assert "Exploratory" in cfg["target_scaling"]["note"]
+
+
+def test_scaled_predictions_are_back_in_kg_per_ha():
+    """Scaled-target pipeline must still output predictions in the original units."""
+    preds = pd.read_csv("yield_forecast/results/predictions_forward_chaining_v1.csv")
+    assert preds["predicted_yield_anomaly"].notna().all()
+    # Magnitudes are on the kg/ha scale of the actuals, not ~1 (scaled units)
+    assert preds["predicted_yield_anomaly"].abs().max() > 50
+    assert np.allclose(preds["residual"], preds["actual_yield_anomaly"] - preds["predicted_yield_anomaly"])
