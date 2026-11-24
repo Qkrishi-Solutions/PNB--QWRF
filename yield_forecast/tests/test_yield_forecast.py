@@ -27,6 +27,7 @@ import pytest
 from yield_forecast.train_forecast import (
     ClimatologyBaseline,
     select_features_in_fold,
+    classify_performance,
     run_training_pipeline
 )
 from sklearn.linear_model import Ridge
@@ -278,17 +279,47 @@ def test_consistent_evaluation_observations_across_models():
 
 
 def test_statistical_significance_reporting():
-    """Verify aggregate model comparison reports p-values and does not claim unsubstantiated superiority."""
-    agg_path = "yield_forecast/results/aggregate_model_comparison_v1.csv"
-    df_agg = pd.read_csv(agg_path)
+    """Verdict columns must be consistent with the computed p-values and differences."""
+    df_agg = pd.read_csv("yield_forecast/results/aggregate_model_comparison_v1.csv")
 
-    assert "paired_ttest_p_value" in df_agg.columns
+    assert "district_cluster_wilcoxon_p_value" in df_agg.columns
     assert "statistically_significant_improvement" in df_agg.columns
+    assert "scaled_mae" in df_agg.columns and "macro_crop_scaled_mae" in df_agg.columns
 
-    xgb_row = df_agg[df_agg["model"] == "XGBoost"].iloc[0]
-    assert xgb_row["statistically_significant_improvement"] == "NO", \
-        "XGBoost improvement must NOT be claimed as statistically significant (p ~ 0.87)"
-    assert xgb_row["paired_ttest_p_value"] > 0.05, "p-value must reflect lack of statistical significance"
+    for _, r in df_agg[df_agg["model"] != "Climatology"].iterrows():
+        sig, verdict = classify_performance(
+            r["model"], r["scaled_mae_diff_vs_baseline"], r["district_cluster_wilcoxon_p_value"]
+        )
+        assert r["statistically_significant_improvement"] == sig
+        assert r["performance_vs_climatology"] == verdict
+
+
+def test_classify_performance_is_derived_not_hardcoded():
+    assert classify_performance("XGBoost", -0.1, 0.01)[0] == "YES"
+    assert classify_performance("XGBoost", -0.1, 0.60)[0] == "NO"
+    assert "worse" in classify_performance("XGBoost", 0.1, 0.01)[1]
+    assert "Not distinguishable" in classify_performance("Ridge", 0.1, 0.60)[1]
+    assert classify_performance("Climatology", 0.0, 1.0)[0] == "Reference"
+
+
+def test_feature_selection_does_not_impute():
+    """Screening uses pairwise-complete data; a feature with NaNs must not be filled."""
+    rng = np.random.default_rng(0)
+    n = 40
+    y = rng.normal(size=n)
+    df = pd.DataFrame({
+        "good": y + rng.normal(scale=0.1, size=n),
+        "gappy": y + rng.normal(scale=0.1, size=n),
+        "yield_anomaly_kg_per_ha": y,
+    })
+    df.loc[:5, "gappy"] = np.nan
+    original = df.copy()
+    sel = select_features_in_fold(df, ["good", "gappy"], "yield_anomaly_kg_per_ha", min_observed_fraction=1.0)
+    assert sel == ["good"]
+    sel_relaxed = select_features_in_fold(df, ["good", "gappy"], "yield_anomaly_kg_per_ha",
+                                          max_collinearity=0.999, min_observed_fraction=0.8)
+    assert "gappy" in sel_relaxed
+    pd.testing.assert_frame_equal(df, original)  # input untouched (no in-place fill)
 
 
 def test_output_deliverables_integrity():

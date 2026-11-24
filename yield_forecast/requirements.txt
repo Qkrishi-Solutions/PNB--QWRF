@@ -1,8 +1,10 @@
-# Dependencies for Issue #50: ML Yield Forecasting
-numpy>=2.0,<3
-pandas>=2.0,<3
-scikit-learn>=1.5,<2
-xgboost>=2.0,<3
-catboost>=1.2,<2
-scipy>=1.10
-pytest>=8,<10
+# Dependencies for Issue #50: ML Yield-Anomaly Response Estimation.
+# Exact pins: committed results in yield_forecast/results/ were generated with these
+# versions (Python 3.12). Tree-model outputs (notably XGBoost) can differ across versions.
+numpy==2.5.5
+pandas==2.3.3
+scikit-learn==1.9.1
+scipy==1.18.1
+xgboost==2.1.4
+catboost==1.2.10
+pytest==9.2.0

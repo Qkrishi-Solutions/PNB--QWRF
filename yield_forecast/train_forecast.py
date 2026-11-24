@@ -23,8 +23,11 @@ Key Principles & Safeguards:
   - Categorical context: One-hot encoded crop and climate_zone (Issue #6 clusters).
   - Uncertainty Intervals: Exploratory residual-quantile intervals derived from in-sample
     training residuals, honestly labeled as uncalibrated due to small sample constraints.
-  - Statistical Rigor: Paired statistical hypothesis tests (two-tailed t-test) assess whether
-    model performance differs significantly from the climatology baseline.
+  - Statistical Rigor: A district-clustered, two-sided Wilcoxon signed-rank test on per-crop
+    scaled absolute errors assesses whether a model differs from the climatology baseline.
+    Verdict labels are derived from the computed result, never hardcoded.
+  - No imputation: feature screening is pairwise-complete and only features fully observed
+    in the train and test rows of a fold are eligible.
   - Reproducibility: Deterministic seeds and thread constraints (OMP_NUM_THREADS=1).
 """
 
@@ -34,7 +37,7 @@ import os
 import sys
 import numpy as np
 import pandas as pd
-from scipy.stats import spearmanr, ttest_rel
+from scipy.stats import spearmanr, wilcoxon
 from sklearn.linear_model import Ridge
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
@@ -63,17 +66,27 @@ class ClimatologyBaseline:
         return df_test['crop'].map(self.crop_means).fillna(self.global_mean).values
 
 
+def _pairwise_complete(x: pd.Series, y: pd.Series):
+    mask = x.notna() & y.notna()
+    return x[mask].values, y[mask].values
+
+
 def select_features_in_fold(
     df_train: pd.DataFrame,
     candidate_features: list,
     target_col: str,
     max_features: int = 3,
     max_collinearity: float = 0.80,
-    min_observed_fraction: float = 0.80
+    min_observed_fraction: float = 1.0,
+    min_pairs: int = 8
 ) -> list:
     """
     Selects top weather features strictly on the training fold.
-    Applies Spearman correlation screening followed by greedy multicollinearity pruning.
+
+    Spearman screening and the greedy multicollinearity filter use pairwise-complete
+    observations only. Nothing is imputed. Candidates observed in fewer than
+    `min_observed_fraction` of training rows, or with fewer than `min_pairs`
+    complete pairs, are skipped.
     """
     valid_candidates = [
         col for col in candidate_features
@@ -82,37 +95,47 @@ def select_features_in_fold(
     if not valid_candidates:
         return []
 
-    y_train = df_train[target_col].values
+    y = df_train[target_col]
     corrs = []
     for col in valid_candidates:
-        # Impute missing values with training fold median for screening
-        x_col = df_train[col].fillna(df_train[col].median()).values
-        if np.std(x_col) == 0 or np.std(y_train) == 0:
+        x_v, y_v = _pairwise_complete(df_train[col], y)
+        if len(x_v) < min_pairs or np.std(x_v) == 0 or np.std(y_v) == 0:
             continue
-        rho, p_val = spearmanr(x_col, y_train)
+        rho, p_val = spearmanr(x_v, y_v)
         if not np.isnan(rho):
             corrs.append((col, abs(rho), rho, p_val))
 
-    # Sort descending by absolute Spearman rho
-    corrs.sort(key=lambda x: x[1], reverse=True)
+    # Sort descending by absolute Spearman rho (column name breaks ties deterministically)
+    corrs.sort(key=lambda x: (-x[1], x[0]))
 
     selected = []
     for col, abs_rho, rho, p_val in corrs:
         if len(selected) >= max_features:
             break
-        # Multicollinearity check against previously selected features
-        x_candidate = df_train[col].fillna(df_train[col].median()).values
         collinear = False
         for prev in selected:
-            x_prev = df_train[prev].fillna(df_train[prev].median()).values
-            corr_matrix = np.corrcoef(x_candidate, x_prev)
-            if abs(corr_matrix[0, 1]) > max_collinearity:
+            a_v, b_v = _pairwise_complete(df_train[col], df_train[prev])
+            if len(a_v) < min_pairs or np.std(a_v) == 0 or np.std(b_v) == 0:
+                continue
+            if abs(np.corrcoef(a_v, b_v)[0, 1]) > max_collinearity:
                 collinear = True
                 break
         if not collinear:
             selected.append(col)
 
     return selected
+
+
+def classify_performance(m_name: str, mae_diff: float, p_val: float, alpha: float = 0.05) -> tuple:
+    """Derive (significant_flag, verdict) from the computed result only."""
+    if m_name == "Climatology":
+        return "Reference", "Reference Climatology Baseline"
+    if p_val < alpha and mae_diff < 0:
+        return "YES", f"Significantly better than Climatology (p={p_val:.4f})"
+    if p_val < alpha and mae_diff > 0:
+        return "NO", f"Significantly worse than Climatology (p={p_val:.4f})"
+    direction = "lower" if mae_diff < 0 else "higher"
+    return "NO", f"Not distinguishable from Climatology; MAE {direction} (p={p_val:.4f})"
 
 
 def run_training_pipeline(
@@ -176,16 +199,30 @@ def run_training_pipeline(
         print(f"FOLD {fold_idx}: Train {train_years} (N={n_train}) -> Test {test_year} (N={n_test})")
         print("-" * 70)
 
+        # Only features that are observed for every train AND test row are eligible
+        # (availability at prediction time; no values are imputed anywhere).
+        available_weather = [
+            c for c in candidate_weather_cols
+            if df_train[c].notna().all() and df_test[c].notna().all()
+        ]
+        print(f"Fully observed candidate features in Fold {fold_idx}: {len(available_weather)}/{len(candidate_weather_cols)}")
+
         # Dynamic feature selection on training data only
         selected_weather = select_features_in_fold(
             df_train=df_train,
-            candidate_features=candidate_weather_cols,
+            candidate_features=available_weather,
             target_col=target_col,
             max_features=config["feature_selection"]["max_features"],
             max_collinearity=config["feature_selection"]["max_collinearity"],
             min_observed_fraction=config["feature_selection"]["min_observed_fraction"]
         )
         print(f"Selected weather features for Fold {fold_idx}: {selected_weather}")
+
+        # Per-crop scale (training-fold anomaly std) used only to put errors on a
+        # comparable footing across crops; fitted on the training fold only.
+        global_std = float(df_train[target_col].std(ddof=0))
+        crop_std = df_train.groupby('crop')[target_col].std(ddof=0).to_dict()
+        crop_scale = {c: (v if v and v > 0 else global_std) for c, v in crop_std.items()}
 
         # Baseline: Climatology
         baseline = ClimatologyBaseline().fit(df_train, target_col)
@@ -204,11 +241,12 @@ def run_training_pipeline(
         X_train_cat = ohe.fit_transform(df_train[cat_cols])
         X_test_cat = ohe.transform(df_test[cat_cols])
 
-        # Impute missing selected weather features using training medians
-        train_medians = df_train[selected_weather].median()
+        # Selected features are fully observed by construction; nothing is imputed.
+        assert not df_train[selected_weather].isna().any().any()
+        assert not df_test[selected_weather].isna().any().any()
         scaler = StandardScaler()
-        X_train_w = scaler.fit_transform(df_train[selected_weather].fillna(train_medians))
-        X_test_w = scaler.transform(df_test[selected_weather].fillna(train_medians))
+        X_train_w = scaler.fit_transform(df_train[selected_weather])
+        X_test_w = scaler.transform(df_test[selected_weather])
 
         X_train = np.hstack([X_train_cat, X_train_w])
         X_test = np.hstack([X_test_cat, X_test_w])
@@ -235,6 +273,7 @@ def run_training_pipeline(
                 "actual_yield_anomaly": act_val,
                 "predicted_yield_anomaly": pred_val,
                 "residual": act_val - pred_val,
+                "scaled_abs_error": abs(act_val - pred_val) / crop_scale.get(row["crop"], global_std),
                 "pi_lower_80": lower,
                 "pi_upper_80": upper,
                 "pi_covered_80": bool(lower <= act_val <= upper)
@@ -344,6 +383,7 @@ def run_training_pipeline(
                     "actual_yield_anomaly": act_val,
                     "predicted_yield_anomaly": pred_val,
                     "residual": act_val - pred_val,
+                    "scaled_abs_error": abs(act_val - pred_val) / crop_scale.get(row["crop"], global_std),
                     "pi_lower_80": lower,
                     "pi_upper_80": upper,
                     "pi_covered_80": is_cov
@@ -397,47 +437,49 @@ def run_training_pipeline(
     df_pi.to_csv(pi_path, index=False)
     print(f"[SAVED] Prediction intervals: {pi_path}")
 
-    # 7. Aggregate Model Comparison with Statistical Testing
+    # 7. Aggregate Model Comparison
+    # Significance: per-district mean of (model - climatology) scaled absolute error,
+    # then a two-sided Wilcoxon signed-rank test across districts. Districts are the
+    # independent-ish units; residuals within a district/year/crop are clustered, so a
+    # row-level t-test would overstate significance. Only 2 test years and 13 districts
+    # exist, so p-values are indicative at best.
+    key = ["fold", "district_code", "crop"]
     agg_rows = []
-    base_preds_sub = df_preds[df_preds["model"] == "Climatology"].sort_values(
-        ["fold", "district_code", "crop"]
-    ).reset_index(drop=True)
-    base_agg_mae = mean_absolute_error(base_preds_sub["actual_yield_anomaly"], base_preds_sub["predicted_yield_anomaly"])
-    base_agg_rmse = np.sqrt(mean_squared_error(base_preds_sub["actual_yield_anomaly"], base_preds_sub["predicted_yield_anomaly"]))
-    base_abs_residuals = np.abs(base_preds_sub["residual"].values)
+    base_sub = df_preds[df_preds["model"] == "Climatology"].sort_values(key).reset_index(drop=True)
+    base_agg_mae = mean_absolute_error(base_sub["actual_yield_anomaly"], base_sub["predicted_yield_anomaly"])
+    base_agg_rmse = np.sqrt(mean_squared_error(base_sub["actual_yield_anomaly"], base_sub["predicted_yield_anomaly"]))
+    base_scaled = base_sub["scaled_abs_error"].values
+    base_crop_scaled = base_sub.groupby("crop")["scaled_abs_error"].mean()
 
     for m_name in ["Climatology", "Ridge", "RandomForest", "XGBoost", "CatBoost"]:
-        m_preds = df_preds[df_preds["model"] == m_name].sort_values(
-            ["fold", "district_code", "crop"]
-        ).reset_index(drop=True)
+        m_preds = df_preds[df_preds["model"] == m_name].sort_values(key).reset_index(drop=True)
+        assert (m_preds[key].values == base_sub[key].values).all(), "Observation mismatch across models"
         y_act = m_preds["actual_yield_anomaly"].values
         y_pr = m_preds["predicted_yield_anomaly"].values
-        m_abs_residuals = np.abs(m_preds["residual"].values)
 
         m_mae = mean_absolute_error(y_act, y_pr)
         m_rmse = np.sqrt(mean_squared_error(y_act, y_pr))
         m_r2 = r2_score(y_act, y_pr)
         avg_pi_cov = m_preds["pi_covered_80"].mean()
+        scaled_mae = float(m_preds["scaled_abs_error"].mean())
+        macro_crop_scaled = float(m_preds.groupby("crop")["scaled_abs_error"].mean().mean())
+
+        mae_diff = m_mae - base_agg_mae
+        pct_mae_diff = (mae_diff / base_agg_mae) * 100
+        rmse_diff = m_rmse - base_agg_rmse
+        scaled_diff = scaled_mae - float(base_scaled.mean())
 
         if m_name == "Climatology":
-            mae_diff = 0.0
-            pct_mae_diff = 0.0
-            rmse_diff = 0.0
             p_val = 1.0
-            stat_sig = "Reference"
-            perf_conclusion = "Reference Climatology Baseline"
         else:
-            mae_diff = m_mae - base_agg_mae
-            pct_mae_diff = (mae_diff / base_agg_mae) * 100
-            rmse_diff = m_rmse - base_agg_rmse
-            t_stat, p_val = ttest_rel(m_abs_residuals, base_abs_residuals)
-            stat_sig = "YES" if (p_val < 0.05 and mae_diff < 0) else "NO"
-            if m_name == "XGBoost":
-                perf_conclusion = f"Statistically Indistinguishable (p={p_val:.4f})"
-            elif mae_diff < 0:
-                perf_conclusion = f"Marginal Improvement (p={p_val:.4f})"
+            d = (m_preds["scaled_abs_error"].values - base_scaled)
+            per_district = pd.Series(d).groupby(m_preds["district_code"].values).mean()
+            if np.allclose(per_district.values, 0):
+                p_val = 1.0
             else:
-                perf_conclusion = f"Inferior to Climatology (p={p_val:.4f})"
+                p_val = float(wilcoxon(per_district.values, alternative="two-sided").pvalue)
+        # Significance decision uses the scaled (cross-crop comparable) difference
+        stat_sig, perf_conclusion = classify_performance(m_name, scaled_diff, p_val)
 
         agg_rows.append({
             "model": m_name,
@@ -445,10 +487,13 @@ def run_training_pipeline(
             "aggregate_mae": m_mae,
             "aggregate_rmse": m_rmse,
             "aggregate_r2": m_r2,
+            "scaled_mae": scaled_mae,
+            "scaled_mae_diff_vs_baseline": scaled_diff,
+            "macro_crop_scaled_mae": macro_crop_scaled,
             "mae_diff_vs_baseline": mae_diff,
             "pct_mae_diff_vs_baseline": pct_mae_diff,
             "rmse_diff_vs_baseline": rmse_diff,
-            "paired_ttest_p_value": p_val,
+            "district_cluster_wilcoxon_p_value": p_val,
             "statistically_significant_improvement": stat_sig,
             "nominal_pi_target_80": confidence_level,
             "empirical_pi_coverage_80": avg_pi_cov,
@@ -463,7 +508,7 @@ def run_training_pipeline(
     print("\n" + "=" * 70)
     print("Aggregate Model Comparison across All Forward-Chaining Folds:")
     print("=" * 70)
-    print(df_agg[["model", "total_test_samples", "aggregate_mae", "mae_diff_vs_baseline", "pct_mae_diff_vs_baseline", "paired_ttest_p_value", "statistically_significant_improvement", "empirical_pi_coverage_80", "performance_vs_climatology"]].to_string(index=False))
+    print(df_agg[["model", "total_test_samples", "aggregate_mae", "scaled_mae", "macro_crop_scaled_mae", "pct_mae_diff_vs_baseline", "district_cluster_wilcoxon_p_value", "statistically_significant_improvement", "empirical_pi_coverage_80", "performance_vs_climatology"]].to_string(index=False))
 
     # 8. Per-Crop Evaluation Breakdown
     crop_rows = []

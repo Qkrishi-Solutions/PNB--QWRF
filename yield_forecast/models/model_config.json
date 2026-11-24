@@ -17,7 +17,7 @@
     "correlation_metric": "spearman_rho",
     "max_features": 3,
     "max_collinearity": 0.80,
-    "min_observed_fraction": 0.80
+    "min_observed_fraction": 1.0
   },
   "models": {
     "Ridge": {

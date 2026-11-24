@@ -98,18 +98,21 @@ Under strict prospective forward chaining without lookahead:
 
 All five models are evaluated on the exact same 256 held-out out-of-fold instances:
 
-| Model | Evaluated Samples | Aggregate MAE (kg/ha) | Aggregate RMSE (kg/ha) | $\Delta$ MAE vs Base | Paired $t$-test $p$-value | Statistically Significant? | Empirical 80% PI Coverage | Performance Conclusion |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
-| **Climatology Baseline** | 256 | **1,341.91** | **3,787.98** | 0.00 | 1.0000 | Reference | 71.9% | Reference Baseline |
-| **XGBoost** | 256 | **1,332.01** | **3,764.76** | **-9.91** (-0.74%) | 0.8709 | **NO** | 73.8% | Statistically Indistinguishable ($p=0.87$) |
-| **CatBoost** | 256 | 1,368.18 | 4,016.13 | +26.27 (+1.96%) | 0.7623 | **NO** | 70.7% | Inferior to Climatology ($p=0.76$) |
-| **RandomForest** | 256 | 1,443.02 | 3,802.90 | +101.11 (+7.53%) | 0.0774 | **NO** | 80.1% | Inferior to Climatology ($p=0.08$) |
-| **Ridge Regression** | 256 | 2,017.91 | 3,851.50 | +676.00 (+50.38%) | < 0.0001 | **NO** | 50.4% | Inferior to Climatology ($p < 0.0001$) |
+| Model | Samples | Aggregate MAE (kg/ha) | Aggregate RMSE (kg/ha) | Scaled MAE (x crop train SD) | $\Delta$ MAE vs Base | District-clustered Wilcoxon $p$ | Significantly better? | Empirical 80% PI Coverage | Verdict (derived by code) |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
+| **Climatology Baseline** | 256 | 1,341.91 | 3,787.98 | 1.033 | 0.00 | 1.0000 | Reference | 71.9% | Reference |
+| **CatBoost** | 256 | 1,368.18 | 4,016.13 | 1.312 | +26.27 (+1.96%) | 0.0002 | NO | 70.7% | Significantly worse |
+| **XGBoost** | 256 | 1,376.04 | 3,761.10 | 1.517 | +34.12 (+2.54%) | 0.0002 | NO | 69.5% | Significantly worse |
+| **RandomForest** | 256 | 1,443.02 | 3,802.90 | 1.941 | +101.11 (+7.53%) | 0.0002 | NO | 80.1% | Significantly worse |
+| **Ridge Regression** | 256 | 2,017.91 | 3,851.50 | 4.587 | +676.00 (+50.38%) | 0.0002 | NO | 50.4% | Significantly worse |
+
+Results are reproducible only with the exact package versions pinned in `yield_forecast/requirements.txt`; tree-model outputs (XGBoost in particular) shifted between library versions during review.
 
 ### Honest Statistical Findings:
-1. **XGBoost Margin:** While XGBoost achieved an aggregate MAE of 1,332.01 kg/ha compared to Climatology's 1,341.91 kg/ha (a reduction of 9.91 kg/ha or 0.74%), a two-tailed paired $t$-test on absolute residuals reveals $t = -0.163, p = 0.8709$. This delta is **statistically indistinguishable from zero**.
-2. **Fold Reversals:** In Fold 1 (2018), XGBoost outperformed Climatology by $-233.82$ kg/ha. In Fold 2 (2019), Climatology outperformed XGBoost by $+214.01$ kg/ha. The models do not demonstrate robust out-of-fold generalization across years.
-3. **No Model Beats Climatology:** No classical ML model demonstrates a statistically significant improvement over the crop-mean climatology baseline on this dataset.
+1. **Pooled kg/ha metrics hide per-crop behaviour.** Sugarcane's anomaly SD (~10,300 kg/ha) is about ten times that of rabi sorghum (~970), so pooled MAE/RMSE are mostly a sugarcane score. On errors scaled by each crop's training-fold SD, every ML model is worse than climatology (scaled MAE 1.31-4.59 vs 1.03).
+2. **Significance test.** Per-district mean differences in scaled absolute error (model minus climatology) are tested with a two-sided Wilcoxon signed-rank test across the 13 districts, because rows within a district, year and crop are clustered and not independent. With 13 districts the smallest attainable $p$ is 0.000244, reached when all 13 districts favour climatology. Only two test years exist, so this is indicative, not conclusive.
+3. **Fold reversals.** In Fold 1 (2018), XGBoost and CatBoost beat Climatology on pooled MAE (-116.79 and -264.28 kg/ha). In Fold 2 (2019), Climatology beat every model. No model shows robust generalisation across years.
+4. **No Model Beats Climatology.** $R^2$ is negative for every model in both folds. None of these models is usable as a predictor on this dataset.
 
 ---
 
@@ -119,7 +122,7 @@ All five models are evaluated on the exact same 256 held-out out-of-fold instanc
 - **Calibration Status:** Honestly designated as **`uncalibrated_in_sample_exploratory`**.
 - **Reason for In-Sample Calculation:** In Fold 1, only a single year (2017, $N=128$) is available for training across 11 crops. Carving out a held-out calibration split within a single year would severely degrade model training and produce highly noisy calibration thresholds.
 - **Empirical Undercoverage:**
-  - Complex models (Ridge: 50.4%, CatBoost: 70.7%, XGBoost: 73.8%) overfit the small training sample, producing artificially narrow residual quantiles that fail to achieve the nominal 80% coverage on out-of-fold test data.
+  - Complex models (Ridge: 50.4%, CatBoost: 70.7%, XGBoost: 69.5%) overfit the small training sample, producing artificially narrow residual quantiles that fail to achieve the nominal 80% coverage on out-of-fold test data.
   - Random Forest achieved 80.1% coverage primarily due to aggressive tree constraints (`max_depth=3`, `min_samples_leaf=3`).
 - **Recommendation:** True conformal out-of-fold calibration requires longer historical time series ($\ge 15$ years) with dedicated multi-year calibration folds.
 
