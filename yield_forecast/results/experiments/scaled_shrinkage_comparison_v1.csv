@@ -1,0 +1,10 @@
+model,variant,shrink_w,n,mae_kg_ha,scaled_mae,skill_vs_clim_pct,beats_clim_pct,direction_acc_pct,district_wilcoxon_p,significantly_better,verdict
+Climatology,baseline,,256,1341.913409363181,1.032662734314708,0.0,,44.140625,1.0,Reference,Reference Climatology Baseline
+Ridge,scaled_target,1.0,256,1360.5634579512225,0.9861550021300569,4.503671008861798,56.640625,49.21875,0.10986328125,NO,Not distinguishable from Climatology; MAE lower (p=0.1099)
+RandomForest,scaled_target,1.0,256,1174.277594145738,0.9503318284718822,7.972681022276051,58.59375,45.703125,0.001708984375,YES,Significantly better than Climatology (p=0.0017)
+XGBoost,scaled_target,1.0,256,1122.8786309454122,0.9382557650580845,9.142091228776007,59.375,43.75,0.000732421875,YES,Significantly better than Climatology (p=0.0007)
+CatBoost,scaled_target,1.0,256,1180.3855996956006,0.9560633173993284,7.417660613676757,56.25,45.703125,0.004638671875,YES,Significantly better than Climatology (p=0.0046)
+Ridge,scaled_target+shrink,0.5,256,1325.2228528314222,0.9891078344339208,4.217727476114542,59.765625,42.578125,0.001220703125,YES,Significantly better than Climatology (p=0.0012)
+RandomForest,scaled_target+shrink,0.5,256,1229.5502476908327,0.9770964569999339,5.380873683957299,60.546875,42.1875,0.000244140625,YES,Significantly better than Climatology (p=0.0002)
+XGBoost,scaled_target+shrink,0.5,256,1210.6536830674763,0.9716120836193967,5.911964155056437,62.109375,41.796875,0.000244140625,YES,Significantly better than Climatology (p=0.0002)
+CatBoost,scaled_target+shrink,0.5,256,1241.2449677439183,0.9796538336997402,5.133224900397437,58.59375,39.84375,0.000732421875,YES,Significantly better than Climatology (p=0.0007)
