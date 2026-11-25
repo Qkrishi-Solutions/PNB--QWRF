@@ -148,7 +148,7 @@ uv pip install --python .venv\Scripts\python.exe -r requirements.txt
 ```bash
 python ml_ready_dataset/build_ml_ready_dataset.py
 ```
-*Expected Output: `ml_ready_dataset/ml_ready_dataset_v1.csv` (715 rows × 307 columns), plus coverage, validation and reproducibility reports in `ml_ready_dataset/`. All 26 checks must pass.*
+*Expected Output: `ml_ready_dataset/ml_ready_dataset_v1.csv` (715 rows × 312 columns), plus coverage, validation and reproducibility reports in `ml_ready_dataset/`. All 29 checks must pass.*
 
 ### Step 3: Run Training & Forward-Chaining Pipeline
 ```powershell
