@@ -1,0 +1,30 @@
+check,kind,passed,detail
+crop_long unique on district_code+year+crop,validation,True,input key uniqueness
+yield_fc unique on district_code+year+crop,validation,True,input key uniqueness
+weather unique on district_code+year+weather_column,validation,True,input key uniqueness
+eligibility unique on crop,validation,True,input key uniqueness
+zones unique on district_code,validation,True,input key uniqueness
+feature_selection unique on crop+feature,validation,True,input key uniqueness
+weather deduplicated to one row per district-year,validation,True,65 district-years (derived from input: 65)
+weather feature count consistent,validation,True,78 weather features (derived from input)
+crop-long raw weather columns identical to weather actual values (dropped as duplicates),validation,True,78 columns compared
+"(district_code, year, crop) unique in output",validation,True,715 rows
+row count reconciles to eligible crop-long rows,validation,True,output 715 == eligible crop-long rows derived from inputs 715
+join 'eligibility' leaves no unmatched base keys,validation,True,matched 11/11
+join 'yield_anomaly' leaves no unmatched base keys,validation,True,matched 715/715
+join 'weather' leaves no unmatched base keys,validation,True,matched 65/65
+join 'climate_zone' leaves no unmatched base keys,validation,True,matched 13/13
+crop_feature_selection coverage reported (unmatched stay missing),coverage_report,True,"matched 10/11 eligible crops; eligible crops with no Issue 5 result: ['rabi_sorghum']; Issue 5 crops not eligible here: ['castor', 'cotton', 'linseed', 'rapeseed_and_mustard', 'safflower', 'soyabean', 'wheat']"
+weather anomaly missingness preserved (no imputation),validation,True,2197 NaN anomaly cells in output district-years == 2197 in source
+yield anomaly NaN count equals source NaN count for kept rows,validation,True,331 NaN targets kept as missing
+no yield anomaly of exactly zero created from missing,validation,True,"missing, insufficient history and true zero stay distinct"
+weather anomaly baselines use only years < target year,leakage,True,4056 rows with a baseline checked
+yield anomaly baselines use only years < target year,leakage,True,744 rows with a baseline checked
+weather normals recompute from earlier years only,leakage,True,2873 available normals recomputed; 0 mismatches
+weather anomaly equals actual minus normal,leakage,True,2873 rows
+forward-chaining crop selection trains on target years strictly before each row's year,leakage,True,55 crop-year selections checked
+forward-chaining crop selection is unchanged when target years >= T are scrambled,leakage,True,55 selections re-run; changed: []
+forward-chaining crop selection outcome reported (none selected is a valid result),coverage_report,True,"statuses: {'no_prior_target_years': 30, 'no_predictors_passed_screen': 16, 'crop_excluded_by_issue5_row_filter': 5, 'selected': 4}; crop-years with >=1 predictor: 4"
+"baseline-leakage-safe set comes only from weather join, climate zone and crop",leakage,True,236 safe columns; outside allowed: []
+"no target, outcome-year or Issue 5 (LOYO) column is marked safe",leakage,True,overlap: []
+every column documented; weather features carry the timing caveat,leakage,True,312 columns documented

@@ -1,0 +1,6 @@
+# Issue #7 ML-ready dataset. Exact pins: the committed dataset was built with these versions
+# (Python 3.12). Other pandas/numpy versions give the same values to ~1e-32 but not
+# byte-identical CSV output.
+numpy==2.5.5
+pandas==2.3.3
+pytest==9.2.0
