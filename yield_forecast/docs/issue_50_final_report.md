@@ -31,7 +31,7 @@ The core objective was to determine whether weather-derived features improve pre
    - **Conclusion:** The tree models beat climatology by about 7-9% on crop-scaled error. With the raw (unscaled) target every model was significantly worse (saved in `results/experiments/raw_target_v1/`), so the result depends on the scaling choice, which was adopted after inspecting these test years. $R^2$ is negative for every model and direction accuracy is chance level (42-49%): the models do not predict whether a year is above or below normal. This is an exploratory finding, not a validated predictor.
 4. **Prediction Intervals:** Residual-quantile intervals derived from in-sample training residuals are honestly designated as **`uncalibrated_in_sample_exploratory`**. Out-of-fold empirical coverage at the nominal 80% level is 71.9% (Climatology), 72.7% (CatBoost), 73.8% (Ridge), and 74.2% (RandomForest and XGBoost). True out-of-fold calibration requires longer historical time series.
 5. **Mitigations:** Climate-zone pooling is partially implemented as a categorical conditioning context feature; explicit hierarchical pooling and trend shrinkage are deferred due to small-sample constraints ($N=128$, $T=3$).
-6. **Automated Verification:** The strengthened test suite (`test_yield_forecast.py`) contains 21 automated tests covering all audit findings (including no-imputation and derived-verdict checks).
+6. **Automated Verification:** The strengthened test suite (`test_yield_forecast.py`) contains 23 automated tests covering all audit findings (including no-imputation and derived-verdict checks).
 
 ---
 
@@ -50,7 +50,7 @@ The core objective was to determine whether weather-derived features improve pre
 10. `yield_forecast/results/crop_level_evaluation_metrics_v1.csv`: Granular per-crop evaluation breakdown.
 11. `yield_forecast/results/prediction_interval_evaluation_v1.csv`: Empirical test coverage vs 80% nominal target.
 12. `yield_forecast/tests/conftest.py`: Synthetic test fixture for unit testing.
-13. `yield_forecast/tests/test_yield_forecast.py`: 21 automated unit and integration tests.
+13. `yield_forecast/tests/test_yield_forecast.py`: 23 automated unit and integration tests.
 14. `yield_forecast/README.md`: Module overview, reproduction instructions, and limitation notices.
 15. `yield_forecast/docs/issue_50_final_report.md`: This comprehensive technical audit report.
 
@@ -255,7 +255,7 @@ The automated test suite (`yield_forecast/tests/test_yield_forecast.py`) contain
 | 15 | `test_statistical_significance_reporting` | Verifies verdict/significance columns match computed p-values and differences | **PASS** |
 | 16 | `test_output_deliverables_integrity` | All 5 deliverable CSVs exist, populated, correct columns | **PASS** |
 
-**Execution Result:** `21 passed` via `python -m pytest yield_forecast/tests -q` (Python 3.12, packages pinned in `yield_forecast/requirements.txt`). Tests 17-21 were added in review (derived verdict, no imputation, scale fitting on training rows only, scaling config, predictions back in kg/ha).
+**Execution Result:** `23 passed` via `python -m pytest yield_forecast/tests -q` (Python 3.12, packages pinned in `yield_forecast/requirements.txt`). Tests 17-23 were added in review (derived verdict, no imputation, scale fitting on training rows only, scaling config, predictions back in kg/ha, per-crop sample-size flags, per-crop predictor coverage).
 
 ---
 
