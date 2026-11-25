@@ -181,6 +181,30 @@ Evaluating on only two out-of-sample macro-years ($T=2$) provides very limited s
 - **Ridge** is not distinguishable from climatology: its scaled MAE is lower but its pooled kg/ha MAE is 1.4% higher.
 - **Test validity:** the earlier row-level paired $t$-test treated 256 clustered residuals as independent and was removed. The district-clustered test is still limited by 2 test years.
 
+### 6.3 Per-Crop Results and Sample-Size Flags (roadmap M5)
+
+### Per-crop results (crop-scaled error, skill vs climatology)
+
+Skill is `100 x (1 - model scaled MAE / climatology scaled MAE)` per crop; positive means better than the crop-mean baseline. A crop is flagged **low-sample** when its smallest fold has fewer than 10 test rows (project threshold in `model_config.json`, above Issue 5's `MIN_N` of 8); read flagged crops with caution. Per-crop numbers rest on 16 to 26 test rows, so they are descriptive, not significance-tested.
+
+| Crop | Test rows | Districts | Min fold rows | Low-sample flag | CatBoost | RandomForest | Ridge | XGBoost | XGBoost beats climatology on |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| chickpea | 22 | 11 | 11 | no | +6.6% | +7.5% | +6.3% | **+7.9%** | 55% of rows |
+| finger_millet | 20 | 10 | 10 | no | -1.9% | -2.9% | -1.8% | **-2.4%** | 45% of rows |
+| groundnut | 26 | 13 | 13 | no | +10.3% | +11.3% | +5.1% | **+11.6%** | 62% of rows |
+| maize | 26 | 13 | 13 | no | +24.6% | +23.8% | +8.6% | **+27.3%** | 77% of rows |
+| pearl_millet | 22 | 11 | 11 | no | +6.8% | +7.5% | +12.9% | **+8.3%** | 45% of rows |
+| pigeonpea | 26 | 13 | 13 | no | +2.3% | +4.5% | +4.1% | **+4.0%** | 50% of rows |
+| rabi_sorghum | 16 | 8 | 8 | **yes** | -0.8% | +0.1% | -2.3% | **+5.9%** | 75% of rows |
+| rice | 26 | 13 | 13 | no | +0.3% | +1.5% | +6.4% | **+1.7%** | 54% of rows |
+| sesamum | 24 | 12 | 12 | no | -1.1% | -2.5% | -6.1% | **-3.2%** | 42% of rows |
+| sugarcane | 26 | 13 | 13 | no | +12.0% | +12.6% | -5.3% | **+17.2%** | 65% of rows |
+| sunflower | 22 | 11 | 11 | no | +18.6% | +19.7% | +13.9% | **+20.9%** | 86% of rows |
+
+XGBoost improves on climatology in 9 of 11 crops. The gain is concentrated (maize, sunflower, sugarcane) and two crops (finger_millet, sesamum) are slightly worse than climatology, so the pooled average hides real heterogeneity.
+
+**Why selection is pooled, not per crop.** Issue #7's forward-chaining version of Issue 5's per-crop selection (`fc_*`) yields at least one predictor for only 48 of the 256 test rows (19%), and none for 16 rows (`rabi_sorghum`, which Issue 5's row filter drops). A per-crop-predictor model could therefore act on under a fifth of the evaluation, so the pipeline selects features pooled across crops inside each forward-chaining fold.
+
 ---
 
 ## 7. Prediction Intervals & Honest Calibration Analysis
@@ -273,6 +297,6 @@ Changes made after review against Issue #50 and the roadmap (M2, M5, Section 10)
 4. **Cross-crop comparability.** `scaled_abs_error`, `scaled_mae` and `macro_crop_scaled_mae` were added so sugarcane does not dominate the comparison.
 5. **Reproducibility.** Exact package versions are pinned and the root `requirements.txt` now includes `scipy`. The earlier committed XGBoost row did not reproduce under current libraries, so results were regenerated.
 6. **Why Issue 5 stable predictors (`crop_feature_selection_v1.csv`) are not used.** That table was selected with leave-one-year-out folds over 2017-2019. Using it to predict 2018 or 2019 would let selection see the test years and break forward chaining. Features are therefore re-selected inside each forward-chaining fold, pooled across crops because per-crop selection is infeasible with 128 training rows in Fold 1. A forward-chained per-crop selection now exists in the Issue #7 dataset (`fc_*` columns): across 55 crop-years only 4 selected any predictor, from 11 to 26 training rows, which supports keeping the pooled in-fold selection used here.
-7. **Still open (roadmap M5):** per-crop sample-size flags; explicit climate-zone pooling and trend shrinkage; out-of-fold prediction-interval calibration.
+7. **Roadmap M5 per-crop sample-size flags: done** (`low_sample_flag`, `min_fold_n_test`, crop-scaled skill in `crop_level_evaluation_metrics_v1.csv`). **Still open:** explicit climate-zone pooling and trend shrinkage (a shrinkage blend toward climatology was tried and made results worse); out-of-fold prediction-interval calibration.
 8. **Per-crop target scaling moved into the main pipeline.** `train_forecast.py` now fits models on yield anomaly divided by each crop's training-fold standard deviation and converts predictions back to kg/ha (`target_scaling` in `model_config.json`; `--no-scale-target` reproduces the raw-target run saved in `results/experiments/raw_target_v1/`). Experiments behind this choice: `experiment_scaled_shrinkage.py` (scaling gained about 9% skill; a 0.5 shrinkage blend toward climatology made results worse and was not adopted) and `experiment_lodo.py` (forward-chaining leave-one-district-out: consistent gain). All were run on the same two test years and the idea was adopted after inspecting them, so confirmation on new years (Issue #44) is required before any claim beyond "exploratory".
 9. **Single shared dataset (Issue #7).** This PR originally built its own table (`yield_forecast/build_ml_dataset.py`, 1,430 rows, 305 columns). That duplicated Issue #7, which defines the one input for forecasting issues #49 to #52 and also requires eligible rows only, the Issue 5 predictor summary, a join-coverage report, and explicit leakage tests. The builder and table were removed; `train_forecast.py` and both experiment scripts now default to `ml_ready_dataset/ml_ready_dataset_v1.csv`. Regenerating every result from it reproduces the earlier numbers to floating-point precision (maximum difference 7e-12; identical rows, features and models), so no result changed. The test suite now derives expected counts from the inputs instead of hard-coding 1,430 / 22 / 715 / 384.

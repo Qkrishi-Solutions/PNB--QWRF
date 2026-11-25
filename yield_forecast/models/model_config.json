@@ -8,6 +8,10 @@
   "operational_taxonomy": "end_of_season_retrospective_response_estimation_diagnostic_hindcast",
   "timing_horizon_note": "Weather features span annual and post-monsoon windows contemporaneous with or after crop growth; this pipeline is an exploratory retrospective response estimation, not an advance pre-season operational early-warning forecast.",
   "target_column": "yield_anomaly_kg_per_ha",
+  "evaluation": {
+    "min_fold_test_samples_for_conclusion": 10,
+    "note": "Project threshold (above Issue 5's MIN_N of 8): a crop with fewer test rows than this in its smallest fold is flagged low_sample and should not be read on its own."
+  },
   "target_scaling": {
     "enabled": true,
     "method": "per_crop_training_fold_std",

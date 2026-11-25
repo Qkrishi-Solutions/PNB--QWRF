@@ -378,3 +378,29 @@ def test_scaled_predictions_are_back_in_kg_per_ha():
     # Magnitudes are on the kg/ha scale of the actuals, not ~1 (scaled units)
     assert preds["predicted_yield_anomaly"].abs().max() > 50
     assert np.allclose(preds["residual"], preds["actual_yield_anomaly"] - preds["predicted_yield_anomaly"])
+
+
+def test_crop_level_metrics_have_sample_size_flags_and_skill():
+    """Roadmap M5: per-crop sample-size flags, plus crop-scaled skill against climatology."""
+    df = pd.read_csv("yield_forecast/results/crop_level_evaluation_metrics_v1.csv")
+    for col in ["n_districts", "min_fold_n_test", "low_sample_flag", "scaled_mae",
+                "skill_vs_climatology_pct", "beats_climatology_pct"]:
+        assert col in df.columns, col
+    with open("yield_forecast/models/model_config.json", encoding="utf-8") as f:
+        thr = json.load(f)["evaluation"]["min_fold_test_samples_for_conclusion"]
+    assert ((df["min_fold_n_test"] < thr) == df["low_sample_flag"]).all()
+    base = df[df["model"] == "Climatology"]
+    assert (base["skill_vs_climatology_pct"] == 0).all()
+    ml = df[df["model"] != "Climatology"].merge(
+        base[["crop", "scaled_mae"]].rename(columns={"scaled_mae": "base_scaled"}), on="crop")
+    # skill is consistent with the scaled errors, and sign agrees with which is smaller
+    assert np.allclose(ml["skill_vs_climatology_pct"], 100 * (1 - ml["scaled_mae"] / ml["base_scaled"]))
+    assert (np.sign(ml["skill_vs_climatology_pct"]) == np.sign(ml["base_scaled"] - ml["scaled_mae"])).all()
+
+
+def test_issue5_style_predictor_coverage_is_documented_in_dataset():
+    """Issue 5-style forward-chaining per-crop predictors exist for only a minority of test rows."""
+    df = pd.read_csv(ML_READY)
+    test_rows = df[df["usable_for_forward_chaining_eval"] & (df["year"] >= 2018)]
+    covered = test_rows["fc_n_selected_predictors"].fillna(0) > 0
+    assert 0 < covered.mean() < 0.5

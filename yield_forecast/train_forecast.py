@@ -536,9 +536,14 @@ def run_training_pipeline(
     print("=" * 70)
     print(df_agg[["model", "total_test_samples", "aggregate_mae", "scaled_mae", "macro_crop_scaled_mae", "pct_mae_diff_vs_baseline", "district_cluster_wilcoxon_p_value", "statistically_significant_improvement", "empirical_pi_coverage_80", "performance_vs_climatology"]].to_string(index=False))
 
-    # 8. Per-Crop Evaluation Breakdown
+    # 8. Per-Crop Evaluation Breakdown (roadmap M5: per-crop sample-size flags)
+    # Errors are scaled by each crop's training-fold std so crops are comparable. The flag marks crops
+    # whose smallest fold has too few test rows for a per-crop conclusion (project threshold in config).
+    min_fold_n = int(config.get("evaluation", {}).get("min_fold_test_samples_for_conclusion", 10))
     crop_rows = []
     crops = sorted(df_eval["crop"].unique())
+    key = ["fold", "district_code", "crop"]
+    base_all = df_preds[df_preds["model"] == "Climatology"].set_index(key)
     for crop_name in crops:
         for m_name in ["Climatology", "Ridge", "RandomForest", "XGBoost", "CatBoost"]:
             m_crop = df_preds[(df_preds["crop"] == crop_name) & (df_preds["model"] == m_name)]
@@ -548,12 +553,24 @@ def run_training_pipeline(
             c_pr = m_crop["predicted_yield_anomaly"].values
             c_mae = mean_absolute_error(c_act, c_pr)
             c_rmse = np.sqrt(mean_squared_error(c_act, c_pr))
+            b_crop = base_all.loc[m_crop.set_index(key).index]
+            scaled = float(m_crop["scaled_abs_error"].mean())
+            base_scaled = float(b_crop["scaled_abs_error"].mean())
+            min_fold = int(m_crop.groupby("fold").size().min())
+            is_base = m_name == "Climatology"
             crop_rows.append({
                 "crop": crop_name,
                 "model": m_name,
                 "n_test_samples": len(m_crop),
+                "n_districts": int(m_crop["district_code"].nunique()),
+                "min_fold_n_test": min_fold,
+                "low_sample_flag": bool(min_fold < min_fold_n),
                 "mae": c_mae,
-                "rmse": c_rmse
+                "rmse": c_rmse,
+                "scaled_mae": scaled,
+                "skill_vs_climatology_pct": 0.0 if is_base else 100.0 * (1.0 - scaled / base_scaled),
+                "beats_climatology_pct": np.nan if is_base else float(
+                    100.0 * (m_crop["scaled_abs_error"].values < b_crop["scaled_abs_error"].values).mean()),
             })
 
     df_crop = pd.DataFrame(crop_rows)

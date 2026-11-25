@@ -51,7 +51,7 @@ yield_forecast/
 │   └── issue_50_final_report.md                 # Complete technical findings and audit decisions
 └── tests/
     ├── conftest.py                              # Synthetic data fixture for unit testing
-    └── test_yield_forecast.py                   # Automated test suite (21 test functions)
+    └── test_yield_forecast.py                   # Automated test suite (23 test functions)
 ```
 
 ---
@@ -113,6 +113,28 @@ Results are reproducible only with the exact package versions pinned in `yield_f
 5. **Fold reversal.** XGBoost beats climatology in both folds on pooled MAE; RandomForest, CatBoost and Ridge beat it in Fold 1 (2018) but not Fold 2 (2019).
 6. **Not a usable predictor yet.** $R^2$ is negative for every model (best: XGBoost -0.312). Direction accuracy (above/below normal) is about 42-49%, i.e. chance. The models reduce the size of errors but do not predict the sign of the anomaly.
 
+### Per-crop results (crop-scaled error, skill vs climatology)
+
+Skill is `100 x (1 - model scaled MAE / climatology scaled MAE)` per crop; positive means better than the crop-mean baseline. A crop is flagged **low-sample** when its smallest fold has fewer than 10 test rows (project threshold in `model_config.json`, above Issue 5's `MIN_N` of 8); read flagged crops with caution. Per-crop numbers rest on 16 to 26 test rows, so they are descriptive, not significance-tested.
+
+| Crop | Test rows | Districts | Min fold rows | Low-sample flag | CatBoost | RandomForest | Ridge | XGBoost | XGBoost beats climatology on |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| chickpea | 22 | 11 | 11 | no | +6.6% | +7.5% | +6.3% | **+7.9%** | 55% of rows |
+| finger_millet | 20 | 10 | 10 | no | -1.9% | -2.9% | -1.8% | **-2.4%** | 45% of rows |
+| groundnut | 26 | 13 | 13 | no | +10.3% | +11.3% | +5.1% | **+11.6%** | 62% of rows |
+| maize | 26 | 13 | 13 | no | +24.6% | +23.8% | +8.6% | **+27.3%** | 77% of rows |
+| pearl_millet | 22 | 11 | 11 | no | +6.8% | +7.5% | +12.9% | **+8.3%** | 45% of rows |
+| pigeonpea | 26 | 13 | 13 | no | +2.3% | +4.5% | +4.1% | **+4.0%** | 50% of rows |
+| rabi_sorghum | 16 | 8 | 8 | **yes** | -0.8% | +0.1% | -2.3% | **+5.9%** | 75% of rows |
+| rice | 26 | 13 | 13 | no | +0.3% | +1.5% | +6.4% | **+1.7%** | 54% of rows |
+| sesamum | 24 | 12 | 12 | no | -1.1% | -2.5% | -6.1% | **-3.2%** | 42% of rows |
+| sugarcane | 26 | 13 | 13 | no | +12.0% | +12.6% | -5.3% | **+17.2%** | 65% of rows |
+| sunflower | 22 | 11 | 11 | no | +18.6% | +19.7% | +13.9% | **+20.9%** | 86% of rows |
+
+XGBoost improves on climatology in 9 of 11 crops. The gain is concentrated (maize, sunflower, sugarcane) and two crops (finger_millet, sesamum) are slightly worse than climatology, so the pooled average hides real heterogeneity.
+
+**Why selection is pooled, not per crop.** Issue #7's forward-chaining version of Issue 5's per-crop selection (`fc_*`) yields at least one predictor for only 48 of the 256 test rows (19%), and none for 16 rows (`rabi_sorghum`, which Issue 5's row filter drops). A per-crop-predictor model could therefore act on under a fifth of the evaluation, so the pipeline selects features pooled across crops inside each forward-chaining fold.
+
 ---
 
 ## 6. Prediction Intervals & Honest Calibration Status
@@ -162,4 +184,4 @@ python yield_forecast/train_forecast.py --no-scale-target \
 ```powershell
 python -m pytest yield_forecast/tests -v
 ```
-*Expected Output: 21 passed.*
+*Expected Output: 23 passed.*
