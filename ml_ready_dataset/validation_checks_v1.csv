@@ -22,5 +22,6 @@ weather anomaly baselines use only years < target year,leakage,True,4056 rows wi
 yield anomaly baselines use only years < target year,leakage,True,744 rows with a baseline checked
 weather normals recompute from earlier years only,leakage,True,2873 available normals recomputed; 0 mismatches
 weather anomaly equals actual minus normal,leakage,True,2873 rows
-forward-chaining safe feature set has no target-derived or LOYO columns,leakage,True,236 safe features; offending: []
-Issue 5 LOYO predictors flagged as not forward-chaining safe,leakage,True,loyo_* columns are informational; re-select inside each forward-chaining fold
+"baseline-leakage-safe set comes only from weather join, climate zone and crop",leakage,True,236 safe columns; outside allowed: []
+"no target, outcome-year or Issue 5 (LOYO) column is marked safe",leakage,True,overlap: []
+every column documented; weather features carry the timing caveat,leakage,True,307 columns documented

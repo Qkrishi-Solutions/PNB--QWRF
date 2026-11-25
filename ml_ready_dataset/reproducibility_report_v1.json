@@ -1,6 +1,6 @@
 {
-  "checks_passed": 25,
-  "checks_total": 25,
+  "checks_passed": 26,
+  "checks_total": 26,
   "command": "python ml_ready_dataset/build_ml_ready_dataset.py",
   "input_sha256": {
     "crop_long": "4765429e3acb7cf3eb9e64226babc9d29d910fb8deb7d0c42ac48e3baddf727d",
@@ -15,8 +15,8 @@
     "numpy": "2.5.5",
     "pandas": "2.3.3"
   },
-  "platform": "macOS-27.0.1-arm64-arm-64bit",
   "python": "3.12.12",
+  "reproducibility_note": "The output is byte-identical only with the pinned package versions in ml_ready_dataset/requirements.txt; other versions can differ in the last float digit.",
   "row_counts": {
     "crop_long_rows": 1430,
     "eligible_crops": 11,
