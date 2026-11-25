@@ -1,16 +1,25 @@
 {
-  "checks_passed": 26,
-  "checks_total": 26,
+  "checks_passed": 29,
+  "checks_total": 29,
   "command": "python ml_ready_dataset/build_ml_ready_dataset.py",
+  "forward_chaining_selection_config": {
+    "COVERAGE": 0.6,
+    "MAX_CORR": 0.85,
+    "MAX_FEATURES": 4,
+    "MAX_Q": 0.2,
+    "MIN_N": 8,
+    "MIN_RHO": 0.3
+  },
   "input_sha256": {
     "crop_long": "4765429e3acb7cf3eb9e64226babc9d29d910fb8deb7d0c42ac48e3baddf727d",
     "eligibility": "70d42dd175fdc321dd3cc2596a830bb10a979fbce3f5cdd918ea8dc971974c76",
     "feature_selection": "9faea5c0425450bc0ffbfa24f691709cb386e8a7e32805e310a45013bfac9340",
+    "issue5_script": "2452edfa55721c9c60fdf04a6ae8b592f659f7d895c80e3d87822b8821508f55",
     "weather": "1cfa80079a7f110783d809dbed6c4c61e8ca2b28350a3dd9c598be77daaadc05",
     "yield_fc": "78661a3d5e7442efb4cb6f8bcd789e6690c62dfad81e385c2906235d45b66275",
     "zones": "dd900248612fc19fea336f7ccb5da50b3190cabc285302408f9ff0925eec6bd2"
   },
-  "output_sha256": "0945b508cba246ca12f838ba72bb09a93fafe92554561a68271aa786ef4fa7a5",
+  "output_sha256": "d0c3314865f0892a7c35d71412beaabe23092fde8eb2cbabb6127402543b47a3",
   "packages": {
     "numpy": "2.5.5",
     "pandas": "2.3.3"
@@ -21,7 +30,7 @@
     "crop_long_rows": 1430,
     "eligible_crops": 11,
     "eligible_rows_kept": 715,
-    "output_columns": 307,
+    "output_columns": 312,
     "rows_excluded": 715,
     "rows_with_valid_yield_anomaly": 384,
     "weather_district_years": 65,

@@ -22,6 +22,9 @@ weather anomaly baselines use only years < target year,leakage,True,4056 rows wi
 yield anomaly baselines use only years < target year,leakage,True,744 rows with a baseline checked
 weather normals recompute from earlier years only,leakage,True,2873 available normals recomputed; 0 mismatches
 weather anomaly equals actual minus normal,leakage,True,2873 rows
+forward-chaining crop selection trains on target years strictly before each row's year,leakage,True,55 crop-year selections checked
+forward-chaining crop selection is unchanged when target years >= T are scrambled,leakage,True,55 selections re-run; changed: []
+forward-chaining crop selection outcome reported (none selected is a valid result),coverage_report,True,"statuses: {'no_prior_target_years': 30, 'no_predictors_passed_screen': 16, 'crop_excluded_by_issue5_row_filter': 5, 'selected': 4}; crop-years with >=1 predictor: 4"
 "baseline-leakage-safe set comes only from weather join, climate zone and crop",leakage,True,236 safe columns; outside allowed: []
 "no target, outcome-year or Issue 5 (LOYO) column is marked safe",leakage,True,overlap: []
-every column documented; weather features carry the timing caveat,leakage,True,307 columns documented
+every column documented; weather features carry the timing caveat,leakage,True,312 columns documented
