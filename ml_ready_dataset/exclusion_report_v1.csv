@@ -1,0 +1,12 @@
+crop,exclusion_reason,rows_excluded
+castor,crop not eligible (proceed_to_modelling is False),65
+cotton,crop not eligible (proceed_to_modelling is False),65
+kharif_sorghum,crop not eligible (proceed_to_modelling is False),65
+linseed,crop not eligible (proceed_to_modelling is False),65
+minor_pulses,crop not eligible (proceed_to_modelling is False),65
+oilseeds,crop not eligible (proceed_to_modelling is False),65
+rapeseed_and_mustard,crop not eligible (proceed_to_modelling is False),65
+safflower,crop not eligible (proceed_to_modelling is False),65
+sorghum,crop not eligible (proceed_to_modelling is False),65
+soyabean,crop not eligible (proceed_to_modelling is False),65
+wheat,crop not eligible (proceed_to_modelling is False),65

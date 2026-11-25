@@ -1,0 +1,308 @@
+column,role,description,is_key,forward_chaining_safe_feature,leakage_note,n_missing
+district_code,key,Row key,True,False,,0
+district_name,metadata,Descriptive attribute from the crop-long table,False,False,Informational,0
+year,key,Row key,True,False,,0
+crop,key,Row key,True,True,,0
+crop_name,metadata,Descriptive attribute from the crop-long table,False,False,Informational,0
+crop_group,metadata,Descriptive attribute from the crop-long table,False,False,Informational,0
+is_aggregate,metadata,Descriptive attribute from the crop-long table,False,False,Informational,0
+is_seasonal_component,metadata,Descriptive attribute from the crop-long table,False,False,Informational,0
+season_component,metadata,Descriptive attribute from the crop-long table,False,False,Informational,650
+component_of_aggregate,metadata,Descriptive attribute from the crop-long table,False,False,Informational,455
+is_group_category,metadata,Descriptive attribute from the crop-long table,False,False,Informational,0
+modelling_role,metadata,Descriptive attribute from the crop-long table,False,False,Informational,0
+use_in_modelling,metadata,Descriptive attribute from the crop-long table,False,False,Informational,0
+area_1000_ha,outcome_year_measurement,Crop outcome measured in the target year,False,False,Target-year outcome info: leakage if used as a feature,0
+production_1000_tons,outcome_year_measurement,Crop outcome measured in the target year,False,False,Target-year outcome info: leakage if used as a feature,0
+yield_kg_per_ha,outcome_year_measurement,Crop outcome measured in the target year,False,False,Target-year outcome info: leakage if used as a feature,0
+yield_check_kg_per_ha,outcome_year_measurement,Crop outcome measured in the target year,False,False,Target-year outcome info: leakage if used as a feature,61
+yield_rel_diff,outcome_year_measurement,Crop outcome measured in the target year,False,False,Target-year outcome info: leakage if used as a feature,65
+yield_vs_other_years_median,outcome_year_measurement,Crop outcome measured in the target year,False,False,Target-year outcome info: leakage if used as a feature,277
+aggregate_member_sum_area,metadata,Descriptive attribute from the crop-long table,False,False,Informational,715
+aggregate_member_sum_production,metadata,Descriptive attribute from the crop-long table,False,False,Informational,715
+flag_nan_filled_with_zero,data_quality_flag,Issue 1 data-quality flag,False,False,Informational,0
+flag_any_missing,data_quality_flag,Issue 1 data-quality flag,False,False,Informational,0
+flag_area_zero,data_quality_flag,Issue 1 data-quality flag,False,False,Informational,0
+flag_production_zero,data_quality_flag,Issue 1 data-quality flag,False,False,Informational,0
+flag_yield_zero,data_quality_flag,Issue 1 data-quality flag,False,False,Informational,0
+flag_all_zero,data_quality_flag,Issue 1 data-quality flag,False,False,Informational,0
+flag_zero_area_positive_production,data_quality_flag,Issue 1 data-quality flag,False,False,Informational,0
+flag_positive_area_zero_production,data_quality_flag,Issue 1 data-quality flag,False,False,Informational,0
+flag_positive_area_zero_yield,data_quality_flag,Issue 1 data-quality flag,False,False,Informational,0
+flag_negative_value,data_quality_flag,Issue 1 data-quality flag,False,False,Informational,0
+flag_yield_mismatch,data_quality_flag,Issue 1 data-quality flag,False,False,Informational,0
+flag_low_area_lt_1000ha,data_quality_flag,Issue 1 data-quality flag,False,False,Informational,0
+flag_yield_jump,data_quality_flag,Issue 1 data-quality flag,False,False,Informational,0
+flag_aggregate_mismatch,data_quality_flag,Issue 1 data-quality flag,False,False,Informational,0
+flag_sugarcane_unit_corrected,data_quality_flag,Issue 1 data-quality flag,False,False,Informational,0
+flag_cotton_2019_suspect,data_quality_flag,Issue 1 data-quality flag,False,False,Informational,0
+flag_minor_pulses_not_reported,data_quality_flag,Issue 1 data-quality flag,False,False,Informational,0
+flag_changed_by_fix_plan,data_quality_flag,Issue 1 data-quality flag,False,False,Informational,0
+flag_estimated_by_allocation,data_quality_flag,Issue 1 data-quality flag,False,False,Informational,0
+n_flags,data_quality_flag,Issue 1 data-quality flag,False,False,Informational,0
+flag_summary,data_quality_flag,Issue 1 data-quality flag,False,False,Informational,402
+state_code,metadata,Descriptive attribute from the crop-long table,False,False,Informational,0
+state_name,metadata,Descriptive attribute from the crop-long table,False,False,Informational,0
+crop_dist_name,metadata,Descriptive attribute from the crop-long table,False,False,Informational,0
+rain_valid_area_fraction,metadata,Descriptive attribute from the crop-long table,False,False,Informational,0
+eligibility_class,eligibility_flag,Eligibility and usability flags,False,False,Use to filter rows,0
+proceed_to_modelling,eligibility_flag,Eligibility and usability flags,False,False,Use to filter rows,0
+eligibility_reasons,eligibility_flag,Eligibility and usability flags,False,False,Use to filter rows,0
+eligibility_reason,target_baseline_meta,How the yield anomaly baseline was formed,False,False,Derived from the target; not a feature,0
+eligible_for_baseline,target_baseline_meta,How the yield anomaly baseline was formed,False,False,Derived from the target; not a feature,0
+validation_year,target_baseline_meta,How the yield anomaly baseline was formed,False,False,Derived from the target; not a feature,0
+baseline_mean_kg_per_ha,target_baseline_meta,How the yield anomaly baseline was formed,False,False,Derived from the target; not a feature,181
+baseline_std_kg_per_ha,target_baseline_meta,How the yield anomaly baseline was formed,False,False,Derived from the target; not a feature,329
+training_observation_count,target_baseline_meta,How the yield anomaly baseline was formed,False,False,Derived from the target; not a feature,0
+training_years,target_baseline_meta,How the yield anomaly baseline was formed,False,False,Derived from the target; not a feature,181
+baseline_status,target_baseline_meta,How the yield anomaly baseline was formed,False,False,Derived from the target; not a feature,0
+minimum_training_observations,target_baseline_meta,How the yield anomaly baseline was formed,False,False,Derived from the target; not a feature,0
+baseline_method,target_baseline_meta,How the yield anomaly baseline was formed,False,False,Derived from the target; not a feature,0
+yield_anomaly_kg_per_ha,target,Issue 4 forward-chaining yield anomaly outcome,False,False,Outcome: never a feature,331
+yield_anomaly_pct,target,Issue 4 forward-chaining yield anomaly outcome,False,False,Outcome: never a feature,331
+yield_anomaly_zscore,target,Issue 4 forward-chaining yield anomaly outcome,False,False,Outcome: never a feature,332
+anomaly_status,target,Issue 4 forward-chaining yield anomaly outcome,False,False,Outcome: never a feature,0
+yield_deviation_class,target,Issue 4 forward-chaining yield anomaly outcome,False,False,Outcome: never a feature,0
+wanom__annual_cal__cold_days,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__annual_cal__dtr_mean,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__annual_cal__gdd_sum,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__annual_cal__hot_days,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__annual_cal__longest_dry,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__annual_cal__max_5day_rain,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__annual_cal__rain_sum,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__annual_cal__rainy_days,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__annual_cal__rh_mean,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__annual_cal__solar_mean,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__annual_cal__tmax_mean,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__annual_cal__tmin_mean,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__annual_cal__wind_mean,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__annual_crop__cold_days,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__annual_crop__dtr_mean,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__annual_crop__gdd_sum,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__annual_crop__hot_days,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__annual_crop__longest_dry,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__annual_crop__max_5day_rain,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__annual_crop__rain_sum,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__annual_crop__rainy_days,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__annual_crop__rh_mean,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__annual_crop__solar_mean,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__annual_crop__tmax_mean,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__annual_crop__tmin_mean,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__annual_crop__wind_mean,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__kharif__cold_days,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__kharif__dtr_mean,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__kharif__gdd_sum,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__kharif__hot_days,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__kharif__longest_dry,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__kharif__max_5day_rain,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__kharif__rain_sum,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__kharif__rainy_days,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__kharif__rh_mean,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__kharif__solar_mean,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__kharif__tmax_mean,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__kharif__tmin_mean,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__kharif__wind_mean,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__ne__cold_days,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__ne__dtr_mean,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__ne__gdd_sum,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__ne__hot_days,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__ne__longest_dry,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__ne__max_5day_rain,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__ne__rain_sum,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__ne__rainy_days,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__ne__rh_mean,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__ne__solar_mean,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__ne__tmax_mean,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__ne__tmin_mean,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__ne__wind_mean,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__rabi_next__cold_days,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__rabi_next__dtr_mean,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__rabi_next__gdd_sum,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__rabi_next__hot_days,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__rabi_next__longest_dry,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__rabi_next__max_5day_rain,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__rabi_next__rain_sum,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__rabi_next__rainy_days,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__rabi_next__rh_mean,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__rabi_next__solar_mean,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__rabi_next__tmax_mean,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__rabi_next__tmin_mean,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__rabi_next__wind_mean,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,286
+wanom__rabi_prev__cold_days,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,429
+wanom__rabi_prev__dtr_mean,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,429
+wanom__rabi_prev__gdd_sum,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,429
+wanom__rabi_prev__hot_days,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,429
+wanom__rabi_prev__longest_dry,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,429
+wanom__rabi_prev__max_5day_rain,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,429
+wanom__rabi_prev__rain_sum,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,429
+wanom__rabi_prev__rainy_days,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,429
+wanom__rabi_prev__rh_mean,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,429
+wanom__rabi_prev__solar_mean,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,429
+wanom__rabi_prev__tmax_mean,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,429
+wanom__rabi_prev__tmin_mean,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,429
+wanom__rabi_prev__wind_mean,feature_weather_anomaly,Issue 3 forward-chaining anomaly (actual - normal from earlier years),False,True,,429
+wz__annual_cal__cold_days,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,495
+wz__annual_cal__dtr_mean,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__annual_cal__gdd_sum,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__annual_cal__hot_days,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__annual_cal__longest_dry,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,297
+wz__annual_cal__max_5day_rain,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__annual_cal__rain_sum,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__annual_cal__rainy_days,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,297
+wz__annual_cal__rh_mean,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__annual_cal__solar_mean,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__annual_cal__tmax_mean,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__annual_cal__tmin_mean,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__annual_cal__wind_mean,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__annual_crop__cold_days,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,484
+wz__annual_crop__dtr_mean,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__annual_crop__gdd_sum,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__annual_crop__hot_days,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__annual_crop__longest_dry,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__annual_crop__max_5day_rain,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__annual_crop__rain_sum,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__annual_crop__rainy_days,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,297
+wz__annual_crop__rh_mean,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__annual_crop__solar_mean,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__annual_crop__tmax_mean,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__annual_crop__tmin_mean,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__annual_crop__wind_mean,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__kharif__cold_days,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,715
+wz__kharif__dtr_mean,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__kharif__gdd_sum,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__kharif__hot_days,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__kharif__longest_dry,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__kharif__max_5day_rain,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__kharif__rain_sum,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__kharif__rainy_days,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__kharif__rh_mean,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__kharif__solar_mean,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__kharif__tmax_mean,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__kharif__tmin_mean,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__kharif__wind_mean,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__ne__cold_days,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,539
+wz__ne__dtr_mean,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__ne__gdd_sum,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__ne__hot_days,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,583
+wz__ne__longest_dry,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__ne__max_5day_rain,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__ne__rain_sum,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__ne__rainy_days,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__ne__rh_mean,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__ne__solar_mean,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__ne__tmax_mean,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__ne__tmin_mean,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__ne__wind_mean,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__rabi_next__cold_days,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,484
+wz__rabi_next__dtr_mean,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__rabi_next__gdd_sum,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__rabi_next__hot_days,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__rabi_next__longest_dry,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__rabi_next__max_5day_rain,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__rabi_next__rain_sum,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__rabi_next__rainy_days,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,297
+wz__rabi_next__rh_mean,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__rabi_next__solar_mean,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__rabi_next__tmax_mean,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__rabi_next__tmin_mean,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__rabi_next__wind_mean,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,286
+wz__rabi_prev__cold_days,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,605
+wz__rabi_prev__dtr_mean,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,429
+wz__rabi_prev__gdd_sum,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,429
+wz__rabi_prev__hot_days,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,429
+wz__rabi_prev__longest_dry,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,429
+wz__rabi_prev__max_5day_rain,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,429
+wz__rabi_prev__rain_sum,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,429
+wz__rabi_prev__rainy_days,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,440
+wz__rabi_prev__rh_mean,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,429
+wz__rabi_prev__solar_mean,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,429
+wz__rabi_prev__tmax_mean,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,429
+wz__rabi_prev__tmin_mean,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,429
+wz__rabi_prev__wind_mean,feature_weather_anomaly_z,Issue 3 forward-chaining anomaly z-score,False,True,,429
+wact__annual_cal__cold_days,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__annual_cal__dtr_mean,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__annual_cal__gdd_sum,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__annual_cal__hot_days,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__annual_cal__longest_dry,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__annual_cal__max_5day_rain,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__annual_cal__rain_sum,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__annual_cal__rainy_days,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__annual_cal__rh_mean,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__annual_cal__solar_mean,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__annual_cal__tmax_mean,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__annual_cal__tmin_mean,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__annual_cal__wind_mean,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__annual_crop__cold_days,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__annual_crop__dtr_mean,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__annual_crop__gdd_sum,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__annual_crop__hot_days,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__annual_crop__longest_dry,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__annual_crop__max_5day_rain,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__annual_crop__rain_sum,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__annual_crop__rainy_days,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__annual_crop__rh_mean,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__annual_crop__solar_mean,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__annual_crop__tmax_mean,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__annual_crop__tmin_mean,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__annual_crop__wind_mean,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__kharif__cold_days,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__kharif__dtr_mean,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__kharif__gdd_sum,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__kharif__hot_days,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__kharif__longest_dry,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__kharif__max_5day_rain,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__kharif__rain_sum,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__kharif__rainy_days,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__kharif__rh_mean,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__kharif__solar_mean,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__kharif__tmax_mean,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__kharif__tmin_mean,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__kharif__wind_mean,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__ne__cold_days,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__ne__dtr_mean,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__ne__gdd_sum,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__ne__hot_days,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__ne__longest_dry,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__ne__max_5day_rain,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__ne__rain_sum,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__ne__rainy_days,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__ne__rh_mean,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__ne__solar_mean,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__ne__tmax_mean,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__ne__tmin_mean,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__ne__wind_mean,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__rabi_next__cold_days,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__rabi_next__dtr_mean,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__rabi_next__gdd_sum,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__rabi_next__hot_days,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__rabi_next__longest_dry,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__rabi_next__max_5day_rain,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__rabi_next__rain_sum,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__rabi_next__rainy_days,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__rabi_next__rh_mean,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__rabi_next__solar_mean,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__rabi_next__tmax_mean,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__rabi_next__tmin_mean,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__rabi_next__wind_mean,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,0
+wact__rabi_prev__cold_days,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,143
+wact__rabi_prev__dtr_mean,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,143
+wact__rabi_prev__gdd_sum,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,143
+wact__rabi_prev__hot_days,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,143
+wact__rabi_prev__longest_dry,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,143
+wact__rabi_prev__max_5day_rain,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,143
+wact__rabi_prev__rain_sum,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,143
+wact__rabi_prev__rainy_days,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,143
+wact__rabi_prev__rh_mean,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,143
+wact__rabi_prev__solar_mean,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,143
+wact__rabi_prev__tmax_mean,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,143
+wact__rabi_prev__tmin_mean,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,143
+wact__rabi_prev__wind_mean,feature_weather_actual,Issue 3 target-year weather value (units not defined in source),False,True,Units not fully defined in source; do not assume,143
+cluster_id,feature_context,"Issue 6 climate zone (similarity group, not a risk level)",False,False,"Cluster number is a label, not a rank",0
+climate_zone,feature_context,"Issue 6 climate zone (similarity group, not a risk level)",False,True,"Cluster number is a label, not a rank",0
+loyo_crop_selection_status,selection_info_loyo,Issue 5 leave-one-year-out predictor summary,False,False,Selected using held-out and later years: not forward-chaining safe,65
+loyo_n_stable_predictors,selection_info_loyo,Issue 5 leave-one-year-out predictor summary,False,False,Selected using held-out and later years: not forward-chaining safe,65
+loyo_stable_predictors,selection_info_loyo,Issue 5 leave-one-year-out predictor summary,False,False,Selected using held-out and later years: not forward-chaining safe,65
+loyo_selection_forward_chaining_safe,selection_info_loyo,Issue 5 leave-one-year-out predictor summary,False,False,Selected using held-out and later years: not forward-chaining safe,0
+is_eligible_crop,eligibility_flag,Eligibility and usability flags,False,False,Use to filter rows,0
+has_valid_yield_anomaly,eligibility_flag,Eligibility and usability flags,False,False,Use to filter rows,0
+usable_for_forward_chaining_eval,eligibility_flag,Eligibility and usability flags,False,False,Use to filter rows,0
