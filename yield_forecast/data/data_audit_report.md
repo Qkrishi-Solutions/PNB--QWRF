@@ -7,6 +7,10 @@
 
 ---
 
+> **Note (review):** this audit describes the earlier PR-local table `ml_yield_dataset_v1.csv` (1,430 rows), which was superseded by Issue #7. The pipeline now reads `ml_ready_dataset/ml_ready_dataset_v1.csv` (eligible rows only; see `ml_ready_dataset/README.md`). The input-file findings below still apply.
+
+---
+
 ## 1. Executive Summary
 
 This report documents the verification and statistical audit of the input datasets available in the repository for training and evaluating predictive crop yield-anomaly models (Ridge, RandomForest, XGBoost, and CatBoost).

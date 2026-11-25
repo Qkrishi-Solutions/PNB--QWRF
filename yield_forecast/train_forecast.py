@@ -155,7 +155,7 @@ def classify_performance(m_name: str, mae_diff: float, p_val: float, alpha: floa
 
 
 def run_training_pipeline(
-    dataset_path: str = "yield_forecast/data/ml_yield_dataset_v1.csv",
+    dataset_path: str = "ml_ready_dataset/ml_ready_dataset_v1.csv",
     config_path: str = "yield_forecast/models/model_config.json",
     results_dir: str = "yield_forecast/results",
     scale_target: bool = None
@@ -177,8 +177,10 @@ def run_training_pipeline(
 
     # 2. Load dataset
     if not os.path.exists(dataset_path):
-        from yield_forecast.build_ml_dataset import build_dataset
-        build_dataset(output_path=dataset_path)
+        raise FileNotFoundError(
+            f"{dataset_path} not found. Build the single ML-ready dataset first (Issue #7): "
+            "python ml_ready_dataset/build_ml_ready_dataset.py"
+        )
 
     df = pd.read_csv(dataset_path)
     print(f"Loaded dataset: {df.shape[0]} rows, {df.shape[1]} columns")
@@ -570,7 +572,8 @@ def run_training_pipeline(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Issue #50 ML Yield Forecasting Runner")
-    parser.add_argument("--dataset", default="yield_forecast/data/ml_yield_dataset_v1.csv")
+    parser.add_argument("--dataset", default="ml_ready_dataset/ml_ready_dataset_v1.csv",
+                        help="Issue #7 ML-ready dataset (single shared input)")
     parser.add_argument("--config", default="yield_forecast/models/model_config.json")
     parser.add_argument("--results-dir", default="yield_forecast/results")
     parser.add_argument("--no-scale-target", action="store_true",

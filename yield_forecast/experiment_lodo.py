@@ -120,7 +120,7 @@ def summarise(p, group_year=None):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--dataset", default="yield_forecast/data/ml_yield_dataset_v1.csv")
+    ap.add_argument("--dataset", default="ml_ready_dataset/ml_ready_dataset_v1.csv")
     ap.add_argument("--config", default="yield_forecast/models/model_config.json")
     ap.add_argument("--outdir", default="yield_forecast/results/experiments")
     a = ap.parse_args()

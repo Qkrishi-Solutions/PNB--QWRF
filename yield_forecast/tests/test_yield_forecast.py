@@ -51,13 +51,24 @@ def test_input_files_exist_and_non_empty():
         assert os.path.getsize(path) > 0, f"Input file is empty: {path}"
 
 
-def test_generated_dataset_schema():
-    """Verify generated ML-ready dataset schema, row count, and essential columns."""
-    dataset_path = "yield_forecast/data/ml_yield_dataset_v1.csv"
-    assert os.path.exists(dataset_path), "Generated ML dataset missing"
+ML_READY = "ml_ready_dataset/ml_ready_dataset_v1.csv"  # single dataset (Issue #7)
 
-    df = pd.read_csv(dataset_path)
-    assert df.shape[0] == 1430, f"Expected 1430 rows, got {df.shape[0]}"
+
+def _eligible_crop_long_rows():
+    """Expected row count derived from the inputs, never hard-coded."""
+    crop_long = pd.read_csv("CropLongFormatv1/crop_long_v1.csv")
+    elig = pd.read_csv("CropModelEligibility/crop_model_eligibility_v1.csv")
+    ok = set(elig.loc[elig["proceed_to_modelling"].astype(bool), "crop"])
+    mask = crop_long["crop"].isin(ok) & crop_long["use_in_modelling"].astype(bool)
+    return crop_long[mask], ok
+
+
+def test_generated_dataset_schema():
+    """The pipeline reads the Issue #7 ML-ready dataset; verify schema and derived row count."""
+    assert os.path.exists(ML_READY), "Issue #7 ML-ready dataset missing"
+    df = pd.read_csv(ML_READY)
+    expected_rows, _ = _eligible_crop_long_rows()
+    assert df.shape[0] == len(expected_rows), f"Expected {len(expected_rows)} rows, got {df.shape[0]}"
     assert df.shape[1] >= 200, f"Expected wide dataset with weather features, got {df.shape[1]} columns"
 
     expected_cols = [
@@ -72,50 +83,49 @@ def test_generated_dataset_schema():
 
 def test_primary_key_uniqueness():
     """Verify primary key (district_code, crop, year) has zero duplicates."""
-    df = pd.read_csv("yield_forecast/data/ml_yield_dataset_v1.csv")
+    df = pd.read_csv(ML_READY)
     keys = ["district_code", "crop", "year"]
     dups = df.duplicated(subset=keys).sum()
     assert dups == 0, f"Found {dups} duplicate primary keys in ML dataset"
 
 
 def test_join_cardinality_and_row_preservation():
-    """Verify join operations did not drop or duplicate baseline rows (must equal 1,430)."""
-    df = pd.read_csv("yield_forecast/data/ml_yield_dataset_v1.csv")
-    assert len(df) == 1430, f"Join cardinality violated: expected 1430, got {len(df)}"
-    assert df["district_code"].nunique() == 13, "Must have exactly 13 districts"
-    assert df["crop"].nunique() == 22, "Must have exactly 22 crops"
-    assert df["year"].nunique() == 5, "Must have exactly 5 years (2015-2019)"
+    """Joins must neither drop nor duplicate the eligible crop-long rows."""
+    df = pd.read_csv(ML_READY)
+    expected_rows, ok = _eligible_crop_long_rows()
+    assert len(df) == len(expected_rows), f"Join cardinality violated: expected {len(expected_rows)}, got {len(df)}"
+    assert df["district_code"].nunique() == expected_rows["district_code"].nunique()
+    assert set(df["crop"]) == ok
+    assert df["year"].nunique() == expected_rows["year"].nunique()
 
 
 def test_crop_eligibility_and_usable_counts():
     """
-    Verify crop eligibility mapping and explain the exact usable record counts.
-    - Exactly 11 crops are eligible (proceed_to_modelling == True), yielding 715 records.
-    - 11 crops are ineligible/conditional, yielding 715 records.
-    - Usable evaluation records equal exactly 384 (128 per year in 2017, 2018, 2019).
-    - Discrepancy from 11 * 13 = 143 is due to 15 uncultivated district-crop pairs in AP.
+    Eligible rows and usable evaluation rows must reconcile to the source files.
+    All counts are derived from inputs; none are hard-coded.
     """
-    df = pd.read_csv("yield_forecast/data/ml_yield_dataset_v1.csv")
-    df_elig = pd.read_csv("CropModelEligibility/crop_model_eligibility_v1.csv")
+    df = pd.read_csv(ML_READY)
+    expected_rows, ok = _eligible_crop_long_rows()
+    assert df["is_eligible_crop"].all(), "Issue #7 keeps eligible crops only"
 
-    eligible_crops = set(df_elig[df_elig["proceed_to_modelling"] == True]["crop"])
-    assert len(eligible_crops) == 11, f"Expected 11 eligible crops, got {len(eligible_crops)}"
+    src_y = pd.read_csv("yield_feature_engineering/yield_anomalies_forward_chaining_v1.csv")
+    keys = ["district_code", "year", "crop"]
+    src = expected_rows[keys].merge(src_y[keys + ["yield_anomaly_kg_per_ha"]], on=keys, how="left")
+    expected_usable = src["yield_anomaly_kg_per_ha"].notna()
 
-    # Check is_eligible_crop boolean flag
-    assert df["is_eligible_crop"].sum() == 715, "11 eligible crops * 13 districts * 5 years must equal 715"
-
-    # Check usable evaluation records
-    df_usable = df[df["usable_for_forward_chaining_eval"] == True]
-    assert len(df_usable) == 384, f"Expected 384 usable evaluation records, got {len(df_usable)}"
-
-    for yr in [2017, 2018, 2019]:
-        yr_count = (df_usable["year"] == yr).sum()
-        assert yr_count == 128, f"Year {yr} must have exactly 128 usable records, got {yr_count}"
+    df_usable = df[df["usable_for_forward_chaining_eval"] == True]  # noqa: E712
+    assert len(df_usable) == int(expected_usable.sum())
+    expected_years = set(src.loc[expected_usable, "year"])
+    assert set(df_usable["year"]) == expected_years
+    assert not set(df_usable["year"]) & {2015, 2016}, "No forward-chaining anomaly exists for 2015-2016"
+    for yr in expected_years:
+        n = int(((src["year"] == yr) & expected_usable).sum())
+        assert (df_usable["year"] == yr).sum() == n
 
 
 def test_missing_target_handling_no_zero_imputation():
     """Verify missing yield anomalies remain NaN and are never silently converted to zero."""
-    df = pd.read_csv("yield_forecast/data/ml_yield_dataset_v1.csv")
+    df = pd.read_csv("ml_ready_dataset/ml_ready_dataset_v1.csv")
 
     # 2015 and 2016 must be 100% NaN in forward chaining
     df_2015_2016 = df[df["year"].isin([2015, 2016])]
@@ -127,7 +137,7 @@ def test_missing_target_handling_no_zero_imputation():
 
 def test_no_target_derived_predictors():
     """Verify that predictor columns do not leak target-derived measures."""
-    df = pd.read_csv("yield_forecast/data/ml_yield_dataset_v1.csv")
+    df = pd.read_csv("ml_ready_dataset/ml_ready_dataset_v1.csv")
     forbidden = [
         "yield_kg_per_ha", "yield_check_kg_per_ha", "yield_rel_diff",
         "production_1000_tons", "yield_vs_other_years_median", "yield_deviation_class",
@@ -224,7 +234,7 @@ def test_forecast_timing_and_retrospective_classification():
     assert config.get("operational_taxonomy") == "end_of_season_retrospective_response_estimation_diagnostic_hindcast", \
         "Configuration must declare retrospective hindcast taxonomy"
 
-    df = pd.read_csv("yield_forecast/data/ml_yield_dataset_v1.csv")
+    df = pd.read_csv("ml_ready_dataset/ml_ready_dataset_v1.csv")
     wanom_cols = [c for c in df.columns if c.startswith("wanom__")]
     windows = set(c.split("__")[1] for c in wanom_cols)
     expected_windows = {"annual_cal", "annual_crop", "kharif", "ne", "rabi_next", "rabi_prev"}

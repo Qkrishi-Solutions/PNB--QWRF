@@ -1,6 +1,6 @@
 fold,train_years,test_year,n_train,n_test,selected_features,model,mae,rmse,r2,mae_diff_vs_baseline,rmse_diff_vs_baseline
 1,2017,2018,128,128,wanom__rabi_next__rh_mean;wanom__annual_cal__rainy_days;wanom__annual_cal__cold_days,Climatology,1652.9804841686093,4531.070946577896,-1.1288827818087017,0.0,0.0
-1,2017,2018,128,128,wanom__rabi_next__rh_mean;wanom__annual_cal__rainy_days;wanom__annual_cal__cold_days,Ridge,2417.93928960909,4433.811938446448,-1.0384711138389053,764.9588054404805,-97.25900813144835
+1,2017,2018,128,128,wanom__rabi_next__rh_mean;wanom__annual_cal__rainy_days;wanom__annual_cal__cold_days,Ridge,2417.939289609091,4433.811938446448,-1.0384711138389062,764.9588054404815,-97.25900813144835
 1,2017,2018,128,128,wanom__rabi_next__rh_mean;wanom__annual_cal__rainy_days;wanom__annual_cal__cold_days,RandomForest,1605.8071777470946,4087.159258742724,-0.7321805030889266,-47.17330642151478,-443.9116878351724
 1,2017,2018,128,128,wanom__rabi_next__rh_mean;wanom__annual_cal__rainy_days;wanom__annual_cal__cold_days,XGBoost,1536.188797451655,3901.7875784865855,-0.5786187920810641,-116.79168671695425,-629.2833680913109
 1,2017,2018,128,128,wanom__rabi_next__rh_mean;wanom__annual_cal__rainy_days;wanom__annual_cal__cold_days,CatBoost,1388.6962733764285,3918.9952426292566,-0.5925735456540258,-264.28421079218083,-612.0757039486398

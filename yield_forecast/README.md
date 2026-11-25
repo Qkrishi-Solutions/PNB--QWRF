@@ -33,13 +33,11 @@ This module addresses GitHub Issue #50: evaluating whether weather-derived indic
 yield_forecast/
 ├── README.md                                    # This guide and technical reference
 ├── requirements.txt                             # Module-specific dependencies
-├── build_ml_dataset.py                          # Compiles canonical inputs into ML-ready dataset
 ├── train_forecast.py                            # Forward-chaining evaluation pipeline (scaled-target by default)
 ├── experiment_scaled_shrinkage.py               # Exploratory: target scaling and shrinkage blend
 ├── experiment_lodo.py                           # Exploratory: forward-chaining leave-one-district-out
 ├── data/
-│   ├── data_audit_report.md                     # Upstream input audit and schema verification
-│   └── ml_yield_dataset_v1.csv                  # Integrated ML-ready table (1,430 rows × 305 cols)
+│   └── data_audit_report.md                     # Upstream input audit (written against the earlier PR-local table)
 ├── models/
 │   └── model_config.json                        # Hyperparameters, random seeds, and taxonomy metadata
 ├── results/
@@ -60,18 +58,12 @@ yield_forecast/
 
 ## 3. Dataset Construction & Exclusion Accounting
 
-The dataset generator (`build_ml_dataset.py`) merges five canonical repository inputs without row duplication or silent data loss:
-1. `CropLongFormatv1/crop_long_v1.csv` (1,430 rows)
-2. `yield_feature_engineering/yield_anomalies_forward_chaining_v1.csv` (1,430 rows)
-3. `District Climate Zonal Clustering/district_zone_map_v1.csv` (13 rows)
-4. `CropModelEligibility/crop_model_eligibility_v1.csv` (22 rows)
-5. `weather_feature_engineering/weather_anomalies_forward_chaining_v1.csv` (5,070 long records pivoted to 65 district-year rows × 158 indicators)
+The pipeline reads the **single shared dataset from Issue #7**, `ml_ready_dataset/ml_ready_dataset_v1.csv`, built by `ml_ready_dataset/build_ml_ready_dataset.py` (see `ml_ready_dataset/README.md` for the column dictionary, join-coverage report, and leakage checks). This module no longer builds its own table.
 
-### Record Accounting & Usable Sample Counts:
-- **Base Table:** Exactly 1,430 rows ($13 \text{ districts} \times 22 \text{ crops} \times 5 \text{ years: 2015–2019}$).
-- **Primary Key:** `['district_code', 'crop', 'year']` (0 duplicate keys).
-- **Eligible Crop Records:** 715 rows (11 eligible crops with `proceed_to_modelling == True`: `groundnut`, `maize`, `rice`, `sugarcane`, `pigeonpea`, `sesamum`, `finger_millet`, `chickpea`, `pearl_millet`, `sunflower`, `rabi_sorghum`).
-- **Ineligible / Conditional Crop Records:** 715 rows (11 crops with `proceed_to_modelling == False`: `kharif_sorghum`, `castor`, `cotton`, `oilseeds`, `sorghum`, `minor_pulses`, `soyabean`, `rapeseed_and_mustard`, `linseed`, `safflower`, `wheat`).
+### Record Accounting & Usable Sample Counts (derived from the inputs, not hard-coded):
+- **Base rows:** the eligible crop-long rows: crops with `proceed_to_modelling == True` (Issue 2) and `use_in_modelling == True` (Issue 1). Committed run: 1,430 crop-long rows, 11 eligible crops, **715 rows kept**, 715 excluded.
+- **Primary Key:** `['district_code', 'year', 'crop']` (0 duplicate keys).
+- **Eligible crops:** `groundnut`, `maize`, `rice`, `sugarcane`, `pigeonpea`, `sesamum`, `finger_millet`, `chickpea`, `pearl_millet`, `sunflower`, `rabi_sorghum`.
 - **Forward-Chaining Target Availability:** Forward anomaly calculation requires $\ge 2$ historical prior years.
   - Years 2015 & 2016: 0 valid forward anomalies (strictly `NaN`, never imputed as 0).
   - Years 2017, 2018, 2019: Exactly 128 usable records per year.
@@ -152,11 +144,11 @@ All commands run using Python in the project's virtual environment:
 uv pip install --python .venv\Scripts\python.exe -r requirements.txt
 ```
 
-### Step 2: Build Integrated ML Dataset
-```powershell
-.venv\Scripts\python.exe yield_forecast/build_ml_dataset.py
+### Step 2: Build the Issue #7 ML-Ready Dataset
+```bash
+python ml_ready_dataset/build_ml_ready_dataset.py
 ```
-*Expected Output: `yield_forecast/data/ml_yield_dataset_v1.csv` ($1,430 \text{ rows} \times 305 \text{ columns}$, SHA-256 `b2e930eda0a1...`)*
+*Expected Output: `ml_ready_dataset/ml_ready_dataset_v1.csv` (715 rows × 307 columns), plus coverage, validation and reproducibility reports in `ml_ready_dataset/`. All 25 checks must pass.*
 
 ### Step 3: Run Training & Forward-Chaining Pipeline
 ```powershell

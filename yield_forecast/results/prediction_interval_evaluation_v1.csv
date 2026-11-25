@@ -1,6 +1,6 @@
 fold,test_year,model,calibration_status,nominal_target_coverage,empirical_test_coverage,coverage_gap,avg_interval_width,n_evaluated
 1,2018,Climatology,uncalibrated_in_sample_exploratory,0.8,0.671875,-0.12812500000000004,1574.461538461539,128
-1,2018,Ridge,uncalibrated_in_sample_exploratory,0.8,0.6640625,-0.13593750000000004,1541.335553357607,128
+1,2018,Ridge,uncalibrated_in_sample_exploratory,0.8,0.6640625,-0.13593750000000004,1541.3355533576073,128
 1,2018,RandomForest,uncalibrated_in_sample_exploratory,0.8,0.6953125,-0.10468750000000004,1389.8058216335578,128
 1,2018,XGBoost,uncalibrated_in_sample_exploratory,0.8,0.7109375,-0.08906250000000004,1393.0944673519793,128
 1,2018,CatBoost,uncalibrated_in_sample_exploratory,0.8,0.6484375,-0.15156250000000004,1290.2974766104862,128

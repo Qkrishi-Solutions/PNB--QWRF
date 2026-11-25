@@ -23,7 +23,7 @@ The core objective was to determine whether weather-derived features improve pre
 
 ### Key Technical Findings:
 1. **Forecast Horizon & Operational Taxonomy:** The weather indicators available in the current dataset (`wanom__annual_cal__*`, `wanom__ne__*`, `wanom__rabi_next__*`) aggregate weather over full calendar years and post-monsoon periods contemporaneous with or after crop harvest. Because these features are physically unavailable at planting or mid-season, this pipeline is an **end-of-season retrospective weather–yield response estimation (diagnostic hindcast)**, NOT an advance operational early-warning forecasting model.
-2. **Dataset Integrity & Reconciled Counts:** `build_ml_dataset.py` constructs a unified ML table of 1,430 rows $\times$ 305 columns with zero key duplicates and zero rows dropped. Exactly 11 crops are eligible (`proceed_to_modelling == True`, 715 records), and 11 crops are ineligible/conditional (715 records). Exactly **384 records** are usable for forward-chaining evaluation (128 observations in each of 2017, 2018, and 2019). The difference from $11 \times 13 = 143$ is accounted for by 15 naturally uncultivated district-crop pairs in Andhra Pradesh.
+2. **Dataset Integrity & Reconciled Counts:** The pipeline reads the single Issue #7 dataset (`ml_ready_dataset/ml_ready_dataset_v1.csv`), not a PR-local table. It has 715 rows (eligible crop-long rows, derived from the inputs), zero key duplicates and 384 rows with a valid forward-chaining yield anomaly (128 in each of 2017, 2018 and 2019). The difference from $11 \times 13 = 143$ is accounted for by naturally uncultivated or unrecorded district-crop pairs in Andhra Pradesh.
 3. **Model Performance & Statistical Hypothesis Testing:** Models are trained on the yield anomaly divided by each crop's training-fold standard deviation, with predictions converted back to kg/ha. All five models were evaluated on the exact same 256 out-of-fold instances:
    - **Climatology Baseline:** MAE = 1,341.91 kg/ha, RMSE = 3,787.98 kg/ha, scaled MAE = 1.033.
    - **XGBoost** 1,122.88 (-16.3%), **RandomForest** 1,174.28 (-12.5%), **CatBoost** 1,180.39 (-12.0%), **Ridge** 1,360.56 (+1.4%) kg/ha. Scaled MAE: 0.938, 0.950, 0.956, 0.986.
@@ -39,8 +39,8 @@ The core objective was to determine whether weather-derived features improve pre
 
 ### 2.1 Files Created
 1. `yield_forecast/requirements.txt`: Module-specific dependency specification (`xgboost>=2.0,<3`, `catboost>=1.2,<2`).
-2. `yield_forecast/build_ml_dataset.py`: Reproducible ML dataset builder resolving Issue #7.
-3. `yield_forecast/data/ml_yield_dataset_v1.csv`: Unified ML-ready tabular dataset (1,430 rows $\times$ 305 columns, SHA-256 `b2e930eda0a1...`).
+2. *(removed in review)* `yield_forecast/build_ml_dataset.py`: replaced by the Issue #7 builder `ml_ready_dataset/build_ml_ready_dataset.py`.
+3. *(removed in review)* `yield_forecast/data/ml_yield_dataset_v1.csv`: replaced by the shared `ml_ready_dataset/ml_ready_dataset_v1.csv`.
 4. `yield_forecast/data/data_audit_report.md`: Detailed audit of input schemas, cardinalities, and missingness.
 5. `yield_forecast/models/model_config.json`: Hyperparameters, seeds, taxonomy, and fold specifications.
 6. `yield_forecast/train_forecast.py`: Forward-chaining evaluation pipeline with paired statistical testing.
@@ -50,7 +50,7 @@ The core objective was to determine whether weather-derived features improve pre
 10. `yield_forecast/results/crop_level_evaluation_metrics_v1.csv`: Granular per-crop evaluation breakdown.
 11. `yield_forecast/results/prediction_interval_evaluation_v1.csv`: Empirical test coverage vs 80% nominal target.
 12. `yield_forecast/tests/conftest.py`: Synthetic test fixture for unit testing.
-13. `yield_forecast/tests/test_yield_forecast.py`: 16 automated unit and integration tests.
+13. `yield_forecast/tests/test_yield_forecast.py`: 21 automated unit and integration tests.
 14. `yield_forecast/README.md`: Module overview, reproduction instructions, and limitation notices.
 15. `yield_forecast/docs/issue_50_final_report.md`: This comprehensive technical audit report.
 
@@ -61,21 +61,17 @@ The core objective was to determine whether weather-derived features improve pre
 
 ## 3. Dataset Construction & Reconciliation of Counts
 
-The dataset generator (`build_ml_dataset.py`) merges the five canonical upstream inputs:
+The pipeline reads `ml_ready_dataset/ml_ready_dataset_v1.csv` (Issue #7), built by `ml_ready_dataset/build_ml_ready_dataset.py` from:
 - `CropLongFormatv1/crop_long_v1.csv`
-- `yield_feature_engineering/yield_anomalies_forward_chaining_v1.csv`
-- `weather_feature_engineering/weather_anomalies_forward_chaining_v1.csv`
-- `District Climate Zonal Clustering/district_zone_map_v1.csv`
 - `CropModelEligibility/crop_model_eligibility_v1.csv`
+- `weather_feature_engineering/weather_anomalies_forward_chaining_v1.csv`
+- `yield_feature_engineering/yield_anomalies_forward_chaining_v1.csv`
+- `crop specific weather feature selection/crop_feature_selection_v1.csv` (informational; LOYO, not forward-chaining safe)
+- `District Climate Zonal Clustering/district_zone_map_v1.csv`
 
-### Reconciliation of Dataset Counts:
-- **Total Initial Records:** 1,430 rows (13 districts $\times$ 22 crops $\times$ 5 years).
-- **Final Merged Records:** 1,430 rows (0 rows dropped, 0 duplicate keys).
-- **Eligible Crop Records:** 715 rows (11 eligible crops $\times$ 13 districts $\times$ 5 years).
-  - Eligible crops (`proceed_to_modelling == True`): `groundnut`, `maize`, `rice`, `sugarcane`, `pigeonpea`, `sesamum`, `finger_millet`, `chickpea`, `pearl_millet`, `sunflower`, `rabi_sorghum`.
-- **Ineligible Crop Records:** 715 rows (11 crops with `proceed_to_modelling == False`).
-  - 8 ineligible: `castor`, `cotton`, `oilseeds`, `sorghum`, `minor_pulses`, `soyabean`, `linseed`, `safflower`.
-  - 3 conditionally eligible: `kharif_sorghum`, `rapeseed_and_mustard`, `wheat`.
+### Reconciliation of Dataset Counts (derived from inputs):
+- **Crop-long rows:** 1,430. **Eligible rows kept:** 715 (11 crops with `proceed_to_modelling == True` and `use_in_modelling == True`); 715 excluded. Join coverage and unmatched keys are in `ml_ready_dataset/join_coverage_report_v1.csv` and `unmatched_keys_v1.csv`.
+- **Eligible crops:** `groundnut`, `maize`, `rice`, `sugarcane`, `pigeonpea`, `sesamum`, `finger_millet`, `chickpea`, `pearl_millet`, `sunflower`, `rabi_sorghum`.
 - **Forward-Chaining Target Availability:**
   - 2015 & 2016: 0 records (insufficient prior history, $< 2$ years; kept strictly as `NaN`).
   - 2017: 128 eligible records with valid forward anomaly.
@@ -219,10 +215,10 @@ The automated test suite (`yield_forecast/tests/test_yield_forecast.py`) contain
 | # | Test Function | What It Actually Verifies | Result |
 |---|---|---|---|
 | 1 | `test_input_files_exist_and_non_empty` | Upstream input existence | **PASS** |
-| 2 | `test_generated_dataset_schema` | $1,430 \times 305$ shape and expected schema | **PASS** |
+| 2 | `test_generated_dataset_schema` | Issue #7 dataset: row count derived from inputs, expected schema | **PASS** |
 | 3 | `test_primary_key_uniqueness` | 0 duplicate primary keys (`district_code, crop, year`) | **PASS** |
-| 4 | `test_join_cardinality_and_row_preservation` | 1,430 rows preserved, 13 districts, 22 crops, 5 years | **PASS** |
-| 5 | `test_crop_eligibility_and_usable_counts` | 11 eligible crops (715 rows), 384 usable rows (128/yr) | **PASS** |
+| 4 | `test_join_cardinality_and_row_preservation` | Eligible crop-long rows preserved (count derived from inputs); districts, crops and years match | **PASS** |
+| 5 | `test_crop_eligibility_and_usable_counts` | Eligible rows and usable rows (per year) reconcile to the source files; none hard-coded | **PASS** |
 | 6 | `test_missing_target_handling_no_zero_imputation` | 2015–2016 targets remain `NaN`, never converted to 0 | **PASS** |
 | 7 | `test_no_target_derived_predictors` | Predictor matrix contains 0 target-derived features | **PASS** |
 | 8 | `test_forward_chaining_chronology` | $t_{\text{train}} < t_{\text{test}}$, exactly 2 folds | **PASS** |
@@ -248,7 +244,7 @@ The automated test suite (`yield_forecast/tests/test_yield_forecast.py`) contain
 | 3 | Use approved synthetic/public data; no real PNB data | **PASS** | Uses public ICRISAT and IMD canonical datasets only |
 | 4 | No silent imputation or missing-to-zero conversion | **PASS** | Missing values maintained as `NaN`; tested via test #6 |
 | 5 | Verify input datasets and schemas | **PASS** | Documented in `yield_forecast/data/data_audit_report.md` |
-| 6 | Resolve Issue #7 ML-ready dataset dependency | **PASS** | Generated `yield_forecast/data/ml_yield_dataset_v1.csv` |
+| 6 | Resolve Issue #7 ML-ready dataset dependency | **PASS** | Pipeline reads the shared Issue #7 dataset `ml_ready_dataset/ml_ready_dataset_v1.csv` (no PR-local table) |
 | 7 | Implement Climatology Baseline | **PASS** | Implemented in `ClimatologyBaseline` class; evaluated in Folds 1 & 2 |
 | 8 | Implement Ridge Regression | **PASS** | Scaled linear pipeline; regularized with $\alpha=10.0$ |
 | 9 | Implement Random Forest | **PASS** | Shallow trees ($depth=3, n=50$) with leaf constraints |
@@ -279,3 +275,4 @@ Changes made after review against Issue #50 and the roadmap (M2, M5, Section 10)
 6. **Why Issue 5 stable predictors (`crop_feature_selection_v1.csv`) are not used.** That table was selected with leave-one-year-out folds over 2017-2019. Using it to predict 2018 or 2019 would let selection see the test years and break forward chaining. Features are therefore re-selected inside each forward-chaining fold, pooled across crops because per-crop selection is infeasible with 128 training rows in Fold 1. Revisit only if a forward-chained per-crop selection is produced.
 7. **Still open (roadmap M5):** per-crop sample-size flags; explicit climate-zone pooling and trend shrinkage; out-of-fold prediction-interval calibration.
 8. **Per-crop target scaling moved into the main pipeline.** `train_forecast.py` now fits models on yield anomaly divided by each crop's training-fold standard deviation and converts predictions back to kg/ha (`target_scaling` in `model_config.json`; `--no-scale-target` reproduces the raw-target run saved in `results/experiments/raw_target_v1/`). Experiments behind this choice: `experiment_scaled_shrinkage.py` (scaling gained about 9% skill; a 0.5 shrinkage blend toward climatology made results worse and was not adopted) and `experiment_lodo.py` (forward-chaining leave-one-district-out: consistent gain). All were run on the same two test years and the idea was adopted after inspecting them, so confirmation on new years (Issue #44) is required before any claim beyond "exploratory".
+9. **Single shared dataset (Issue #7).** This PR originally built its own table (`yield_forecast/build_ml_dataset.py`, 1,430 rows, 305 columns). That duplicated Issue #7, which defines the one input for forecasting issues #49 to #52 and also requires eligible rows only, the Issue 5 predictor summary, a join-coverage report, and explicit leakage tests. The builder and table were removed; `train_forecast.py` and both experiment scripts now default to `ml_ready_dataset/ml_ready_dataset_v1.csv`. Regenerating every result from it reproduces the earlier numbers to floating-point precision (maximum difference 7e-12; identical rows, features and models), so no result changed. The test suite now derives expected counts from the inputs instead of hard-coding 1,430 / 22 / 715 / 384.
