@@ -36,6 +36,7 @@ yield_forecast/
 ├── train_forecast.py                            # Forward-chaining evaluation pipeline (scaled-target by default)
 ├── experiment_scaled_shrinkage.py               # Exploratory: target scaling and shrinkage blend
 ├── experiment_lodo.py                           # Exploratory: forward-chaining leave-one-district-out
+├── experiment_five_year_loyo.py                 # Exploratory: five-year nested leave-one-year-out (not forecasting)
 ├── data/
 │   └── data_audit_report.md                     # Upstream input audit (written against the earlier PR-local table)
 ├── models/
@@ -51,7 +52,7 @@ yield_forecast/
 │   └── issue_50_final_report.md                 # Complete technical findings and audit decisions
 └── tests/
     ├── conftest.py                              # Synthetic data fixture for unit testing
-    └── test_yield_forecast.py                   # Automated test suite (23 test functions)
+    └── test_yield_forecast.py                   # Automated test suite (26 test functions)
 ```
 
 ---
@@ -108,7 +109,7 @@ Results are reproducible only with the exact package versions pinned in `yield_f
 ### Honest Statistical Findings:
 1. **Target scaling drives the result.** With the raw kg/ha target (saved in `results/experiments/raw_target_v1/`) every model was significantly *worse* than climatology (scaled MAE 1.31-4.59 vs 1.03). Sugarcane's anomaly SD (~10,300 kg/ha) is about ten times that of rabi sorghum (~970), so a pooled fit on the raw target is mostly learning sugarcane. Scaling each crop's target by its training-fold SD reverses the ranking.
 2. **Size of the gain is modest.** The tree models cut crop-scaled error by about 7-9% versus climatology and beat it on 56-59% of individual rows. Ridge is not distinguishable from climatology.
-3. **Selected after seeing the test years.** The scaling idea was adopted after inspecting the 2018-2019 results, and several variants were compared. The p-values are therefore optimistic. A forward-chaining leave-one-district-out check (`experiment_lodo.py`, 12-13 districts better for CatBoost/XGBoost, +7-8% skill) supports it but reuses the same two test years. It needs confirmation on new years (Issue #44).
+3. **Selected after seeing the test years.** The scaling idea was adopted after inspecting the 2018-2019 results, and several variants were compared. The p-values are therefore optimistic. A forward-chaining leave-one-district-out check (`experiment_lodo.py`, 12-13 districts better for CatBoost/XGBoost, +7-8% skill) supports it but reuses the same two test years. A five-year check (below) did **not** confirm the size of the gain: it shrinks to about 2-3% and is not significant.
 4. **Significance test.** Per-district mean differences in scaled absolute error are tested with a two-sided Wilcoxon signed-rank test across the 13 districts (rows within a district, year and crop are clustered). With 13 districts the smallest attainable $p$ is 0.000244. Only two test years exist, so $p$-values are indicative.
 5. **Fold reversal.** XGBoost beats climatology in both folds on pooled MAE; RandomForest, CatBoost and Ridge beat it in Fold 1 (2018) but not Fold 2 (2019).
 6. **Not a usable predictor yet.** $R^2$ is negative for every model (best: XGBoost -0.312). Direction accuracy (above/below normal) is about 42-49%, i.e. chance. The models reduce the size of errors but do not predict the sign of the anomaly.
@@ -134,6 +135,23 @@ Skill is `100 x (1 - model scaled MAE / climatology scaled MAE)` per crop; posit
 XGBoost improves on climatology in 9 of 11 crops. The gain is concentrated (maize, sunflower, sugarcane) and two crops (finger_millet, sesamum) are slightly worse than climatology, so the pooled average hides real heterogeneity.
 
 **Why selection is pooled, not per crop.** Issue #7's forward-chaining version of Issue 5's per-crop selection (`fc_*`) yields at least one predictor for only 48 of the 256 test rows (19%), and none for 16 rows (`rabi_sorghum`, which Issue 5's row filter drops). A per-crop-predictor model could therefore act on under a fifth of the evaluation, so the pipeline selects features pooled across crops inside each forward-chaining fold.
+
+### Five-year check (exploratory; retrospective response estimation, **not forecasting**)
+
+Only 2015-2019 are available, and forward chaining scores just two of those years. `experiment_five_year_loyo.py` re-estimates the weather-yield response on **all five years** with nested leave-one-year-out validation: for each held-out year, every anomaly (target and weather) is recomputed from raw values with a baseline that excludes both the row's own year and the held-out year, so training anomalies never contain the held-out year. Because the baselines use later years, this track **cannot support a forecasting claim**; it estimates how strongly weather relates to yield.
+
+Recomputation check: the held-out-year anomalies match the source leave-one-year-out files (`yield_anomalies_v1.csv`, `weather_anomalies_v1.csv`) to about 1e-13 on 642 yield and 4901 weather values compared, with none missing.
+
+| Model | Raw-target skill | Scaled-target skill | Scaled: years better than climatology | Scaled: district Wilcoxon p | Verdict (scaled) |
+| :--- | :---: | :---: | :---: | :---: | :--- |
+| XGBoost | -9.0% | **+2.6%** | 3 of 5 | 0.127 | Not distinguishable from Climatology; scaled MAE lower |
+| CatBoost | -5.6% | **+2.8%** | 3 of 5 | 0.146 | Not distinguishable from Climatology; scaled MAE lower |
+| RandomForest | -14.1% | **+2.6%** | 3 of 5 | 0.146 | Not distinguishable from Climatology; scaled MAE lower |
+| Ridge | -118.6% | **+2.4%** | 4 of 5 | 0.168 | Not distinguishable from Climatology; scaled MAE lower |
+
+XGBoost's scaled-target skill by held-out year: 2015: -0.3%, 2016: -0.2%, 2017: +5.4%, 2018: +4.0%, 2019: +3.1%.
+
+**What this changes.** (1) Target scaling is still essential: with the raw target no model beats climatology. (2) But the gain over climatology across five years is **about +2 to +3%, not the +9% seen on 2018-2019**, it is **not statistically distinguishable from zero** (p 0.13 to 0.17), and the tree models are better in only 3 of 5 held-out years (2017 to 2019) and marginally worse in 2015 and 2016 (Ridge: 4 of 5). The headline forward-chaining gain should therefore be read as largely specific to those two test years and optimistic. The honest summary is: weather adds a small, unconfirmed improvement over a crop-mean baseline.
 
 ---
 
@@ -184,4 +202,4 @@ python yield_forecast/train_forecast.py --no-scale-target \
 ```powershell
 python -m pytest yield_forecast/tests -v
 ```
-*Expected Output: 23 passed.*
+*Expected Output: 26 passed.*

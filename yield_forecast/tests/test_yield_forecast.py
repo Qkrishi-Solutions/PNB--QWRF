@@ -404,3 +404,36 @@ def test_issue5_style_predictor_coverage_is_documented_in_dataset():
     test_rows = df[df["usable_for_forward_chaining_eval"] & (df["year"] >= 2018)]
     covered = test_rows["fc_n_selected_predictors"].fillna(0) > 0
     assert 0 < covered.mean() < 0.5
+
+
+# ---------------- five-year nested leave-one-year-out experiment ----------------
+
+def test_five_year_nested_training_data_ignores_held_out_year():
+    """Training anomalies and features must not change when the held-out year's raw data is altered."""
+    import yield_forecast.experiment_five_year_loyo as ex
+    keys, Y, dists, W, wcols = ex.load_arrays("ml_ready_dataset/ml_ready_dataset_v1.csv")
+    t_idx = 3
+    tr_a, te_a, feats = ex.fold_frames(keys, Y, dists, W, wcols, t_idx)
+    Y2, W2 = Y.copy(), W.copy()
+    Y2[:, t_idx] = Y2[:, t_idx] * 7.0 + 123.0
+    W2[:, t_idx, :] = W2[:, t_idx, :] * -5.0 + 9.0
+    tr_b, te_b, _ = ex.fold_frames(keys, Y2, dists, W2, wcols, t_idx)
+    cols = ["district_code", "crop", "year", ex.TARGET] + feats
+    pd.testing.assert_frame_equal(tr_a[cols].reset_index(drop=True), tr_b[cols].reset_index(drop=True))
+    assert not np.allclose(te_a[ex.TARGET].values, te_b[ex.TARGET].values, equal_nan=True)  # the test year does move
+
+
+def test_five_year_recomputation_matches_source_loyo_files():
+    v = pd.read_csv("yield_forecast/results/experiments/five_year_loyo_validation_v1.csv")
+    assert (v["n_compared"] > 500).all()
+    assert (v["max_abs_diff"] < 1e-9).all()
+    assert (v["source_only_missing_in_mine"] == 0).all()
+
+
+def test_five_year_results_are_labelled_and_consistent():
+    c = pd.read_csv("yield_forecast/results/experiments/five_year_loyo_comparison_v1.csv")
+    assert set(c["variant"]) == {"raw_target", "scaled_target"}
+    assert (c["years_total"] == 5).all() and (c["years_better_than_clim"] <= 5).all()
+    for r in c.itertuples(index=False):
+        sig, verdict = classify_performance(r.model, r.scaled_mae - r.clim_scaled_mae, r.district_wilcoxon_p)
+        assert verdict == r.verdict
