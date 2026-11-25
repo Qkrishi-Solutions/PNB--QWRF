@@ -4,3 +4,4 @@ yield_anomaly,district_code+year+crop,715,1430,715,0,715,source also holds ineli
 weather,district_code+year,65,65,65,0,0,weather repeats across crops; joined at district-year
 climate_zone,district_code,13,13,13,0,0,
 crop_feature_selection,crop,11,17,10,1,7,Issue 5 selected with leave-one-year-out folds
+forward_chaining_selection,crop+year,55,55,55,0,0,per crop and target year; uses only earlier target years

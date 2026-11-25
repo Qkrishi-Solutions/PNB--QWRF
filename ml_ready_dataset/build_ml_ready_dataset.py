@@ -16,6 +16,8 @@ Inputs (defaults are repo-relative):
 Outputs (in --outdir, default ml_ready_dataset/):
   ml_ready_dataset_v1.csv           the dataset
   ml_ready_column_dictionary_v1.csv column roles, source, leakage and timing notes (also rendered in README.md)
+  fc_crop_feature_selection_v1.csv  forward-chaining crop-specific predictors per crop and target year
+  fc_crop_feature_selection_detail_v1.csv  the correlation statistics behind them
   join_coverage_report_v1.csv       matched / unmatched keys for every join
   unmatched_keys_v1.csv             the actual unmatched keys
   exclusion_report_v1.csv           crop-long rows excluded and why
@@ -25,6 +27,7 @@ Outputs (in --outdir, default ml_ready_dataset/):
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import sys
@@ -42,6 +45,7 @@ DEFAULTS = {
     "yield_fc": "yield_feature_engineering/yield_anomalies_forward_chaining_v1.csv",
     "feature_selection": "crop specific weather feature selection/crop_feature_selection_v1.csv",
     "zones": "District Climate Zonal Clustering/district_zone_map_v1.csv",
+    "issue5_script": "crop specific weather feature selection/feature_selection.py",
 }
 
 YIELD_ANOMALY_COLS = [
@@ -122,9 +126,14 @@ def column_role(c):
     if c in OUTCOME_COLS:
         return ("outcome_year_measurement", "Crop outcome measured in the target year", False, False, "",
                 "Target-year outcome: leakage if used as a feature")
+    if c.startswith("fc_"):
+        return ("selection_info_forward_chaining",
+                "Per-crop weather predictors selected with Issue 5's method using only target years before this row's year",
+                False, False, "",
+                "Safe as this row's per-crop feature list (selection saw only earlier years). Not itself a feature.")
     if c.startswith("loyo_"):
         return ("selection_info_loyo", "Issue 5 leave-one-year-out predictor summary", False, False, "",
-                "Selected using the held-out and later years: not forward-chaining safe")
+                "Selected using the held-out and later years: not forward-chaining safe. Use the fc_* columns instead")
     if c in BASELINE_META_COLS:
         return ("target_baseline_meta", "How the yield anomaly baseline was formed", False, False, "",
                 "Derived from the target; not a feature")
@@ -186,6 +195,84 @@ def update_readme(readme_path, dd):
     return True
 
 
+def load_issue5(path):
+    """Load Issue 5's own selection code so the statistics, thresholds and row filter are identical."""
+    spec = importlib.util.spec_from_file_location("issue5_feature_selection", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _fc_pool(df, i5):
+    """Eligible training pool in Issue 5's naming: weather z-score columns without the wz__ prefix."""
+    z_cols = [c for c in df.columns if c.startswith("wz__")]
+    data = df.rename(columns={c: c[len("wz__"):] for c in z_cols})
+    return i5.filter_eligible_crops(data), [c[len("wz__"):] for c in z_cols]
+
+
+def _select_one(pool, feats, i5, crop, target_year):
+    """Issue 5 selection for one crop using ONLY target years strictly before target_year."""
+    crop_pool = pool[pool["crop"] == crop]
+    tr = crop_pool[crop_pool["year"] < target_year]
+    if crop_pool.empty:
+        # e.g. rabi_sorghum: eligible in Issue 2 but a seasonal component, which Issue 5's row filter drops
+        return tr, [], [], "crop_excluded_by_issue5_row_filter"
+    if tr.empty:
+        return tr, [], [], "no_prior_target_years"
+    selected, stats, status = i5.select_features_for_fold(tr, feats, crop, target_year)
+    return tr, selected, stats, status
+
+
+def forward_chaining_selection(df, i5):
+    """Crop-specific predictors selected with Issue 5's method but forward-chaining folds.
+
+    For every crop and target year T the selection sees only eligible rows of years < T, so it is
+    safe to attach to rows of year T. Issue 5's published selection used leave-one-year-out folds
+    (the held-out year's neighbours include later years) and is therefore not forward-chaining safe.
+    """
+    pool, feats = _fc_pool(df, i5)
+    summary, detail = [], []
+    for crop in sorted(df["crop"].unique()):
+        for ty in sorted(df["year"].unique()):
+            tr, selected, stats, status = _select_one(pool, feats, i5, crop, ty)
+            names = [item["feature"] for item in selected]
+            ran = status not in ("no_prior_target_years", "crop_excluded_by_issue5_row_filter")
+            summary.append({
+                "crop": crop, "year": int(ty),
+                "fc_selection_train_years": ";".join(str(int(y)) for y in sorted(tr["year"].unique())),
+                "fc_selection_n_training_rows": int(len(tr)),
+                "fc_selection_status": status,
+                "fc_n_selected_predictors": len(names) if ran else np.nan,
+                "fc_selected_predictors": ";".join(names),
+            })
+            for item in stats:
+                detail.append({
+                    "crop": crop, "year": int(ty), "feature": item["feature"], "paired_n": item["paired_n"],
+                    "spearman_rho": item["spearman_rho"], "p_value": item["p_value"],
+                    "bh_q_value": item["bh_q_value"], "passes_screen": bool(item["passes_screen"]),
+                    "selected": item["feature"] in names,
+                })
+    summary = pd.DataFrame(summary)
+    summary["fc_n_selected_predictors"] = summary["fc_n_selected_predictors"].astype("Int64")
+    cols = ["crop", "year", "feature", "paired_n", "spearman_rho", "p_value", "bh_q_value", "passes_screen", "selected"]
+    return summary, pd.DataFrame(detail, columns=cols)
+
+
+def selection_ignores_future(df, i5, summary):
+    """Leakage test: scramble the target in every year >= T; the selection for year T must not change."""
+    pool, feats = _fc_pool(df, i5)
+    mismatches = []
+    for r in summary.itertuples(index=False):
+        p2 = pool.copy()
+        future = p2["year"] >= r.year
+        p2.loc[future, "yield_anomaly_zscore"] = -3.0 * p2.loc[future, "yield_anomaly_zscore"] + 11.0
+        _, selected, _, status = _select_one(p2, feats, i5, r.crop, r.year)
+        names = ";".join(item["feature"] for item in selected)
+        if status != r.fc_selection_status or names != r.fc_selected_predictors:
+            mismatches.append((r.crop, r.year))
+    return mismatches
+
+
 def build(paths, outdir, command):
     checks = Checks()
     os.makedirs(outdir, exist_ok=True)
@@ -194,6 +281,10 @@ def build(paths, outdir, command):
         if not os.path.exists(p):
             raise FileNotFoundError(f"Missing required input '{name}': {p}")
     in_hash = {k: sha256(v) for k, v in paths.items()}
+    issue5_path = paths.get("issue5_script", DEFAULTS["issue5_script"])
+    if not os.path.exists(issue5_path):
+        raise FileNotFoundError(f"Missing Issue 5 selection code: {issue5_path}")
+    in_hash["issue5_script"] = sha256(issue5_path)
 
     crop_long = pd.read_csv(paths["crop_long"])
     elig = pd.read_csv(paths["eligibility"])
@@ -324,6 +415,13 @@ def build(paths, outdir, command):
 
     df = df.sort_values(["crop", "district_code", "year"]).reset_index(drop=True)
 
+    # ---- 7b. forward-chaining crop-specific predictors (leakage-safe alternative to loyo_*) ----
+    i5 = load_issue5(issue5_path)
+    fc_summary, fc_detail = forward_chaining_selection(df, i5)
+    report("forward_chaining_selection", df, fc_summary[["crop", "year"]], ["crop", "year"],
+           "per crop and target year; uses only earlier target years")
+    df = df.merge(fc_summary, on=["crop", "year"], how="left", validate="many_to_one")
+
     # ---- 8. validation checks -------------------------------------------------------------
     checks.add("(district_code, year, crop) unique in output", not df.duplicated(KEY).any(), f"{len(df)} rows")
     checks.add("row count reconciles to eligible crop-long rows", len(df) == expected_rows,
@@ -381,6 +479,20 @@ def build(paths, outdir, command):
     checks.add("weather anomaly equals actual minus normal",
                bool(np.allclose(chk["anomaly"], chk["actual_value"] - chk["normal_mean"], atol=1e-6)),
                f"{len(chk)} rows", kind="leakage")
+    # (f) forward-chaining crop selection: only earlier target years, and invariant to the future
+    fc_max_ok = all(
+        (not tys) or max(int(v) for v in tys.split(";")) < yr
+        for tys, yr in zip(fc_summary["fc_selection_train_years"], fc_summary["year"]))
+    checks.add("forward-chaining crop selection trains on target years strictly before each row's year",
+               fc_max_ok, f"{len(fc_summary)} crop-year selections checked", kind="leakage")
+    fc_mismatch = selection_ignores_future(df, i5, fc_summary)
+    checks.add("forward-chaining crop selection is unchanged when target years >= T are scrambled",
+               not fc_mismatch, f"{len(fc_summary)} selections re-run; changed: {fc_mismatch}", kind="leakage")
+    status_counts = fc_summary["fc_selection_status"].value_counts().to_dict()
+    checks.add("forward-chaining crop selection outcome reported (none selected is a valid result)", True,
+               f"statuses: {status_counts}; crop-years with >=1 predictor: "
+               f"{int((fc_summary['fc_n_selected_predictors'].fillna(0) > 0).sum())}", kind="coverage_report")
+
     # (e) provenance-based: the safe set must come only from the weather join, climate zone and crop,
     #     and must not intersect anything sourced from the yield file, outcome columns or Issue 5.
     dd = make_dictionary(df)
@@ -402,6 +514,8 @@ def build(paths, outdir, command):
     out_csv = os.path.join(outdir, "ml_ready_dataset_v1.csv")
     df.to_csv(out_csv, index=False)
     dd.to_csv(os.path.join(outdir, "ml_ready_column_dictionary_v1.csv"), index=False)
+    fc_summary.to_csv(os.path.join(outdir, "fc_crop_feature_selection_v1.csv"), index=False)
+    fc_detail.to_csv(os.path.join(outdir, "fc_crop_feature_selection_detail_v1.csv"), index=False)
     readme_updated = update_readme(os.path.join(outdir, "README.md"), dd)
     pd.DataFrame(coverage).to_csv(os.path.join(outdir, "join_coverage_report_v1.csv"), index=False)
     um = pd.DataFrame(unmatched_rows)
@@ -420,6 +534,8 @@ def build(paths, outdir, command):
         "reproducibility_note": ("The output is byte-identical only with the pinned package versions in "
                                  "ml_ready_dataset/requirements.txt; other versions can differ in the last float digit."),
         "input_sha256": in_hash,
+        "forward_chaining_selection_config": {k: getattr(i5, k) for k in
+                                              ("MIN_N", "COVERAGE", "MIN_RHO", "MAX_Q", "MAX_CORR", "MAX_FEATURES")},
         "row_counts": {
             "crop_long_rows": len(crop_long), "eligible_rows_kept": len(df), "rows_excluded": int((~base_mask).sum()),
             "eligible_crops": len(eligible_crops), "weather_district_years": n_district_years,

@@ -31,8 +31,9 @@ The build stops with a non-zero exit if any validation or leakage check fails. T
 
 | File | Content |
 |---|---|
-| `ml_ready_dataset_v1.csv` | the dataset (715 rows × 307 columns) |
+| `ml_ready_dataset_v1.csv` | the dataset (715 rows × 312 columns) |
 | `ml_ready_column_dictionary_v1.csv` | every column: role, description, `baseline_leakage_safe` flag, timing caveat, leakage note, missing count (also rendered below) |
+| `fc_crop_feature_selection_v1.csv`, `fc_crop_feature_selection_detail_v1.csv` | forward-chaining crop-specific predictors per crop and target year, and the correlation statistics behind them |
 | `join_coverage_report_v1.csv` | matched and unmatched keys for every join |
 | `unmatched_keys_v1.csv` | the unmatched keys, each with a `reason`: `GAP` (a real missing source record) or `expected` (e.g. a crop that is not eligible in Issue 2) |
 | `exclusion_report_v1.csv` | crop-long rows excluded and why |
@@ -48,6 +49,24 @@ Rows are **not** dropped for having a missing yield anomaly. Use the flags to fi
 - `has_valid_yield_anomaly`: a forward-chaining yield anomaly exists (384 rows; 2017–2019 only).
 - `usable_for_forward_chaining_eval`: eligible crop and valid anomaly (384 rows; 128 in each of 2017, 2018, 2019).
 
+## Forward-chaining crop-specific predictors (`fc_*`): the leakage-safe alternative to `loyo_*`
+
+Issue 5's published selection (`loyo_*`) used leave-one-year-out folds, so the choice for a held-out year saw later years. The `fc_*` columns use **the same method and thresholds** (Issue 5's own `select_features_for_fold`: Spearman, Benjamini-Hochberg, multicollinearity filter, at most 4 features, `MIN_N` 8, `COVERAGE` 0.6, `MIN_RHO` 0.3, `MAX_Q` 0.2, `MAX_CORR` 0.85) and the same row filter, but for every crop and target year `T` they train **only on target years strictly before `T`**. They are therefore safe to attach to rows of year `T`.
+
+| Column | Meaning |
+|---|---|
+| `fc_selection_train_years` | the earlier target years the selection used |
+| `fc_selection_n_training_rows` | rows it used |
+| `fc_selection_status` | `selected`, `no_predictors_passed_screen` (ran, nothing passed), `no_prior_target_years` (could not run), `crop_excluded_by_issue5_row_filter`, or Issue 5's insufficient-data statuses |
+| `fc_n_selected_predictors` | 0 means it ran and nothing passed; **missing means it could not run** |
+| `fc_selected_predictors` | `;`-separated, in Issue 5 feature naming (`<window>__<indicator>`, z-score anomalies) |
+
+**Result (committed run, 55 crop-years):** 4 selected, 16 ran with nothing passing, 30 could not run (no forward-chaining target exists before 2017, so 2015 to 2017 have no earlier target years), 5 are `rabi_sorghum` (see below). The four selections are chickpea 2018 (trained on 2017 only, 11 rows) and maize, pigeonpea and sunflower 2019 (trained on 2017 to 2018, 20 to 26 rows). For maize, pigeonpea and sunflower these overlap with Issue 5's stable LOYO predictors (`annual_crop__hot_days`, `annual_crop__hot_days`, `kharif__dtr_mean`), which is a reassuring but small cross-check.
+
+**Read this honestly:** with 11 to 26 rows and 78 candidate features, a selection is fragile, "nothing passed" is the typical outcome, and a selection is a statistical association, not a causal driver. Use `fc_*` as the per-crop feature list for year `T`, never `loyo_*`.
+
+**Leakage tests (builder):** training years are all `< T`, and scrambling the target in every year `>= T` leaves each selection unchanged (a look-ahead mutation of the code fails the build; see the tests).
+
 ## Join coverage (committed run)
 
 | Join | Keys | Base keys matched | Unmatched base keys |
@@ -58,7 +77,7 @@ Rows are **not** dropped for having a missing yield anomaly. Use the flags to fi
 | climate zone | `district_code` | 13 / 13 | 0 |
 | crop feature selection (Issue 5) | `crop` | **10 / 11** | **1: `rabi_sorghum`** |
 
-**Known gap:** `rabi_sorghum` is eligible under Issue 2 but has no Issue 5 result, and Issue 5 contains seven crops (castor, cotton, linseed, rapeseed_and_mustard, safflower, soyabean, wheat) that Issue 2 does not mark eligible. The two issues used different eligible sets. Its `loyo_*` columns stay **missing** for `rabi_sorghum`; nothing is filled in. This should be reconciled upstream.
+**Known gap:** `rabi_sorghum` is eligible under Issue 2 but has no Issue 5 result. The cause is a rule mismatch: crop-long marks it `is_seasonal_component = True`, which Issue 5's row filter excludes (`crop_excluded_by_issue5_row_filter`). Either Issue 2 or Issue 5 should change; this dataset does not decide. Separately, Issue 5 contains seven crops (castor, cotton, linseed, rapeseed_and_mustard, safflower, soyabean, wheat) that Issue 2 does not mark eligible. The two issues used different eligible sets. Its `loyo_*` columns stay **missing** for `rabi_sorghum`; nothing is filled in. This should be reconciled upstream.
 
 ## Column roles (see `ml_ready_column_dictionary_v1.csv`)
 
@@ -72,12 +91,13 @@ Rows are **not** dropped for having a missing yield anomaly. Use the flags to fi
 | target | 5 | `yield_anomaly_kg_per_ha`, `yield_anomaly_pct`, `yield_anomaly_zscore`, `yield_deviation_class`, `anomaly_status` |
 | target_baseline_meta | 10 | how each anomaly baseline was formed |
 | outcome_year_measurement | 6 | area, production, yield measured in the target year |
-| selection_info_loyo | 4 | Issue 5 predictor summary (see warning) |
+| selection_info_loyo | 4 | Issue 5 leave-one-year-out predictor summary (**not** forward-chaining safe; see warning) |
+| selection_info_forward_chaining | 5 | `fc_*`: the same selection using only earlier target years (leakage-safe) |
 | eligibility_flag / data_quality_flag / metadata | 6 / 21 / 16 | filtering and traceability |
 
 **Baseline-leakage-safe set (236 columns):** the `wanom__`, `wz__` and `wact__` columns, plus `climate_zone` and `crop`. "Safe" means only that the anomaly baselines use earlier years than the target year. It does **not** mean the weather would be available at a forecast origin: the source does not define the window dates, and `annual_cal`, `annual_crop`, `ne` and `rabi_next` may extend past harvest, so treat them as retrospective unless a window end is confirmed to precede the forecast origin. Everything else is a target, a target-year outcome, or selection information and must not be used as a feature.
 
-> **Warning on `loyo_*` columns.** Issue 5 selected predictors with leave-one-year-out folds over 2017–2019, so the selection saw the held-out year and later years. They are included because the issue asks for them, but they are **not forward-chaining safe** (marked `safe = no`). Re-select features inside each forward-chaining fold.
+> **Warning on `loyo_*` columns (use `fc_*` instead).** Issue 5 selected predictors with leave-one-year-out folds over 2017–2019, so the selection saw the held-out year and later years. They are included because the issue asks for them, but they are **not forward-chaining safe** (marked `safe = no`). Re-select features inside each forward-chaining fold.
 
 The same-year raw weather columns that crop-long also carries are dropped after verifying they are identical to `wact__*`.
 
@@ -85,7 +105,7 @@ The same-year raw weather columns that crop-long also carries are dropped after 
 
 ### Column dictionary
 
-307 columns. `safe` = baseline-leakage safe (see the timing caveat below the table).
+312 columns. `safe` = baseline-leakage safe (see the timing caveat below the table).
 
 | Column | Role | Safe | Missing | Description |
 |---|---|---|---|---|
@@ -165,6 +185,11 @@ The same-year raw weather columns that crop-long also carries are dropped after 
 | `is_eligible_crop` | eligibility_flag | no | 0 | Eligibility and usability flags |
 | `has_valid_yield_anomaly` | eligibility_flag | no | 0 | Eligibility and usability flags |
 | `usable_for_forward_chaining_eval` | eligibility_flag | no | 0 | Eligibility and usability flags |
+| `fc_selection_train_years` | selection_info_forward_chaining | no | 0 | Per-crop weather predictors selected with Issue 5's method using only target years before this row's year |
+| `fc_selection_n_training_rows` | selection_info_forward_chaining | no | 0 | Per-crop weather predictors selected with Issue 5's method using only target years before this row's year |
+| `fc_selection_status` | selection_info_forward_chaining | no | 0 | Per-crop weather predictors selected with Issue 5's method using only target years before this row's year |
+| `fc_n_selected_predictors` | selection_info_forward_chaining | no | 455 | Per-crop weather predictors selected with Issue 5's method using only target years before this row's year |
+| `fc_selected_predictors` | selection_info_forward_chaining | no | 0 | Per-crop weather predictors selected with Issue 5's method using only target years before this row's year |
 
 Weather windows (6): `annual_cal`, `annual_crop`, `kharif`, `ne`, `rabi_next`, `rabi_prev`. Indicators (13): `cold_days`, `dtr_mean`, `gdd_sum`, `hot_days`, `longest_dry`, `max_5day_rain`, `rain_sum`, `rainy_days`, `rh_mean`, `solar_mean`, `tmax_mean`, `tmin_mean`, `wind_mean`.
 
@@ -172,7 +197,7 @@ Weather windows (6): `annual_cal`, `annual_crop`, `kharif`, `ne`, `rabi_next`, `
 
 <!-- COLUMN_DICTIONARY_END -->
 
-## Validation and leakage checks (26 of 26 pass)
+## Validation and leakage checks (29 of 29 pass)
 
 Recorded in `validation_checks_v1.csv`.
 
@@ -184,7 +209,8 @@ Recorded in `validation_checks_v1.csv`.
   - every available weather normal is **recomputed** from its listed earlier years and matches;
   - anomaly equals actual minus normal;
   - the safe set is checked by **provenance**: it must come only from the weather join, `climate_zone` and `crop`, and must not overlap any column sourced from the yield file, any target-year outcome column, or any Issue 5 (`loyo_*`) column;
-  - every column is documented and every weather feature carries the timing caveat.
+  - every column is documented and every weather feature carries the timing caveat;
+  - the `fc_*` selections train only on target years before the row's year, and are unchanged when later years' targets are scrambled.
 - **Mutation-tested:** the builder was run on tampered inputs (a baseline containing the target year, a tampered normal, a duplicate key) and exited non-zero each time.
 
 ## Known limitations

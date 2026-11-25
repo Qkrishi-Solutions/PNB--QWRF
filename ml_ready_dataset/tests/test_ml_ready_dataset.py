@@ -194,3 +194,79 @@ def DEFAULTS_PATHS():
     return {"crop_long": DEFAULTS["crop_long"], "eligibility": DEFAULTS["eligibility"],
             "weather": DEFAULTS["weather"], "yield_fc": DEFAULTS["yield_fc"],
             "feature_selection": DEFAULTS["feature_selection"], "zones": DEFAULTS["zones"]}
+
+
+# ---------------- forward-chaining crop-specific predictors (fc_*) ----------------
+
+def _fc_summary():
+    return pd.read_csv(os.path.join(OUT, "fc_crop_feature_selection_v1.csv"))
+
+
+def test_fc_selection_trains_only_on_earlier_target_years():
+    fc = _fc_summary()
+    assert len(fc) == fc["crop"].nunique() * fc["year"].nunique()
+    for r in fc.itertuples(index=False):
+        if isinstance(r.fc_selection_train_years, str) and r.fc_selection_train_years:
+            assert max(int(v) for v in r.fc_selection_train_years.split(";")) < r.year
+
+
+def test_fc_selection_status_semantics(df):
+    fc = _fc_summary()
+    assert set(fc["fc_selection_status"]) <= {
+        "no_prior_target_years", "crop_excluded_by_issue5_row_filter",
+        "no_predictors_passed_screen", "selected", "insufficient_training_samples",
+        "no_features_with_sufficient_data"}
+    # No forward-chaining anomaly exists before 2017, so nothing earlier can be selected from.
+    early = fc[fc["year"] <= 2017]
+    assert early["fc_n_selected_predictors"].isna().all()
+    # Ran-and-found-nothing (0) is distinct from could-not-run (missing)
+    ran_none = fc[fc["fc_selection_status"] == "no_predictors_passed_screen"]
+    assert (ran_none["fc_n_selected_predictors"] == 0).all()
+    sel = fc[fc["fc_selection_status"] == "selected"]
+    assert (sel["fc_n_selected_predictors"] >= 1).all() and (sel["fc_n_selected_predictors"] <= 4).all()
+    assert sel["fc_selected_predictors"].notna().all()
+    # attached to dataset rows by (crop, year)
+    cols = ["fc_selection_status", "fc_n_selected_predictors", "fc_selected_predictors"]
+    chk = df[["crop", "year"] + cols].drop_duplicates()
+    assert len(chk) == len(fc[fc["crop"].isin(df["crop"])])
+
+
+def test_rabi_sorghum_gap_is_explained_by_issue5_row_filter():
+    fc = _fc_summary()
+    rs = fc[fc["crop"] == "rabi_sorghum"]
+    assert (rs["fc_selection_status"] == "crop_excluded_by_issue5_row_filter").all()
+    crop_long = pd.read_csv(DEFAULTS["crop_long"])
+    assert crop_long.loc[crop_long["crop"] == "rabi_sorghum", "is_seasonal_component"].astype(bool).all()
+
+
+def test_fc_selection_ignores_future_target_years(df):
+    i5 = mod.load_issue5(DEFAULTS["issue5_script"])
+    summary, _ = mod.forward_chaining_selection(df, i5)
+    assert mod.selection_ignores_future(df, i5, summary) == []
+    on_disk = _fc_summary().reset_index(drop=True)
+    fresh = summary.reset_index(drop=True)
+    text = ["crop", "fc_selection_train_years", "fc_selection_status", "fc_selected_predictors"]
+    for c in text:  # empty string and NaN are the same after a CSV round trip
+        assert fresh[c].fillna("").astype(str).tolist() == on_disk[c].fillna("").astype(str).tolist(), c
+    for c in ["year", "fc_selection_n_training_rows", "fc_n_selected_predictors"]:
+        assert np.allclose(fresh[c].astype(float), on_disk[c].astype(float), equal_nan=True), c
+
+
+def test_leakage_check_fails_if_selection_uses_the_target_year(tmp_path, monkeypatch):
+    """Mutation test: a selection that also trains on year == T (look-ahead) must stop the build."""
+    real = mod._select_one
+
+    def leaky(pool, feats, i5, crop, target_year):
+        return real(pool, feats, i5, crop, target_year + 1)  # trains on year <= T
+
+    monkeypatch.setattr(mod, "_select_one", leaky)
+    with pytest.raises(SystemExit):
+        build(DEFAULTS_PATHS(), str(tmp_path), "pytest")
+
+
+def test_dictionary_marks_fc_columns_and_points_loyo_users_to_them():
+    d = pd.read_csv(os.path.join(OUT, "ml_ready_column_dictionary_v1.csv"))
+    fc = d[d["column"].str.startswith("fc_")]
+    assert len(fc) == 5 and (fc["role"] == "selection_info_forward_chaining").all()
+    loyo = d[d["role"] == "selection_info_loyo"]
+    assert loyo["leakage_note"].str.contains("fc_").all()
