@@ -1,0 +1,6 @@
+join,join_keys,base_keys,source_keys,matched_base_keys,unmatched_base_keys,source_keys_not_in_base,note
+eligibility,crop,11,22,11,0,11,source also lists ineligible crops
+yield_anomaly,district_code+year+crop,715,1430,715,0,715,source also holds ineligible-crop rows
+weather,district_code+year,65,65,65,0,0,weather repeats across crops; joined at district-year
+climate_zone,district_code,13,13,13,0,0,
+crop_feature_selection,crop,11,17,10,1,7,Issue 5 selected with leave-one-year-out folds
