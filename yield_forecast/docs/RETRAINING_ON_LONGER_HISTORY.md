@@ -125,7 +125,7 @@ With a longer history these choices can be tested properly instead of assumed. D
 | Model sizes | 10 to 50 trees or rounds, depth 2 to 3, Ridge alpha 10 | chosen for about 128 rows; tune with nested temporal validation |
 | Per-crop target scaling | divide by the crop's training standard deviation | adopted after seeing our test years; confirm it holds on many test years |
 | Baseline | per-crop mean of training anomalies | with more years, consider a trend or a rolling window |
-| Prediction intervals | in-sample residual quantile, uncalibrated | with many folds, calibrate from out-of-fold residuals |
+| Prediction intervals | in-sample residual quantile, uncalibrated | with many folds, calibrate from out-of-fold residuals. On our data out-of-fold, per-crop-scaled conformal intervals were sharper and far more even across crops, but a single training year cannot reveal a year-level shift (coverage stayed about 72-75%); with several training years calibrate with leave-one-year-out inside the training window (see `experiment_calibrated_intervals.py`) |
 | Minimum observations for a baseline | 2 earlier years | a longer history supports a higher minimum and more stable normals |
 | Crop eligibility thresholds | Issue 2 report | more years can change which crops qualify |
 | Climate zones | 3 zones from 2015 to 2019 | recompute on the longer history |

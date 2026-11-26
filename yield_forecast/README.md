@@ -37,6 +37,7 @@ yield_forecast/
 ├── folds.py                                     # Year-agnostic fold generation and validation
 ├── experiment_scaled_shrinkage.py               # Exploratory: target scaling and shrinkage blend
 ├── experiment_lodo.py                           # Exploratory: forward-chaining leave-one-district-out
+├── experiment_calibrated_intervals.py           # Exploratory: calibrated 80% intervals (out-of-fold, per-crop)
 ├── experiment_five_year_loyo.py                 # Exploratory: five-year nested leave-one-year-out (not forecasting)
 ├── data/
 │   └── data_audit_report.md                     # Upstream input audit (written against the earlier PR-local table)
@@ -54,7 +55,7 @@ yield_forecast/
 │   └── RETRAINING_ON_LONGER_HISTORY.md          # How to rebuild and retrain on more years
 └── tests/
     ├── conftest.py                              # Synthetic data fixture for unit testing
-    └── test_yield_forecast.py                   # Automated test suite (43 test functions)
+    └── test_yield_forecast.py                   # Automated test suite (49 test functions)
 ```
 
 ---
@@ -169,6 +170,24 @@ XGBoost's scaled-target skill by held-out year: 2015: -0.3%, 2016: -0.2%, 2017: 
 
 **What this changes.** (1) Target scaling is still essential: with the raw target no model beats climatology. (2) But the gain over climatology across five years is **about +2 to +3%, not the +9% seen on 2018-2019**, it is **not statistically distinguishable from zero** (p 0.13 to 0.17), and the tree models are better in only 3 of 5 held-out years (2017 to 2019) and marginally worse in 2015 and 2016 (Ridge: 4 of 5). The headline forward-chaining gain should therefore be read as largely specific to those two test years and optimistic. The honest summary is: weather adds a small, unconfirmed improvement over a crop-mean baseline.
 
+### Calibrated prediction intervals (exploratory; `experiment_calibrated_intervals.py`)
+
+The pipeline's 80% intervals use in-sample training residuals and one width in kg/ha for every crop, and they cover only 70-75%. The experiment compares four ways of building them on the same folds, features and models (nothing re-tuned). The best, `oof_scaled`, is a split-conformal interval built from **out-of-fold residuals** (leave-one-district-out inside the training rows only, feature selection repeated inside each inner fold), **normalised by each crop's training standard deviation** so every crop gets its own width. The test year is never used to calibrate (a test confirms the bounds do not change when the test targets change).
+
+| Model | Coverage now -> calibrated | Worst crop's coverage now -> calibrated | Crops within 10 pts of 80% | Interval score (lower is better) | Coverage 2018 / 2019 (calibrated) |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| Climatology | 73.0% -> **73.8%** | 0% -> **50%** | 2 of 11 -> **8 of 11** | 8.09 -> **5.05** | 66% / 82% |
+| XGBoost | 75.0% -> **75.4%** | 8% -> **59%** | 1 of 11 -> **6 of 11** | 7.10 -> **4.90** | 66% / 84% |
+| RandomForest | 73.8% -> **74.2%** | 8% -> **59%** | 2 of 11 -> **7 of 11** | 7.19 -> **4.94** | 65% / 84% |
+| CatBoost | 71.5% -> **74.6%** | 4% -> **59%** | 2 of 11 -> **6 of 11** | 7.00 -> **4.99** | 66% / 84% |
+| Ridge | 70.3% -> **71.5%** | 4% -> **55%** | 3 of 11 -> **6 of 11** | 8.45 -> **5.36** | 64% / 79% |
+
+**What it shows**
+- **Per-crop calibration is the real fix.** The current rule looks acceptable overall but is badly wrong by crop: its worst crop is covered 0-8% of the time (sugarcane's intervals are far too narrow) while small crops are covered almost always (far too wide). The calibrated version brings the worst crop to about 50-59% and puts 6-8 of 11 crops within 10 points of 80%.
+- **Sharper at the same coverage.** Intervals are about half as wide in crop-std units (about 2.9 against 5-6), and the interval score, which penalises both width and misses, improves by roughly 30% for every model.
+- **Overall coverage is still short of 80%** (about 72-75%) and this is a limit, not a bug. The calibration data come from one training year (2017), so they cannot see a **year-level shift**: errors on the 2018 test year were about 1.43-1.51x the calibration error (coverage 64-66%), while 2019 was about 1.00-1.27x (coverage 79-84%, near nominal). More training years allow leave-one-year-out calibration inside the training window, which would capture that shift.
+- Two test years and 13 districts, so this is indicative. It has not been moved into the main pipeline: the committed interval columns are still the in-sample rule, labelled `uncalibrated_in_sample_exploratory`.
+
 ---
 
 ## 6. Prediction Intervals & Honest Calibration Status
@@ -218,4 +237,4 @@ python yield_forecast/train_forecast.py --no-scale-target \
 ```powershell
 python -m pytest yield_forecast/tests -v
 ```
-*Expected Output: 43 passed.*
+*Expected Output: 49 passed.*
