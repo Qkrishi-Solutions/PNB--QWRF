@@ -27,4 +27,11 @@ forward-chaining crop selection is unchanged when target years >= T are scramble
 forward-chaining crop selection outcome reported (none selected is a valid result),coverage_report,True,"statuses: {'no_prior_target_years': 30, 'no_predictors_passed_screen': 16, 'crop_excluded_by_issue5_row_filter': 5, 'selected': 4}; crop-years with >=1 predictor: 4"
 "baseline-leakage-safe set comes only from weather join, climate zone and crop",leakage,True,236 safe columns; outside allowed: []
 "no target, outcome-year or Issue 5 (LOYO) column is marked safe",leakage,True,overlap: []
-every column documented; weather features carry the timing caveat,leakage,True,312 columns documented
+every column documented; weather features carry the timing caveat,leakage,True,313 columns documented
+every crop-long row is either carried or listed in excluded_crop_rows (none lost),validation,True,715 carried + 715 excluded = 1430 crop-long rows; overlap 0
+every carried row states why it has or lacks a yield target (anomaly_status never missing),validation,True,"{'calculated': 383, 'insufficient_history': 271, 'ineligible_observation': 60, 'zero_baseline_std': 1}"
+ambiguous-zero rows are labelled and equal an independent recount from crop-long,validation,True,"35 rows: area, production and yield all 0 and not flagged as filled"
+low-confidence z-score flag equals 'baseline has fewer than MIN_OBS_FOR_ZSCORE observations',validation,True,threshold 3; flagged 128 rows
+dropped columns were empty for every carried row,validation,True,"dropped: ['aggregate_member_sum_area', 'aggregate_member_sum_production']"
+leave-one-year-out weather companion matches an independent recomputation (actual minus mean of the other years),validation,True,65 district-years; 4901 cells compared; 0 mismatches
+missing-data report reconciles to the excluded rows,validation,True,715 == 715
