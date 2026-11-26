@@ -159,6 +159,137 @@ def classify_performance(m_name: str, mae_diff: float, p_val: float, alpha: floa
     return "NO", f"Not distinguishable from Climatology; scaled MAE {direction} (p={p_val:.4f})"
 
 
+MODEL_NAMES = ["Ridge", "RandomForest", "XGBoost", "CatBoost"]
+
+
+def build_models(config):
+    """The four models with the settings in model_config.json (single definition used by the pipeline,
+    the inner calibration folds and the experiments)."""
+    m = config["models"]
+    return {
+        "Ridge": Ridge(alpha=m["Ridge"]["alpha"], fit_intercept=m["Ridge"]["fit_intercept"],
+                       random_state=m["Ridge"]["random_state"]),
+        "RandomForest": RandomForestRegressor(
+            n_estimators=m["RandomForest"]["n_estimators"], max_depth=m["RandomForest"]["max_depth"],
+            min_samples_leaf=m["RandomForest"]["min_samples_leaf"], max_features=m["RandomForest"]["max_features"],
+            n_jobs=m["RandomForest"]["n_jobs"], random_state=m["RandomForest"]["random_state"]),
+        "XGBoost": XGBRegressor(
+            n_estimators=m["XGBoost"]["n_estimators"], max_depth=m["XGBoost"]["max_depth"],
+            learning_rate=m["XGBoost"]["learning_rate"], reg_alpha=m["XGBoost"]["reg_alpha"],
+            reg_lambda=m["XGBoost"]["reg_lambda"], subsample=m["XGBoost"]["subsample"],
+            colsample_bytree=m["XGBoost"]["colsample_bytree"], n_jobs=m["XGBoost"]["n_jobs"],
+            random_state=m["XGBoost"]["random_state"]),
+        "CatBoost": CatBoostRegressor(
+            iterations=m["CatBoost"]["iterations"], depth=m["CatBoost"]["depth"],
+            learning_rate=m["CatBoost"]["learning_rate"], l2_leaf_reg=m["CatBoost"]["l2_leaf_reg"],
+            thread_count=m["CatBoost"]["thread_count"], random_seed=m["CatBoost"]["random_seed"],
+            verbose=m["CatBoost"]["verbose"], allow_writing_files=m["CatBoost"].get("allow_writing_files", False)),
+    }
+
+
+def conformal_quantile(scores, alpha=0.2):
+    """Split-conformal quantile: the ceil((n+1)(1-alpha))-th smallest score (the maximum if n is too small)."""
+    s = np.sort(np.asarray(scores, float))
+    n = len(s)
+    if n == 0:
+        raise ValueError("no calibration scores")
+    k = int(np.ceil((n + 1) * (1 - alpha)))
+    return float(s[min(k, n) - 1])
+
+
+def predict_model(name, tr, te, feats, config, target, s_tr, s_te):
+    """Fit `name` on tr (target divided by s_tr) and return predictions in kg/ha for te and, in-sample, for tr."""
+    if name == "Climatology":
+        base = ClimatologyBaseline().fit(tr, target)
+        return base.predict(te), base.predict(tr)
+    cats = ["crop", "climate_zone"]
+    ohe = OneHotEncoder(drop="first", sparse_output=False, handle_unknown="ignore")
+    parts_tr, parts_te = [ohe.fit_transform(tr[cats])], [ohe.transform(te[cats])]
+    if feats:
+        sc = StandardScaler()
+        parts_tr.append(sc.fit_transform(tr[feats]))
+        parts_te.append(sc.transform(te[feats]))
+    X_tr, X_te = np.hstack(parts_tr), np.hstack(parts_te)
+    model = build_models(config)[name]
+    model.fit(X_tr, tr[target].values / s_tr)
+    return model.predict(X_te) * s_te, model.predict(X_tr) * s_tr
+
+
+def oof_abs_residuals(df_train, available_features, config, target, scale_target=True):
+    """Out-of-fold absolute residuals (kg/ha) for the baseline and every model, from leave-one-district-out
+    cross-validation INSIDE the training rows only. Feature selection is repeated inside each inner fold.
+    Returns {model name: array aligned with df_train's rows}."""
+    fs = config["feature_selection"]
+    names = ["Climatology"] + MODEL_NAMES
+    res = {m: np.full(len(df_train), np.nan) for m in names}
+    pos = {ix: i for i, ix in enumerate(df_train.index)}
+    for dist in sorted(df_train["district_code"].unique()):
+        inner_tr = df_train[df_train["district_code"] != dist]
+        inner_te = df_train[df_train["district_code"] == dist]
+        feats = select_features_in_fold(inner_tr, available_features, target, fs["max_features"],
+                                        fs["max_collinearity"], fs["min_observed_fraction"])
+        scale, g = fit_crop_scales(inner_tr, target)
+        s_in_tr = inner_tr["crop"].map(scale).fillna(g).values
+        s_in_te = inner_te["crop"].map(scale).fillna(g).values
+        if not scale_target:
+            s_in_tr, s_in_te = np.ones_like(s_in_tr), np.ones_like(s_in_te)
+        idx = [pos[i] for i in inner_te.index]
+        for m in names:
+            pred, _ = predict_model(m, inner_tr, inner_te, feats, config, target, s_in_tr, s_in_te)
+            res[m][idx] = np.abs(inner_te[target].values - pred)
+    return res
+
+
+def make_intervals(name, pred_te, pred_tr, y_tr, oof, s_tr_crop, s_te_crop, confidence_level):
+    """Return (lo, hi, lo_in_sample, hi_in_sample, n_calibration).
+
+    in-sample : pred +/- the `confidence_level` quantile of the absolute IN-SAMPLE training residuals (kg/ha).
+    calibrated: pred +/- q * crop_std, with q the split-conformal quantile of OUT-OF-FOLD residuals divided by the
+                crop's training std, so every crop gets its own width. Used when `oof` is given, else the
+                in-sample interval is returned for both."""
+    q_abs = np.quantile(np.abs(y_tr - pred_tr), confidence_level)
+    lo_in, hi_in = pred_te - q_abs, pred_te + q_abs
+    if oof is None:
+        return lo_in, hi_in, lo_in, hi_in, 0
+    q = conformal_quantile(oof[name] / s_tr_crop, 1 - confidence_level)
+    half = q * s_te_crop
+    return pred_te - half, pred_te + half, lo_in, hi_in, int(len(oof[name]))
+
+
+def interval_score(lo, hi, y, s, alpha):
+    """Winkler interval score in crop-std units (lower is better): width plus a penalty for misses."""
+    lo, hi, y, s = (np.asarray(a, float) for a in (lo, hi, y, s))
+    return ((hi - lo) + (2.0 / alpha) * (np.maximum(lo - y, 0) + np.maximum(y - hi, 0))) / s
+
+
+def interval_fields(i, lo, hi, lo_in, hi_in, act, s, confidence_level, status):
+    a = 1 - confidence_level
+    return {
+        "pi_lower_80": float(lo[i]), "pi_upper_80": float(hi[i]), "pi_covered_80": bool(lo[i] <= act <= hi[i]),
+        "pi_lower_80_in_sample": float(lo_in[i]), "pi_upper_80_in_sample": float(hi_in[i]),
+        "pi_covered_80_in_sample": bool(lo_in[i] <= act <= hi_in[i]),
+        "pi_score_scaled": float(interval_score(lo[i], hi[i], act, s, a)),
+        "pi_score_scaled_in_sample": float(interval_score(lo_in[i], hi_in[i], act, s, a)),
+        "pi_method": status,
+    }
+
+
+def pi_eval_row(fold_idx, test_year, model, status, confidence_level, lo, hi, lo_in, hi_in, y, s, n_cal):
+    a = 1 - confidence_level
+    cov = float(np.mean((lo <= y) & (y <= hi)))
+    cov_in = float(np.mean((lo_in <= y) & (y <= hi_in)))
+    return {
+        "fold": fold_idx, "test_year": test_year, "model": model, "calibration_status": status,
+        "nominal_target_coverage": confidence_level, "empirical_test_coverage": cov,
+        "coverage_gap": cov - confidence_level, "avg_interval_width": float(np.mean(hi - lo)),
+        "avg_interval_width_scaled": float(np.mean((hi - lo) / s)),
+        "interval_score_scaled": float(np.mean(interval_score(lo, hi, y, s, a))),
+        "empirical_test_coverage_in_sample": cov_in, "avg_interval_width_in_sample": float(np.mean(hi_in - lo_in)),
+        "interval_score_scaled_in_sample": float(np.mean(interval_score(lo_in, hi_in, y, s, a))),
+        "n_calibration_oof": n_cal, "n_evaluated": int(len(y)),
+    }
+
+
 def run_training_pipeline(
     dataset_path: str = "ml_ready_dataset/ml_ready_dataset_v1.csv",
     config_path: str = "yield_forecast/models/model_config.json",
@@ -296,16 +427,24 @@ def run_training_pipeline(
         X_test = np.hstack([X_test_cat, X_test_w])
         y_train = df_train[target_col].values
 
-        # Exploratory in-sample residual quantile for Climatology
+        # Prediction intervals. Default: out-of-fold, per-crop-scaled split-conformal (see make_intervals);
+        # the old in-sample interval is kept beside it in the *_in_sample columns for comparison.
+        interval_cfg = config.get("prediction_intervals", {})
+        use_oof = (interval_cfg.get("method") == "oof_conformal_per_crop"
+                   and df_train["district_code"].nunique() >= 3)
+        interval_status = (interval_cfg.get("calibration_status", "oof_conformal_per_crop_exploratory")
+                           if use_oof else "uncalibrated_in_sample_exploratory")
+        s_crop_train = df_train["crop"].map(crop_scale).fillna(global_std).values
+        s_crop_test = df_test["crop"].map(crop_scale).fillna(global_std).values
+        oof = oof_abs_residuals(df_train, available_weather, config, target_col, scale_target) if use_oof else None
+        print(f"Prediction intervals: {interval_status}")
         train_base_preds = baseline.predict(df_train)
-        train_base_resid = np.abs(y_train - train_base_preds)
-        base_q_pi = np.quantile(train_base_resid, confidence_level)
+        lo, hi, lo_in, hi_in, n_cal = make_intervals("Climatology", base_preds, train_base_preds, y_train, oof,
+                                                     s_crop_train, s_crop_test, confidence_level)
 
         for i, row in df_test.reset_index(drop=True).iterrows():
             pred_val = float(base_preds[i])
             act_val = float(y_test_true[i])
-            lower = pred_val - base_q_pi
-            upper = pred_val + base_q_pi
             all_predictions.append({
                 "fold": fold_idx,
                 "train_years": ";".join(str(y) for y in train_years),
@@ -319,9 +458,7 @@ def run_training_pipeline(
                 "predicted_yield_anomaly": pred_val,
                 "residual": act_val - pred_val,
                 "scaled_abs_error": abs(act_val - pred_val) / crop_scale.get(row["crop"], global_std),
-                "pi_lower_80": lower,
-                "pi_upper_80": upper,
-                "pi_covered_80": bool(lower <= act_val <= upper)
+                **interval_fields(i, lo, hi, lo_in, hi_in, act_val, s_crop_test[i], confidence_level, interval_status),
             })
 
         fold_metrics.append({
@@ -340,60 +477,10 @@ def run_training_pipeline(
             "rmse_diff_vs_baseline": 0.0
         })
 
-        base_coverage = np.mean([
-            (pred - base_q_pi) <= act <= (pred + base_q_pi)
-            for pred, act in zip(base_preds, y_test_true)
-        ])
-        pi_evaluations.append({
-            "fold": fold_idx,
-            "test_year": test_year,
-            "model": "Climatology",
-            "calibration_status": "uncalibrated_in_sample_exploratory",
-            "nominal_target_coverage": confidence_level,
-            "empirical_test_coverage": base_coverage,
-            "coverage_gap": base_coverage - confidence_level,
-            "avg_interval_width": 2 * base_q_pi,
-            "n_evaluated": n_test
-        })
+        pi_evaluations.append(pi_eval_row(fold_idx, test_year, "Climatology", interval_status, confidence_level,
+                                          lo, hi, lo_in, hi_in, y_test_true, s_crop_test, n_cal))
 
-        # Instantiate Models
-        catboost_allow_write = config["models"]["CatBoost"].get("allow_writing_files", False)
-        model_instances = {
-            "Ridge": Ridge(
-                alpha=config["models"]["Ridge"]["alpha"],
-                fit_intercept=config["models"]["Ridge"]["fit_intercept"],
-                random_state=config["models"]["Ridge"]["random_state"]
-            ),
-            "RandomForest": RandomForestRegressor(
-                n_estimators=config["models"]["RandomForest"]["n_estimators"],
-                max_depth=config["models"]["RandomForest"]["max_depth"],
-                min_samples_leaf=config["models"]["RandomForest"]["min_samples_leaf"],
-                max_features=config["models"]["RandomForest"]["max_features"],
-                n_jobs=config["models"]["RandomForest"]["n_jobs"],
-                random_state=config["models"]["RandomForest"]["random_state"]
-            ),
-            "XGBoost": XGBRegressor(
-                n_estimators=config["models"]["XGBoost"]["n_estimators"],
-                max_depth=config["models"]["XGBoost"]["max_depth"],
-                learning_rate=config["models"]["XGBoost"]["learning_rate"],
-                reg_alpha=config["models"]["XGBoost"]["reg_alpha"],
-                reg_lambda=config["models"]["XGBoost"]["reg_lambda"],
-                subsample=config["models"]["XGBoost"]["subsample"],
-                colsample_bytree=config["models"]["XGBoost"]["colsample_bytree"],
-                n_jobs=config["models"]["XGBoost"]["n_jobs"],
-                random_state=config["models"]["XGBoost"]["random_state"]
-            ),
-            "CatBoost": CatBoostRegressor(
-                iterations=config["models"]["CatBoost"]["iterations"],
-                depth=config["models"]["CatBoost"]["depth"],
-                learning_rate=config["models"]["CatBoost"]["learning_rate"],
-                l2_leaf_reg=config["models"]["CatBoost"]["l2_leaf_reg"],
-                thread_count=config["models"]["CatBoost"]["thread_count"],
-                random_seed=config["models"]["CatBoost"]["random_seed"],
-                verbose=config["models"]["CatBoost"]["verbose"],
-                allow_writing_files=catboost_allow_write
-            )
-        }
+        model_instances = build_models(config)
 
         for m_name, model in model_instances.items():
             # Fit on the (optionally per-crop scaled) target; convert predictions back to kg/ha.
@@ -404,21 +491,15 @@ def run_training_pipeline(
             rmse = np.sqrt(mean_squared_error(y_test_true, test_preds))
             r2 = r2_score(y_test_true, test_preds)
 
-            # In-sample residual quantile calculation (uncalibrated exploratory)
+            # Prediction intervals (calibrated default plus the in-sample interval for comparison)
             train_preds = model.predict(X_train) * s_train
-            train_resid = np.abs(y_train - train_preds)
-            q_pi = np.quantile(train_resid, confidence_level)
+            lo, hi, lo_in, hi_in, n_cal = make_intervals(m_name, test_preds, train_preds, y_train, oof,
+                                                         s_crop_train, s_crop_test, confidence_level)
 
             # Record individual test predictions
-            covered_count = 0
             for i, row in df_test.reset_index(drop=True).iterrows():
                 pred_val = float(test_preds[i])
                 act_val = float(y_test_true[i])
-                lower = pred_val - q_pi
-                upper = pred_val + q_pi
-                is_cov = bool(lower <= act_val <= upper)
-                if is_cov:
-                    covered_count += 1
                 all_predictions.append({
                     "fold": fold_idx,
                     "train_years": ";".join(str(y) for y in train_years),
@@ -432,23 +513,13 @@ def run_training_pipeline(
                     "predicted_yield_anomaly": pred_val,
                     "residual": act_val - pred_val,
                     "scaled_abs_error": abs(act_val - pred_val) / crop_scale.get(row["crop"], global_std),
-                    "pi_lower_80": lower,
-                    "pi_upper_80": upper,
-                    "pi_covered_80": is_cov
+                    **interval_fields(i, lo, hi, lo_in, hi_in, act_val, s_crop_test[i], confidence_level, interval_status),
                 })
 
-            emp_cov = covered_count / n_test
-            pi_evaluations.append({
-                "fold": fold_idx,
-                "test_year": test_year,
-                "model": m_name,
-                "calibration_status": "uncalibrated_in_sample_exploratory",
-                "nominal_target_coverage": confidence_level,
-                "empirical_test_coverage": emp_cov,
-                "coverage_gap": emp_cov - confidence_level,
-                "avg_interval_width": 2 * q_pi,
-                "n_evaluated": n_test
-            })
+            pi_row = pi_eval_row(fold_idx, test_year, m_name, interval_status, confidence_level,
+                                 lo, hi, lo_in, hi_in, y_test_true, s_crop_test, n_cal)
+            pi_evaluations.append(pi_row)
+            emp_cov = pi_row["empirical_test_coverage"]
 
             fold_metrics.append({
                 "fold": fold_idx,
@@ -466,7 +537,7 @@ def run_training_pipeline(
                 "rmse_diff_vs_baseline": rmse - base_rmse
             })
 
-            print(f"{m_name:<15}: MAE={mae:.2f} (diff={mae - base_mae:+.2f}), RMSE={rmse:.2f}, R2={r2:.3f}, PI Cov={emp_cov*100:.1f}%")
+            print(f"{m_name:<15}: MAE={mae:.2f} (diff={mae - base_mae:+.2f}), RMSE={rmse:.2f}, R2={r2:.3f}, PI Cov={emp_cov*100:.1f}% (in-sample rule {pi_row['empirical_test_coverage_in_sample']*100:.1f}%)")
 
     # 4. Save Prediction Deliverable
     df_preds = pd.DataFrame(all_predictions)
@@ -510,6 +581,7 @@ def run_training_pipeline(
         m_rmse = np.sqrt(mean_squared_error(y_act, y_pr))
         m_r2 = r2_score(y_act, y_pr)
         avg_pi_cov = m_preds["pi_covered_80"].mean()
+        avg_pi_cov_in = m_preds["pi_covered_80_in_sample"].mean()
         scaled_mae = float(m_preds["scaled_abs_error"].mean())
         macro_crop_scaled = float(m_preds.groupby("crop")["scaled_abs_error"].mean().mean())
 
@@ -546,7 +618,10 @@ def run_training_pipeline(
             "statistically_significant_improvement": stat_sig,
             "nominal_pi_target_80": confidence_level,
             "empirical_pi_coverage_80": avg_pi_cov,
-            "pi_calibration_status": "uncalibrated_in_sample_exploratory",
+            "empirical_pi_coverage_80_in_sample": avg_pi_cov_in,
+            "interval_score_scaled": float(m_preds["pi_score_scaled"].mean()),
+            "interval_score_scaled_in_sample": float(m_preds["pi_score_scaled_in_sample"].mean()),
+            "pi_calibration_status": m_preds["pi_method"].iloc[0],
             "performance_vs_climatology": perf_conclusion
         })
 
@@ -594,6 +669,8 @@ def run_training_pipeline(
                 "skill_vs_climatology_pct": 0.0 if is_base else 100.0 * (1.0 - scaled / base_scaled),
                 "beats_climatology_pct": np.nan if is_base else float(
                     100.0 * (m_crop["scaled_abs_error"].values < b_crop["scaled_abs_error"].values).mean()),
+                "pi_coverage_80": float(m_crop["pi_covered_80"].mean()),
+                "pi_coverage_80_in_sample": float(m_crop["pi_covered_80_in_sample"].mean()),
             })
 
     df_crop = pd.DataFrame(crop_rows)

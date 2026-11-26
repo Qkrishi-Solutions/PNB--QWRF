@@ -32,6 +32,8 @@ from catboost import CatBoostRegressor
 
 from yield_forecast.folds import generate_folds, validate_folds
 from yield_forecast.train_forecast import (
+    MODEL_NAMES as MODELS,  # noqa: F401  (re-exported for the other experiments)
+    build_models,  # noqa: F401
     ClimatologyBaseline,
     classify_performance,
     select_features_in_fold,
@@ -39,31 +41,7 @@ from yield_forecast.train_forecast import (
 
 PRIMARY_W = 0.5
 SENSITIVITY_W = [0.25, 0.5, 0.75, 1.0]
-MODELS = ["Ridge", "RandomForest", "XGBoost", "CatBoost"]
 KEY = ["fold", "district_code", "crop"]
-
-
-def build_models(cfg):
-    m = cfg["models"]
-    return {
-        "Ridge": Ridge(alpha=m["Ridge"]["alpha"], fit_intercept=m["Ridge"]["fit_intercept"],
-                       random_state=m["Ridge"]["random_state"]),
-        "RandomForest": RandomForestRegressor(
-            n_estimators=m["RandomForest"]["n_estimators"], max_depth=m["RandomForest"]["max_depth"],
-            min_samples_leaf=m["RandomForest"]["min_samples_leaf"], max_features=m["RandomForest"]["max_features"],
-            n_jobs=m["RandomForest"]["n_jobs"], random_state=m["RandomForest"]["random_state"]),
-        "XGBoost": XGBRegressor(
-            n_estimators=m["XGBoost"]["n_estimators"], max_depth=m["XGBoost"]["max_depth"],
-            learning_rate=m["XGBoost"]["learning_rate"], reg_alpha=m["XGBoost"]["reg_alpha"],
-            reg_lambda=m["XGBoost"]["reg_lambda"], subsample=m["XGBoost"]["subsample"],
-            colsample_bytree=m["XGBoost"]["colsample_bytree"], n_jobs=m["XGBoost"]["n_jobs"],
-            random_state=m["XGBoost"]["random_state"]),
-        "CatBoost": CatBoostRegressor(
-            iterations=m["CatBoost"]["iterations"], depth=m["CatBoost"]["depth"],
-            learning_rate=m["CatBoost"]["learning_rate"], l2_leaf_reg=m["CatBoost"]["l2_leaf_reg"],
-            thread_count=m["CatBoost"]["thread_count"], random_seed=m["CatBoost"]["random_seed"],
-            verbose=False, allow_writing_files=False),
-    }
 
 
 def run(dataset, config, outdir):

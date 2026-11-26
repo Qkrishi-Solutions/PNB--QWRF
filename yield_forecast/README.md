@@ -55,7 +55,7 @@ yield_forecast/
 │   └── RETRAINING_ON_LONGER_HISTORY.md          # How to rebuild and retrain on more years
 └── tests/
     ├── conftest.py                              # Synthetic data fixture for unit testing
-    └── test_yield_forecast.py                   # Automated test suite (49 test functions)
+    └── test_yield_forecast.py                   # Automated test suite (53 test functions)
 ```
 
 ---
@@ -113,7 +113,7 @@ All five models are evaluated on the exact same 256 held-out out-of-fold instanc
 
 Models are trained on the yield anomaly divided by each crop's training-fold standard deviation and their predictions are converted back to kg/ha (`target_scaling` in `models/model_config.json`; `--no-scale-target` restores the raw-target run, saved in `results/experiments/raw_target_v1/`).
 
-| Model | Samples | Aggregate MAE (kg/ha) | Aggregate RMSE (kg/ha) | Scaled MAE (x crop train SD) | $\Delta$ MAE vs Base | District-clustered Wilcoxon $p$ | Better than climatology? | Empirical 80% PI Coverage | Verdict (derived by code) |
+| Model | Samples | Aggregate MAE (kg/ha) | Aggregate RMSE (kg/ha) | Scaled MAE (x crop train SD) | $\Delta$ MAE vs Base | District-clustered Wilcoxon $p$ | Better than climatology? | 80% PI coverage (legacy in-sample rule) | Verdict (derived by code) |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
 | **Climatology Baseline** | 256 | 1,341.91 | 3,787.98 | 1.033 | 0.00 | 1.0000 | Reference | 71.9% | Reference |
 | **XGBoost** | 256 | 1,122.88 | 3,304.92 | 0.938 | -219.03 (-16.32%) | 0.0007 | YES | 74.2% | Significantly better |
@@ -186,17 +186,20 @@ The pipeline's 80% intervals use in-sample training residuals and one width in k
 - **Per-crop calibration is the real fix.** The current rule looks acceptable overall but is badly wrong by crop: its worst crop is covered only 4-15% of the time (sugarcane's intervals are far too narrow) while small crops are covered almost always (far too wide). The calibrated version brings the worst crop to 50-59% and puts 6-8 of 11 crops within 10 points of 80%.
 - **Sharper at the same coverage.** Intervals are about half as wide in crop-std units (2.7-2.9 against 4.9-5.6), and the interval score, which penalises both width and misses, improves by 30-35% for every model.
 - **Overall coverage is still short of 80%** (73-76%) and this is a limit, not a bug. The calibration data come from one training year (2017), so they cannot see a **year-level shift**: errors on the 2018 test year were about 1.43-1.51x the calibration error (coverage 64-66%), while 2019 was about 0.92-0.99x (coverage 82-86%, at or above nominal). More training years allow leave-one-year-out calibration inside the training window, which would capture that shift.
-- Two test years and 13 districts, so this is indicative. It has not been moved into the main pipeline: the committed interval columns are still the in-sample rule, labelled `uncalibrated_in_sample_exploratory`.
+- Two test years and 13 districts, so this is indicative. It is now the pipeline's default interval (the `pi_*_80` columns, labelled `oof_conformal_per_crop_exploratory`); the old in-sample interval is kept in the `*_in_sample` columns.
 
 ---
 
 ## 6. Prediction Intervals & Honest Calibration Status
 
-- **Method:** In-sample residual quantiles: $q_{80} = \text{Quantile}_{0.80}(|y_{\text{train}} - \hat{y}_{\text{train}}|)$.
-- **Calibration Status:** Honestly designated as **`uncalibrated_in_sample_exploratory`**.
-- **Reason for In-Sample Calculation:** In Fold 1, only a single year (2017, $N=128$) is available for training across 11 crops. Carving out a held-out calibration split within a single year would severely degrade model training and produce highly noisy calibration thresholds.
-- **Empirical Coverage vs 80% target:** 71.9% (Climatology), 72.7% (CatBoost), 73.8% (Ridge), 74.2% (RandomForest and XGBoost). All remain below nominal; the intervals are in-sample and uncalibrated.
-- **Recommendation:** True conformal out-of-fold calibration requires longer historical time series ($\ge 15$ years) with dedicated multi-year calibration folds.
+- **Default method (`oof_conformal_per_crop`):** prediction $\pm\, q \times \sigma_{\text{crop}}$, where $\sigma_{\text{crop}}$ is the crop's training-fold standard deviation and $q$ is the split-conformal quantile of **out-of-fold** residuals divided by $\sigma_{\text{crop}}$. The out-of-fold residuals come from leave-one-district-out cross-validation **inside the training rows only**, with feature selection repeated inside each inner fold. The test year is never used to calibrate (tested).
+- **Status label:** **`oof_conformal_per_crop_exploratory`**. "Calibrated" describes the method, not the outcome: coverage is **measured on the test years and reported, and it falls short of 80%**.
+- **Measured coverage vs the 80% target (pooled, 256 test rows):** Climatology 74.2%, XGBoost 76.2%, RandomForest 74.2%, CatBoost 75.4%, Ridge 73.0%. By year: 2018 64-66% and 2019 82-86%.
+- **Per crop:** the worst crop's coverage is 50-59% (the legacy in-sample interval: 4-15%). Per-crop coverage is in `crop_level_evaluation_metrics_v1.csv` (`pi_coverage_80`).
+- **Legacy interval kept for comparison:** the old in-sample rule (prediction $\pm$ the 80th percentile of absolute in-sample training residuals, one width in kg/ha for every crop) is in the `*_in_sample` columns. Its pooled coverage was 72-74%, and it is far too narrow for sugarcane and far too wide for small crops. Interval score (lower is better, crop-std units): Climatology 7.41 -> 4.80, XGBoost 6.46 -> 4.55, RandomForest 6.62 -> 4.62, CatBoost 6.68 -> 4.64, Ridge 7.35 -> 4.83 (legacy -> default, 30-35% better).
+- **Why coverage is still short:** the calibration data come from a single training year (2017), so they cannot reveal a **year-level shift**. The 2018 test errors were about 1.5x the calibration error, while 2019 matched it.
+- **Switching back:** set `prediction_intervals.method` to `in_sample_residual_quantile` in `models/model_config.json`.
+- **Recommendation:** with a longer history, calibrate with leave-one-year-out inside the training window so the year-level shift is visible (see `docs/RETRAINING_ON_LONGER_HISTORY.md`).
 
 ---
 
@@ -237,4 +240,4 @@ python yield_forecast/train_forecast.py --no-scale-target \
 ```powershell
 python -m pytest yield_forecast/tests -v
 ```
-*Expected Output: 49 passed.*
+*Expected Output: 53 passed.*

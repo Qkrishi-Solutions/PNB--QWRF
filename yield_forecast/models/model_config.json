@@ -73,10 +73,12 @@
     "note": "expanding: every year with targets that has at least min_train_years_with_targets earlier years with targets is a test year, trained on ALL earlier years. For our 2015-2019 data: train 2015-2017 -> test 2018, then train 2015-2018 -> test 2019 (forward-chaining targets exist only from 2017, so 2015 and 2016 add no training rows). Other modes (fixed_origin, explicit) are described in yield_forecast/docs/RETRAINING_ON_LONGER_HISTORY.md."
   },
   "prediction_intervals": {
-    "method": "in_sample_residual_quantile",
+    "method": "oof_conformal_per_crop",
     "confidence_level": 0.80,
-    "calibration_status": "uncalibrated_in_sample_exploratory",
-    "note": "Derived from in-sample training residuals due to small time series (T=1 in Fold 1); uncalibrated exploratory uncertainty bounds that do not guarantee nominal out-of-fold coverage."
+    "calibration_status": "oof_conformal_per_crop_exploratory",
+    "inner_scheme": "leave_one_district_out_inside_training_rows",
+    "legacy_method": "in_sample_residual_quantile (kept beside the default in the *_in_sample columns)",
+    "note": "Default interval = prediction +/- q x crop std, q the split-conformal quantile of out-of-fold residuals (leave-one-district-out inside the training rows, feature selection repeated inside each inner fold) divided by the crop's training std. Coverage is MEASURED on the test years and still falls short of nominal (about 73-76% vs 80%) because one training year cannot reveal a year-level shift. Set method to 'in_sample_residual_quantile' for the legacy interval. Tested only on 2015-2019."
   },
   "mitigations_status": {
     "extend_history_issue_44": "DEFERRED",

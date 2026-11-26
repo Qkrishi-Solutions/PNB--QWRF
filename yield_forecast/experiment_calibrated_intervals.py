@@ -36,57 +36,19 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
-from yield_forecast.experiment_scaled_shrinkage import MODELS, build_models
 from yield_forecast.folds import generate_folds, validate_folds
-from yield_forecast.train_forecast import ClimatologyBaseline, fit_crop_scales, select_features_in_fold
+from yield_forecast.train_forecast import (  # one shared implementation with the main pipeline
+    MODEL_NAMES as MODELS,
+    conformal_quantile,
+    fit_crop_scales,
+    oof_abs_residuals,
+    predict_model,
+    select_features_in_fold,
+)
 
 ALPHA = 0.2                      # 80% intervals, as in the pipeline
 VARIANTS = ["current_in_sample_abs", "in_sample_scaled", "oof_abs", "oof_scaled"]
 ALL_MODELS = ["Climatology"] + MODELS
-
-
-def conformal_quantile(scores, alpha=ALPHA):
-    """Split-conformal quantile: the ceil((n+1)(1-alpha))-th smallest score (the maximum if n is too small)."""
-    s = np.sort(np.asarray(scores, float))
-    n = len(s)
-    if n == 0:
-        raise ValueError("no calibration scores")
-    k = int(np.ceil((n + 1) * (1 - alpha)))
-    return float(s[min(k, n) - 1])
-
-
-def predict_model(name, tr, te, feats, cfg, target, s_tr, s_te):
-    """Fit on tr (target scaled by s_tr) and return predictions in kg/ha for te and for tr (in-sample)."""
-    if name == "Climatology":
-        base = ClimatologyBaseline().fit(tr, target)
-        return base.predict(te), base.predict(tr)
-    ohe = OneHotEncoder(drop="first", sparse_output=False, handle_unknown="ignore")
-    cats = ["crop", "climate_zone"]
-    sc = StandardScaler()
-    X_tr = np.hstack([ohe.fit_transform(tr[cats]), sc.fit_transform(tr[feats])])
-    X_te = np.hstack([ohe.transform(te[cats]), sc.transform(te[feats])])
-    model = build_models(cfg)[name]
-    model.fit(X_tr, tr[target].values / s_tr)
-    return model.predict(X_te) * s_te, model.predict(X_tr) * s_tr
-
-
-def oof_residuals(tr, avail, cfg, target, outer_scale, gstd, fs):
-    """Leave-one-district-out residuals inside the training rows. Returns {model: |residual| (kg/ha) aligned with tr}."""
-    res = {m: np.full(len(tr), np.nan) for m in ALL_MODELS}
-    pos = {ix: i for i, ix in enumerate(tr.index)}
-    for dist in sorted(tr["district_code"].unique()):
-        inner_tr = tr[tr["district_code"] != dist]
-        inner_te = tr[tr["district_code"] == dist]
-        feats = select_features_in_fold(inner_tr, avail, target, fs["max_features"], fs["max_collinearity"],
-                                        fs["min_observed_fraction"])
-        in_scale, in_g = fit_crop_scales(inner_tr, target)
-        s_in_tr = inner_tr["crop"].map(in_scale).fillna(in_g).values
-        s_in_te = inner_te["crop"].map(in_scale).fillna(in_g).values
-        for m in ALL_MODELS:
-            pred, _ = predict_model(m, inner_tr, inner_te, feats, cfg, target, s_in_tr, s_in_te)
-            idx = [pos[i] for i in inner_te.index]
-            res[m][idx] = np.abs(inner_te[target].values - pred)
-    return res
 
 
 def run(dataset, config, alpha=ALPHA):
@@ -109,7 +71,7 @@ def run(dataset, config, alpha=ALPHA):
         crop_scale, gstd = fit_crop_scales(tr, target)
         s_tr = tr["crop"].map(crop_scale).fillna(gstd).values
         s_te = te["crop"].map(crop_scale).fillna(gstd).values
-        oof = oof_residuals(tr, avail, cfg, target, crop_scale, gstd, fs)
+        oof = oof_abs_residuals(tr, avail, cfg, target)
         y_te = te[target].values
 
         for m in ALL_MODELS:

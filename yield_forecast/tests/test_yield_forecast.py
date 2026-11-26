@@ -244,29 +244,33 @@ def test_forecast_timing_and_retrospective_classification():
 
 def test_prediction_interval_calculations_and_honest_calibration_labels():
     """
-    Verify prediction intervals satisfy lower <= pred <= upper, strictly positive width,
-    and are honestly labeled as uncalibrated in-sample exploratory bounds.
+    Intervals satisfy lower <= pred <= upper with positive width, the calibrated interval is the default, the
+    legacy in-sample interval is kept beside it, and the labels never claim more than was measured.
     """
     preds_path = "yield_forecast/results/predictions_forward_chaining_v1.csv"
     assert os.path.exists(preds_path), "Predictions file missing"
     df_preds = pd.read_csv(preds_path)
 
-    assert (df_preds["pi_lower_80"] <= df_preds["predicted_yield_anomaly"] + 1e-6).all(), \
-        "Lower bound exceeded predicted value"
-    assert (df_preds["predicted_yield_anomaly"] <= df_preds["pi_upper_80"] + 1e-6).all(), \
-        "Predicted value exceeded upper bound"
-    assert ((df_preds["pi_upper_80"] - df_preds["pi_lower_80"]) > 0).all(), \
-        "Prediction interval width must be strictly positive"
+    for lo, hi in (("pi_lower_80", "pi_upper_80"), ("pi_lower_80_in_sample", "pi_upper_80_in_sample")):
+        assert (df_preds[lo] <= df_preds["predicted_yield_anomaly"] + 1e-6).all(), "Lower bound exceeded predicted value"
+        assert (df_preds["predicted_yield_anomaly"] <= df_preds[hi] + 1e-6).all(), "Predicted value exceeded upper bound"
+        assert ((df_preds[hi] - df_preds[lo]) > 0).all(), "Prediction interval width must be strictly positive"
 
-    # Verify honest labeling in prediction interval evaluation deliverable
+    with open("yield_forecast/models/model_config.json", encoding="utf-8") as f:
+        method = json.load(f)["prediction_intervals"]["method"]
+    expected = "oof_conformal_per_crop_exploratory" if method == "oof_conformal_per_crop" else "uncalibrated_in_sample_exploratory"
+    assert (df_preds["pi_method"] == expected).all()
+
     pi_path = "yield_forecast/results/prediction_interval_evaluation_v1.csv"
     assert os.path.exists(pi_path), "Prediction interval evaluation file missing"
     df_pi = pd.read_csv(pi_path)
     assert "calibration_status" in df_pi.columns, "Must report calibration_status"
-    assert (df_pi["calibration_status"] == "uncalibrated_in_sample_exploratory").all(), \
-        "Must honestly label intervals as uncalibrated in-sample exploratory"
-    assert "nominal_target_coverage" in df_pi.columns
-    assert "empirical_test_coverage" in df_pi.columns
+    assert (df_pi["calibration_status"] == expected).all()
+    assert {"nominal_target_coverage", "empirical_test_coverage", "coverage_gap", "empirical_test_coverage_in_sample",
+            "interval_score_scaled", "n_calibration_oof"} <= set(df_pi.columns), "coverage and the legacy comparison must be reported"
+    # the exploratory label must never be dropped, and the measured gap to nominal must be reported, not hidden
+    assert "exploratory" in expected
+    assert np.allclose(df_pi["coverage_gap"], df_pi["empirical_test_coverage"] - df_pi["nominal_target_coverage"])
 
 
 def test_consistent_evaluation_observations_across_models():
