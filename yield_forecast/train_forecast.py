@@ -216,9 +216,14 @@ def run_training_pipeline(
 
         n_train = len(df_train)
         n_test = len(df_test)
+        # Forward-chaining targets exist only for some years (an anomaly needs two earlier years), so a
+        # configured training year can contribute zero rows. Record the years that actually do.
+        train_years_with_targets = ";".join(str(int(y)) for y in sorted(df_train["year"].unique()))
+        assert all(y < test_year for y in df_train["year"].unique()), "training data must precede the test year"
 
         print("\n" + "-" * 70)
         print(f"FOLD {fold_idx}: Train {train_years} (N={n_train}) -> Test {test_year} (N={n_test})")
+        print(f"Configured training years that actually have usable targets: {train_years_with_targets}")
         print("-" * 70)
 
         # Only features that are observed for every train AND test row are eligible
@@ -290,6 +295,7 @@ def run_training_pipeline(
             all_predictions.append({
                 "fold": fold_idx,
                 "train_years": ";".join(str(y) for y in train_years),
+                "train_years_with_targets": train_years_with_targets,
                 "test_year": test_year,
                 "district_code": row["district_code"],
                 "district_name": row["district_name"],
@@ -307,6 +313,7 @@ def run_training_pipeline(
         fold_metrics.append({
             "fold": fold_idx,
             "train_years": ";".join(str(y) for y in train_years),
+                "train_years_with_targets": train_years_with_targets,
             "test_year": test_year,
             "n_train": n_train,
             "n_test": n_test,
@@ -401,6 +408,7 @@ def run_training_pipeline(
                 all_predictions.append({
                     "fold": fold_idx,
                     "train_years": ";".join(str(y) for y in train_years),
+                "train_years_with_targets": train_years_with_targets,
                     "test_year": test_year,
                     "district_code": row["district_code"],
                     "district_name": row["district_name"],
@@ -431,6 +439,7 @@ def run_training_pipeline(
             fold_metrics.append({
                 "fold": fold_idx,
                 "train_years": ";".join(str(y) for y in train_years),
+                "train_years_with_targets": train_years_with_targets,
                 "test_year": test_year,
                 "n_train": n_train,
                 "n_test": n_test,

@@ -437,3 +437,18 @@ def test_five_year_results_are_labelled_and_consistent():
     for r in c.itertuples(index=False):
         sig, verdict = classify_performance(r.model, r.scaled_mae - r.clim_scaled_mae, r.district_wilcoxon_p)
         assert verdict == r.verdict
+
+
+def test_fold_design_trains_on_2015_2017_tests_2018_and_2019():
+    with open("yield_forecast/models/model_config.json", encoding="utf-8") as f:
+        folds = json.load(f)["validation"]["folds"]
+    assert [(f_["train_years"], f_["test_year"]) for f_ in folds] == [([2015, 2016, 2017], 2018), ([2015, 2016, 2017], 2019)]
+    fm = pd.read_csv("yield_forecast/results/fold_evaluation_metrics_v1.csv")
+    assert "train_years_with_targets" in fm.columns
+    for _, r in fm.iterrows():
+        used = {int(y) for y in str(r["train_years_with_targets"]).split(";")}
+        configured = {int(y) for y in str(r["train_years"]).split(";")}
+        assert used <= configured and max(used) < r["test_year"]
+    # honesty check: years without forward-chaining targets contribute no training rows
+    df = pd.read_csv(ML_READY)
+    assert df.loc[df["usable_for_forward_chaining_eval"] & (df["year"] < 2017)].empty

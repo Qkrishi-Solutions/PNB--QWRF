@@ -69,12 +69,12 @@
     "folds": [
       {
         "fold": 1,
-        "train_years": [2017],
+        "train_years": [2015, 2016, 2017],
         "test_year": 2018
       },
       {
         "fold": 2,
-        "train_years": [2017, 2018],
+        "train_years": [2015, 2016, 2017],
         "test_year": 2019
       }
     ]
