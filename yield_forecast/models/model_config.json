@@ -66,11 +66,11 @@
   },
   "validation": {
     "method": "forward_chaining",
-    "mode": "fixed_origin",
-    "train_end_year": 2017,
+    "mode": "expanding",
+    "min_train_years_with_targets": 1,
     "min_training_rows": 8,
     "modes_available": ["expanding", "fixed_origin", "explicit"],
-    "note": "fixed_origin: train on every year up to train_end_year, test on each later year that has targets. Forward-chaining targets exist only from the third data year, so 2015 and 2016 add no training rows in the current data. For a longer history use mode 'expanding' (each test year trains on all earlier years); see yield_forecast/docs/RETRAINING_ON_LONGER_HISTORY.md."
+    "note": "expanding: every year with targets that has at least min_train_years_with_targets earlier years with targets is a test year, trained on ALL earlier years. For our 2015-2019 data: train 2015-2017 -> test 2018, then train 2015-2018 -> test 2019 (forward-chaining targets exist only from 2017, so 2015 and 2016 add no training rows). Other modes (fixed_origin, explicit) are described in yield_forecast/docs/RETRAINING_ON_LONGER_HISTORY.md."
   },
   "prediction_intervals": {
     "method": "in_sample_residual_quantile",

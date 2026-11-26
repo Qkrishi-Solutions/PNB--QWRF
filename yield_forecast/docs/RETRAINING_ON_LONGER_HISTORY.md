@@ -32,8 +32,8 @@ Set `validation` in `yield_forecast/models/model_config.json`.
 
 | Mode | Use it when | What it does |
 |---|---|---|
-| `expanding` | **recommended for a long history** | every year with targets that has at least `min_train_years_with_targets` earlier years with targets is a test year; each fold trains on all earlier years |
-| `fixed_origin` | you want one frozen training window (the design committed for our data) | train on all years up to `train_end_year`; test on each later year that has targets |
+| `expanding` | **recommended for a long history, and the committed design for our data** | every year with targets that has at least `min_train_years_with_targets` earlier years with targets is a test year; each fold trains on all earlier years |
+| `fixed_origin` | you want one frozen training window (we tried `train_end_year` 2017; it trained both folds on 2017 alone and was worse) | train on all years up to `train_end_year`; test on each later year that has targets |
 | `explicit` | you need hand-picked folds | list them under `validation.folds` (an old config with only a `folds` list still works) |
 
 Examples:
@@ -51,7 +51,7 @@ Optional for `expanding`: `first_test_year` and `last_test_year` to limit which 
 
 **Why `min_train_years_with_targets` matters.** A forward-chaining target needs at least two earlier years, so the first two data years never have targets, and the third has no earlier year with a target to train on. A fold trained on one year (as ours were) is very weak; with a longer history, require several years (for example 3 to 5) before scoring a test year.
 
-**How the pipeline reports it.** At the start of a run it prints, for every fold, the test year, the number of test rows, and the training rows with the years they actually come from. Always read this block. A configured training year with no targets contributes no rows (this is why both of our folds train on 2017 only).
+**How the pipeline reports it.** At the start of a run it prints, for every fold, the test year, the number of test rows, and the training rows with the years they actually come from. Always read this block. A configured training year with no targets contributes no rows (this is why our first fold trains on the 2017 rows alone).
 
 ## 4. Step by step
 
@@ -125,7 +125,7 @@ With a longer history these choices can be tested properly instead of assumed. D
 | Model sizes | 10 to 50 trees or rounds, depth 2 to 3, Ridge alpha 10 | chosen for about 128 rows; tune with nested temporal validation |
 | Per-crop target scaling | divide by the crop's training standard deviation | adopted after seeing our test years; confirm it holds on many test years |
 | Baseline | per-crop mean of training anomalies | with more years, consider a trend or a rolling window |
-| Prediction intervals | in-sample residual quantile, uncalibrated | with many folds, calibrate from out-of-fold residuals. On our data out-of-fold, per-crop-scaled conformal intervals were sharper and far more even across crops, but a single training year cannot reveal a year-level shift (coverage stayed about 72-75%); with several training years calibrate with leave-one-year-out inside the training window (see `experiment_calibrated_intervals.py`) |
+| Prediction intervals | in-sample residual quantile, uncalibrated | with many folds, calibrate from out-of-fold residuals. On our data out-of-fold, per-crop-scaled conformal intervals were sharper and far more even across crops, but a single training year cannot reveal a year-level shift (coverage stayed about 73-76%); with several training years calibrate with leave-one-year-out inside the training window (see `experiment_calibrated_intervals.py`) |
 | Minimum observations for a baseline | 2 earlier years | a longer history supports a higher minimum and more stable normals |
 | Crop eligibility thresholds | Issue 2 report | more years can change which crops qualify |
 | Climate zones | 3 zones from 2015 to 2019 | recompute on the longer history |

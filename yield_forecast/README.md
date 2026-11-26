@@ -97,11 +97,11 @@ The folds are no longer hand-written. `yield_forecast/folds.py` builds them from
 
 | Mode | What it does |
 |---|---|
-| `fixed_origin` | train on all years up to `train_end_year`, test each later year that has targets. **This is the committed design: `train_end_year` 2017, test 2018 and 2019.** |
-| `expanding` | recommended for a longer history: every usable year after the first is a test year, trained on all earlier years (for our data: train 2015-2017 to test 2018, then train 2015-2018 to test 2019) |
+| `expanding` | **the committed design.** Every usable year after the first is a test year, trained on all earlier years. For our data: train 2015-2017 to test 2018, then train 2015-2018 to test 2019 |
+| `fixed_origin` | train on all years up to `train_end_year`, test each later year that has targets (for us `train_end_year` 2017 would train both folds on the 2017 rows alone, which weakens Fold 2) |
 | `explicit` | hand-listed folds (a config with only a `folds` list still works) |
 
-Forward-chaining targets exist only from the third data year, so **2015 and 2016 contribute no training rows**: both committed folds train on the 128 rows from 2017. The run prints, for every fold, which years actually supply training rows.
+Forward-chaining targets exist only from the third data year, so **2015 and 2016 contribute no training rows**: Fold 1 trains on the 128 rows from 2017, and Fold 2 on 256 rows (2017 and 2018). The run prints, for every fold, which years actually supply training rows.
 
 It was tested on a synthetic 12-year dataset with a planted weather signal (`tests/test_multi_year.py`). To retrain on a longer real history, follow `docs/RETRAINING_ON_LONGER_HISTORY.md`. That test shows the code works on more years, not what a real longer-history result will be.
 
@@ -172,20 +172,20 @@ XGBoost's scaled-target skill by held-out year: 2015: -0.3%, 2016: -0.2%, 2017: 
 
 ### Calibrated prediction intervals (exploratory; `experiment_calibrated_intervals.py`)
 
-The pipeline's 80% intervals use in-sample training residuals and one width in kg/ha for every crop, and they cover only 70-75%. The experiment compares four ways of building them on the same folds, features and models (nothing re-tuned). The best, `oof_scaled`, is a split-conformal interval built from **out-of-fold residuals** (leave-one-district-out inside the training rows only, feature selection repeated inside each inner fold), **normalised by each crop's training standard deviation** so every crop gets its own width. The test year is never used to calibrate (a test confirms the bounds do not change when the test targets change).
+The pipeline's 80% intervals use in-sample training residuals and one width in kg/ha for every crop, and they cover only about 72-74%. The experiment compares four ways of building them on the same folds, features and models (nothing re-tuned). The best, `oof_scaled`, is a split-conformal interval built from **out-of-fold residuals** (leave-one-district-out inside the training rows only, feature selection repeated inside each inner fold), **normalised by each crop's training standard deviation** so every crop gets its own width. The test year is never used to calibrate (a test confirms the bounds do not change when the test targets change).
 
 | Model | Coverage now -> calibrated | Worst crop's coverage now -> calibrated | Crops within 10 pts of 80% | Interval score (lower is better) | Coverage 2018 / 2019 (calibrated) |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| Climatology | 73.0% -> **73.8%** | 0% -> **50%** | 2 of 11 -> **8 of 11** | 8.09 -> **5.05** | 66% / 82% |
-| XGBoost | 75.0% -> **75.4%** | 8% -> **59%** | 1 of 11 -> **6 of 11** | 7.10 -> **4.90** | 66% / 84% |
-| RandomForest | 73.8% -> **74.2%** | 8% -> **59%** | 2 of 11 -> **7 of 11** | 7.19 -> **4.94** | 65% / 84% |
-| CatBoost | 71.5% -> **74.6%** | 4% -> **59%** | 2 of 11 -> **6 of 11** | 7.00 -> **4.99** | 66% / 84% |
-| Ridge | 70.3% -> **71.5%** | 4% -> **55%** | 3 of 11 -> **6 of 11** | 8.45 -> **5.36** | 64% / 79% |
+| Climatology | 71.9% -> **74.2%** | 4% -> **50%** | 2 of 11 -> **8 of 11** | 7.41 -> **4.80** | 66% / 83% |
+| XGBoost | 74.2% -> **76.2%** | 8% -> **59%** | 1 of 11 -> **8 of 11** | 6.46 -> **4.55** | 66% / 86% |
+| RandomForest | 74.2% -> **74.2%** | 15% -> **59%** | 2 of 11 -> **8 of 11** | 6.62 -> **4.62** | 65% / 84% |
+| CatBoost | 72.7% -> **75.4%** | 12% -> **59%** | 2 of 11 -> **8 of 11** | 6.68 -> **4.64** | 66% / 85% |
+| Ridge | 73.8% -> **73.0%** | 8% -> **59%** | 3 of 11 -> **6 of 11** | 7.35 -> **4.83** | 64% / 82% |
 
 **What it shows**
-- **Per-crop calibration is the real fix.** The current rule looks acceptable overall but is badly wrong by crop: its worst crop is covered 0-8% of the time (sugarcane's intervals are far too narrow) while small crops are covered almost always (far too wide). The calibrated version brings the worst crop to about 50-59% and puts 6-8 of 11 crops within 10 points of 80%.
-- **Sharper at the same coverage.** Intervals are about half as wide in crop-std units (about 2.9 against 5-6), and the interval score, which penalises both width and misses, improves by roughly 30% for every model.
-- **Overall coverage is still short of 80%** (about 72-75%) and this is a limit, not a bug. The calibration data come from one training year (2017), so they cannot see a **year-level shift**: errors on the 2018 test year were about 1.43-1.51x the calibration error (coverage 64-66%), while 2019 was about 1.00-1.27x (coverage 79-84%, near nominal). More training years allow leave-one-year-out calibration inside the training window, which would capture that shift.
+- **Per-crop calibration is the real fix.** The current rule looks acceptable overall but is badly wrong by crop: its worst crop is covered only 4-15% of the time (sugarcane's intervals are far too narrow) while small crops are covered almost always (far too wide). The calibrated version brings the worst crop to 50-59% and puts 6-8 of 11 crops within 10 points of 80%.
+- **Sharper at the same coverage.** Intervals are about half as wide in crop-std units (2.7-2.9 against 4.9-5.6), and the interval score, which penalises both width and misses, improves by 30-35% for every model.
+- **Overall coverage is still short of 80%** (73-76%) and this is a limit, not a bug. The calibration data come from one training year (2017), so they cannot see a **year-level shift**: errors on the 2018 test year were about 1.43-1.51x the calibration error (coverage 64-66%), while 2019 was about 0.92-0.99x (coverage 82-86%, at or above nominal). More training years allow leave-one-year-out calibration inside the training window, which would capture that shift.
 - Two test years and 13 districts, so this is indicative. It has not been moved into the main pipeline: the committed interval columns are still the in-sample rule, labelled `uncalibrated_in_sample_exploratory`.
 
 ---

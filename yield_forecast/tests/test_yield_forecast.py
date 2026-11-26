@@ -446,17 +446,17 @@ def test_five_year_results_are_labelled_and_consistent():
 
 
 def test_committed_fold_design_matches_the_configured_mode():
-    """The committed config trains on every year up to train_end_year and tests each later year with targets."""
+    """The committed config is 'expanding': each test year trains on ALL earlier years."""
     with open("yield_forecast/models/model_config.json", encoding="utf-8") as f:
         cfg = json.load(f)["validation"]
-    assert cfg["mode"] == "fixed_origin" and cfg["train_end_year"] == 2017
+    assert cfg["mode"] == "expanding"
     df = pd.read_csv(ML_READY)
     usable = df[df["usable_for_forward_chaining_eval"]]
-    expected_train = [y for y in sorted(df["year"].unique()) if y <= cfg["train_end_year"]]
-    expected_tests = [y for y in sorted(usable["year"].unique()) if y > cfg["train_end_year"]]
-    folds = generate_folds(cfg, sorted(usable["year"].unique()), sorted(df["year"].unique()))
+    years_t = sorted(usable["year"].unique())
+    expected_tests = years_t[cfg.get("min_train_years_with_targets", 1):]
+    folds = generate_folds(cfg, years_t, sorted(df["year"].unique()))
     assert [f_["test_year"] for f_ in folds] == expected_tests
-    assert all(f_["train_years"] == expected_train for f_ in folds)
+    assert all(f_["train_years"] == [y for y in sorted(df["year"].unique()) if y < f_["test_year"]] for f_ in folds)
     fm = pd.read_csv("yield_forecast/results/fold_evaluation_metrics_v1.csv")
     assert sorted(fm["test_year"].unique()) == expected_tests
     assert "train_years_with_targets" in fm.columns
