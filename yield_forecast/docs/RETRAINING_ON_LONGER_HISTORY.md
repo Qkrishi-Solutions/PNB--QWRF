@@ -92,7 +92,7 @@ python ml_ready_dataset/build_ml_ready_dataset.py \
   --feature-selection <crop_feature_selection_v1.csv> --zones <district_zone_map_v1.csv> \
   --outdir ml_ready_dataset
 ```
-The builder derives its counts from the inputs, verifies every join, and runs 29 checks including the leakage checks; it exits non-zero if any fails. **The tests in `ml_ready_dataset/tests` contain assertions tied to our five years** (for example about `rabi_sorghum` and years up to 2017). On new data those tests should be updated, not deleted.
+The builder derives its counts from the inputs, verifies every join, and runs 36 checks including the leakage and completeness checks; it exits non-zero if any fails. It also writes `missing_data_report_v1.csv`, `excluded_crop_rows_v1.csv` and `weather_loyo_anomalies_v1.csv`, so every gap in the data is listed with its cause (read the report first on new data). **The tests in `ml_ready_dataset/tests` contain assertions tied to our five years** (for example about `rabi_sorghum` and years up to 2017). On new data those tests should be updated, not deleted.
 
 ### Step 7. Choose the validation mode and train
 Edit `validation` (Section 3), then:
