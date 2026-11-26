@@ -1,7 +1,16 @@
 {
-  "checks_passed": 29,
-  "checks_total": 29,
+  "checks_passed": 36,
+  "checks_total": 36,
   "command": "python ml_ready_dataset/build_ml_ready_dataset.py",
+  "companion_files": {
+    "excluded_crop_rows": 715,
+    "missing_data_report_items": 42,
+    "weather_loyo_district_years": 65
+  },
+  "dropped_empty_columns": [
+    "aggregate_member_sum_area",
+    "aggregate_member_sum_production"
+  ],
   "forward_chaining_selection_config": {
     "COVERAGE": 0.6,
     "MAX_CORR": 0.85,
@@ -16,10 +25,12 @@
     "feature_selection": "9faea5c0425450bc0ffbfa24f691709cb386e8a7e32805e310a45013bfac9340",
     "issue5_script": "2452edfa55721c9c60fdf04a6ae8b592f659f7d895c80e3d87822b8821508f55",
     "weather": "1cfa80079a7f110783d809dbed6c4c61e8ca2b28350a3dd9c598be77daaadc05",
+    "weather_loyo": "7d6b0055a5bb6d0b16fcdb0e5c191d10f509291941eaaff2063893015a4bae78",
     "yield_fc": "78661a3d5e7442efb4cb6f8bcd789e6690c62dfad81e385c2906235d45b66275",
     "zones": "dd900248612fc19fea336f7ccb5da50b3190cabc285302408f9ff0925eec6bd2"
   },
-  "output_sha256": "d0c3314865f0892a7c35d71412beaabe23092fde8eb2cbabb6127402543b47a3",
+  "min_obs_for_zscore": 3,
+  "output_sha256": "070350a2d10fcb18971e5028688a0fc0f6f13f276994038e9b27d24d11c7ded5",
   "packages": {
     "numpy": "2.5.5",
     "pandas": "2.3.3"
@@ -30,7 +41,7 @@
     "crop_long_rows": 1430,
     "eligible_crops": 11,
     "eligible_rows_kept": 715,
-    "output_columns": 312,
+    "output_columns": 313,
     "rows_excluded": 715,
     "rows_with_valid_yield_anomaly": 384,
     "weather_district_years": 65,
