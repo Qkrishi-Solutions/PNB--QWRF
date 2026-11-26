@@ -34,6 +34,7 @@ yield_forecast/
 ├── README.md                                    # This guide and technical reference
 ├── requirements.txt                             # Module-specific dependencies
 ├── train_forecast.py                            # Forward-chaining evaluation pipeline (scaled-target by default)
+├── folds.py                                     # Year-agnostic fold generation and validation
 ├── experiment_scaled_shrinkage.py               # Exploratory: target scaling and shrinkage blend
 ├── experiment_lodo.py                           # Exploratory: forward-chaining leave-one-district-out
 ├── experiment_five_year_loyo.py                 # Exploratory: five-year nested leave-one-year-out (not forecasting)
@@ -49,10 +50,11 @@ yield_forecast/
 │   ├── prediction_interval_evaluation_v1.csv    # Empirical test coverage vs 80% nominal target
 │   └── experiments/                             # raw_target_v1/ run, shrinkage and LODO outputs
 ├── docs/
-│   └── issue_50_final_report.md                 # Complete technical findings and audit decisions
+│   ├── issue_50_final_report.md                 # Complete technical findings and audit decisions
+│   └── RETRAINING_ON_LONGER_HISTORY.md          # How to rebuild and retrain on more years
 └── tests/
     ├── conftest.py                              # Synthetic data fixture for unit testing
-    └── test_yield_forecast.py                   # Automated test suite (26 test functions)
+    └── test_yield_forecast.py                   # Automated test suite (43 test functions)
 ```
 
 ---
@@ -87,6 +89,20 @@ Under strict prospective forward chaining without lookahead:
 - **Fold 2:** Train strictly on 2017 + 2018 ($N=256$) $\to$ Test on 2019 ($N=128$).
 - Exactly **two forward-chaining test folds** are mathematically possible.
 - Total out-of-fold test instances per model: **256 observations**.
+
+### Validation modes: the pipeline is year-agnostic
+
+The folds are no longer hand-written. `yield_forecast/folds.py` builds them from the years present in the dataset, and the pipeline stops with a clear message if a fold would leak, has no test rows, or has too few training rows. Set `validation.mode` in `models/model_config.json`:
+
+| Mode | What it does |
+|---|---|
+| `fixed_origin` | train on all years up to `train_end_year`, test each later year that has targets. **This is the committed design: `train_end_year` 2017, test 2018 and 2019.** |
+| `expanding` | recommended for a longer history: every usable year after the first is a test year, trained on all earlier years (for our data: train 2015-2017 to test 2018, then train 2015-2018 to test 2019) |
+| `explicit` | hand-listed folds (a config with only a `folds` list still works) |
+
+Forward-chaining targets exist only from the third data year, so **2015 and 2016 contribute no training rows**: both committed folds train on the 128 rows from 2017. The run prints, for every fold, which years actually supply training rows.
+
+It was tested on a synthetic 12-year dataset with a planted weather signal (`tests/test_multi_year.py`). To retrain on a longer real history, follow `docs/RETRAINING_ON_LONGER_HISTORY.md`. That test shows the code works on more years, not what a real longer-history result will be.
 
 ---
 
@@ -202,4 +218,4 @@ python yield_forecast/train_forecast.py --no-scale-target \
 ```powershell
 python -m pytest yield_forecast/tests -v
 ```
-*Expected Output: 26 passed.*
+*Expected Output: 43 passed.*

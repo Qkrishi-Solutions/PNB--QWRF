@@ -24,6 +24,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from yield_forecast.folds import generate_folds, validate_folds
 from yield_forecast.train_forecast import (
     ClimatologyBaseline,
     select_features_in_fold,
@@ -117,7 +118,8 @@ def test_crop_eligibility_and_usable_counts():
     assert len(df_usable) == int(expected_usable.sum())
     expected_years = set(src.loc[expected_usable, "year"])
     assert set(df_usable["year"]) == expected_years
-    assert not set(df_usable["year"]) & {2015, 2016}, "No forward-chaining anomaly exists for 2015-2016"
+    first_two = set(sorted(df["year"].unique())[:2])
+    assert not set(df_usable["year"]) & first_two, "No forward-chaining anomaly exists for the first two data years"
     for yr in expected_years:
         n = int(((src["year"] == yr) & expected_usable).sum())
         assert (df_usable["year"] == yr).sum() == n
@@ -127,10 +129,10 @@ def test_missing_target_handling_no_zero_imputation():
     """Verify missing yield anomalies remain NaN and are never silently converted to zero."""
     df = pd.read_csv("ml_ready_dataset/ml_ready_dataset_v1.csv")
 
-    # 2015 and 2016 must be 100% NaN in forward chaining
-    df_2015_2016 = df[df["year"].isin([2015, 2016])]
+    # The first two data years (2015 and 2016 here) must be 100% NaN in forward chaining
+    df_2015_2016 = df[df["year"].isin(sorted(df["year"].unique())[:2])]
     assert df_2015_2016["yield_anomaly_kg_per_ha"].isna().all(), \
-        "2015-2016 forward anomalies must be NaN due to insufficient history"
+        "the first two years' forward anomalies must be NaN due to insufficient history"
     assert (df_2015_2016["yield_anomaly_kg_per_ha"] == 0).sum() == 0, \
         "Missing anomalies must not be imputed as zero"
 
@@ -150,18 +152,17 @@ def test_no_target_derived_predictors():
 
 
 def test_forward_chaining_chronology():
-    """Assert all forward-chaining folds strictly enforce t_train < t_test and exactly 2 folds exist."""
-    config_path = "yield_forecast/models/model_config.json"
-    with open(config_path, "r", encoding="utf-8") as f:
+    """Every generated fold trains only on years strictly before its test year."""
+    with open("yield_forecast/models/model_config.json", "r", encoding="utf-8") as f:
         config = json.load(f)
-
-    folds = config["validation"]["folds"]
-    assert len(folds) == 2, f"Exactly 2 forward-chaining folds expected, got {len(folds)}"
-
+    df = pd.read_csv(ML_READY)
+    usable = df[df["usable_for_forward_chaining_eval"]]
+    folds = generate_folds(config["validation"], sorted(usable["year"].unique()), sorted(df["year"].unique()))
+    assert len(folds) >= 1
     for fold in folds:
-        test_year = fold["test_year"]
         for train_yr in fold["train_years"]:
-            assert train_yr < test_year, f"Future leakage: train {train_yr} >= test {test_year}"
+            assert train_yr < fold["test_year"], f"Future leakage: train {train_yr} >= test {fold['test_year']}"
+    validate_folds(folds, usable, config["validation"].get("min_training_rows", 8))
 
 
 def test_feature_selection_isolation(synthetic_sample_data):
@@ -401,7 +402,11 @@ def test_crop_level_metrics_have_sample_size_flags_and_skill():
 def test_issue5_style_predictor_coverage_is_documented_in_dataset():
     """Issue 5-style forward-chaining per-crop predictors exist for only a minority of test rows."""
     df = pd.read_csv(ML_READY)
-    test_rows = df[df["usable_for_forward_chaining_eval"] & (df["year"] >= 2018)]
+    with open("yield_forecast/models/model_config.json", encoding="utf-8") as f:
+        cfg = json.load(f)
+    usable = df[df["usable_for_forward_chaining_eval"]]
+    test_years = {f_["test_year"] for f_ in generate_folds(cfg["validation"], sorted(usable["year"].unique()), sorted(df["year"].unique()))}
+    test_rows = df[df["usable_for_forward_chaining_eval"] & df["year"].isin(test_years)]
     covered = test_rows["fc_n_selected_predictors"].fillna(0) > 0
     assert 0 < covered.mean() < 0.5
 
@@ -411,13 +416,13 @@ def test_issue5_style_predictor_coverage_is_documented_in_dataset():
 def test_five_year_nested_training_data_ignores_held_out_year():
     """Training anomalies and features must not change when the held-out year's raw data is altered."""
     import yield_forecast.experiment_five_year_loyo as ex
-    keys, Y, dists, W, wcols = ex.load_arrays("ml_ready_dataset/ml_ready_dataset_v1.csv")
-    t_idx = 3
-    tr_a, te_a, feats = ex.fold_frames(keys, Y, dists, W, wcols, t_idx)
+    keys, Y, dists, W, wcols, years = ex.load_arrays("ml_ready_dataset/ml_ready_dataset_v1.csv")
+    t_idx = len(years) // 2
+    tr_a, te_a, feats = ex.fold_frames(keys, Y, dists, W, wcols, years, t_idx)
     Y2, W2 = Y.copy(), W.copy()
     Y2[:, t_idx] = Y2[:, t_idx] * 7.0 + 123.0
     W2[:, t_idx, :] = W2[:, t_idx, :] * -5.0 + 9.0
-    tr_b, te_b, _ = ex.fold_frames(keys, Y2, dists, W2, wcols, t_idx)
+    tr_b, te_b, _ = ex.fold_frames(keys, Y2, dists, W2, wcols, years, t_idx)
     cols = ["district_code", "crop", "year", ex.TARGET] + feats
     pd.testing.assert_frame_equal(tr_a[cols].reset_index(drop=True), tr_b[cols].reset_index(drop=True))
     assert not np.allclose(te_a[ex.TARGET].values, te_b[ex.TARGET].values, equal_nan=True)  # the test year does move
@@ -433,22 +438,32 @@ def test_five_year_recomputation_matches_source_loyo_files():
 def test_five_year_results_are_labelled_and_consistent():
     c = pd.read_csv("yield_forecast/results/experiments/five_year_loyo_comparison_v1.csv")
     assert set(c["variant"]) == {"raw_target", "scaled_target"}
-    assert (c["years_total"] == 5).all() and (c["years_better_than_clim"] <= 5).all()
+    n_years = pd.read_csv(ML_READY)["year"].nunique()
+    assert (c["years_total"] == n_years).all() and (c["years_better_than_clim"] <= n_years).all()
     for r in c.itertuples(index=False):
         sig, verdict = classify_performance(r.model, r.scaled_mae - r.clim_scaled_mae, r.district_wilcoxon_p)
         assert verdict == r.verdict
 
 
-def test_fold_design_trains_on_2015_2017_tests_2018_and_2019():
+def test_committed_fold_design_matches_the_configured_mode():
+    """The committed config trains on every year up to train_end_year and tests each later year with targets."""
     with open("yield_forecast/models/model_config.json", encoding="utf-8") as f:
-        folds = json.load(f)["validation"]["folds"]
-    assert [(f_["train_years"], f_["test_year"]) for f_ in folds] == [([2015, 2016, 2017], 2018), ([2015, 2016, 2017], 2019)]
+        cfg = json.load(f)["validation"]
+    assert cfg["mode"] == "fixed_origin" and cfg["train_end_year"] == 2017
+    df = pd.read_csv(ML_READY)
+    usable = df[df["usable_for_forward_chaining_eval"]]
+    expected_train = [y for y in sorted(df["year"].unique()) if y <= cfg["train_end_year"]]
+    expected_tests = [y for y in sorted(usable["year"].unique()) if y > cfg["train_end_year"]]
+    folds = generate_folds(cfg, sorted(usable["year"].unique()), sorted(df["year"].unique()))
+    assert [f_["test_year"] for f_ in folds] == expected_tests
+    assert all(f_["train_years"] == expected_train for f_ in folds)
     fm = pd.read_csv("yield_forecast/results/fold_evaluation_metrics_v1.csv")
+    assert sorted(fm["test_year"].unique()) == expected_tests
     assert "train_years_with_targets" in fm.columns
     for _, r in fm.iterrows():
         used = {int(y) for y in str(r["train_years_with_targets"]).split(";")}
         configured = {int(y) for y in str(r["train_years"]).split(";")}
         assert used <= configured and max(used) < r["test_year"]
-    # honesty check: years without forward-chaining targets contribute no training rows
-    df = pd.read_csv(ML_READY)
-    assert df.loc[df["usable_for_forward_chaining_eval"] & (df["year"] < 2017)].empty
+    # years without forward-chaining targets contribute no training rows
+    first_two = sorted(df["year"].unique())[:2]
+    assert df.loc[df["usable_for_forward_chaining_eval"] & df["year"].isin(first_two)].empty

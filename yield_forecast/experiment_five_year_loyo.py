@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 experiment_five_year_loyo.py - Issue #50 follow-up: retrospective weather-yield response estimation
-using ALL FIVE years (2015-2019) with nested leave-one-year-out validation.  EXPLORATORY.
+using ALL available years (2015-2019 in the current data) with nested leave-one-year-out validation.  EXPLORATORY.
 
 Why: the forward-chaining pipeline scores only 2018 and 2019 (anomalies need two earlier years). With
 only 2015-2019 available, this track uses all five years to ask whether the weather-yield association
@@ -46,7 +46,6 @@ from yield_forecast.train_forecast import (
     select_features_in_fold,
 )
 
-YEARS = [2015, 2016, 2017, 2018, 2019]
 MIN_BASELINE_YEARS = 2          # same minimum as the source LOYO files
 TARGET = "y_anom"
 
@@ -70,48 +69,49 @@ def load_arrays(dataset_path):
     # yield observations usable for baselines (Issue 1/2 eligibility), one array per district-crop
     obs = df.copy()
     obs["y_val"] = np.where(obs["eligible_for_baseline"].astype(bool), obs["yield_kg_per_ha"], np.nan)
+    years = sorted(int(y) for y in df["year"].unique())
     keys = obs[["district_code", "crop", "climate_zone"]].drop_duplicates().sort_values(
         ["crop", "district_code"]).reset_index(drop=True)
-    Y = np.full((len(keys), len(YEARS)), np.nan)
+    Y = np.full((len(keys), len(years)), np.nan)
     idx = {(r.district_code, r.crop): i for i, r in enumerate(keys.itertuples(index=False))}
     for r in obs.itertuples(index=False):
-        Y[idx[(r.district_code, r.crop)], YEARS.index(r.year)] = r.y_val
+        Y[idx[(r.district_code, r.crop)], years.index(r.year)] = r.y_val
     dists = sorted(df["district_code"].unique())
     dy = df.drop_duplicates(["district_code", "year"])
-    W = np.full((len(dists), len(YEARS), len(wcols)), np.nan)
+    W = np.full((len(dists), len(years), len(wcols)), np.nan)
     for r in dy.itertuples(index=False):
         d = dists.index(r.district_code)
-        W[d, YEARS.index(r.year), :] = [getattr(r, c) for c in wcols]
-    return keys, Y, dists, W, wcols
+        W[d, years.index(r.year), :] = [getattr(r, c) for c in wcols]
+    return keys, Y, dists, W, wcols, years
 
 
-def fold_frames(keys, Y, dists, W, wcols, t_idx):
+def fold_frames(keys, Y, dists, W, wcols, years, t_idx):
     """Training and test frames for held-out year T, with nested anomalies."""
     feats = [c.replace("wact__", "wanom__") for c in wcols]
     rows = []
     for i, k in enumerate(keys.itertuples(index=False)):
         d = dists.index(k.district_code)
-        for y_idx in range(len(YEARS)):
+        for y_idx in range(len(years)):
             ya = baseline_anomaly(Y[i], y_idx, t_idx)
             wa = baseline_anomaly(W[d].T, y_idx, t_idx)  # (n_features,)
             rec = {"district_code": k.district_code, "crop": k.crop, "climate_zone": k.climate_zone,
-                   "year": YEARS[y_idx], TARGET: ya}
+                   "year": years[y_idx], TARGET: ya}
             rec.update(dict(zip(feats, wa)))
             rows.append(rec)
     fr = pd.DataFrame(rows)
     fr = fr[fr[TARGET].notna()]
-    return fr[fr["year"] != YEARS[t_idx]].copy(), fr[fr["year"] == YEARS[t_idx]].copy(), feats
+    return fr[fr["year"] != years[t_idx]].copy(), fr[fr["year"] == years[t_idx]].copy(), feats
 
 
 def run(dataset, config):
     with open(config, encoding="utf-8") as f:
         cfg = json.load(f)
     fs = cfg["feature_selection"]
-    keys, Y, dists, W, wcols = load_arrays(dataset)
+    keys, Y, dists, W, wcols, years = load_arrays(dataset)
     recs, sel_log = [], []
 
-    for t_idx, T in enumerate(YEARS):
-        tr, te, feats = fold_frames(keys, Y, dists, W, wcols, t_idx)
+    for t_idx, T in enumerate(years):
+        tr, te, feats = fold_frames(keys, Y, dists, W, wcols, years, t_idx)
         te = te.reset_index(drop=True)
         avail = [c for c in feats if tr[c].notna().all() and te[c].notna().all()]
         sel = select_features_in_fold(tr, avail, TARGET, fs["max_features"], fs["max_collinearity"],
@@ -149,7 +149,7 @@ def run(dataset, config):
     return pd.DataFrame(recs), pd.DataFrame(sel_log)
 
 
-def verify_against_source(dataset, keys, Y, dists, W, wcols):
+def verify_against_source(dataset, keys, Y, dists, W, wcols, years):
     """Held-out-year anomalies must equal the source LOYO files (proves the recomputation is right)."""
     out = []
     ysrc = pd.read_csv("yield_feature_engineering/yield_anomalies_v1.csv")
@@ -157,7 +157,7 @@ def verify_against_source(dataset, keys, Y, dists, W, wcols):
     ysrc = ysrc.set_index(["district_code", "crop", "year"])["yield_anomaly_kg_per_ha"]
     diffs, n_missing = [], 0
     for i, k in enumerate(keys.itertuples(index=False)):
-        for t_idx, T in enumerate(YEARS):
+        for t_idx, T in enumerate(years):
             mine = baseline_anomaly(Y[i], t_idx, t_idx)
             key = (k.district_code, k.crop, T)
             if key in ysrc.index and not np.isnan(mine):
@@ -172,7 +172,7 @@ def verify_against_source(dataset, keys, Y, dists, W, wcols):
     wd, wmiss = [], 0
     names = [c.replace("wact__", "") for c in wcols]
     for d, dc in enumerate(dists):
-        for t_idx, T in enumerate(YEARS):
+        for t_idx, T in enumerate(years):
             mine = baseline_anomaly(W[d].T, t_idx, t_idx)
             for j, nm in enumerate(names):
                 key = (dc, T, nm)
@@ -185,7 +185,7 @@ def verify_against_source(dataset, keys, Y, dists, W, wcols):
     return pd.DataFrame(out)
 
 
-def summarise(p):
+def summarise(p, years):
     base = p[p.model == "Climatology"].sort_values(["test_year", "district_code", "crop"]).reset_index(drop=True)
     rows = []
     for variant in ["raw_target", "scaled_target"]:
@@ -198,7 +198,7 @@ def summarise(p):
             sdiff = g.scaled_abs_error.mean() - base.scaled_abs_error.mean()
             _, verdict = classify_performance(name, sdiff, pv)
             per_year = {}
-            for T in YEARS:
+            for T in years:
                 a = g[g.test_year == T].scaled_abs_error.mean()
                 b = base[base.test_year == T].scaled_abs_error.mean()
                 per_year[T] = 100 * (1 - a / b)
@@ -208,10 +208,10 @@ def summarise(p):
                 "scaled_mae": g.scaled_abs_error.mean(), "clim_scaled_mae": base.scaled_abs_error.mean(),
                 "skill_vs_clim_pct": 100 * (1 - g.scaled_abs_error.mean() / base.scaled_abs_error.mean()),
                 "beats_clim_pct": 100 * (g.scaled_abs_error.values < base.scaled_abs_error.values).mean(),
-                "years_better_than_clim": int(sum(v > 0 for v in per_year.values())), "years_total": len(YEARS),
+                "years_better_than_clim": int(sum(v > 0 for v in per_year.values())), "years_total": len(years),
                 "direction_acc_pct": 100 * (np.sign(g.pred) == np.sign(g.actual)).mean(),
                 "district_wilcoxon_p": pv, "verdict": verdict,
-                **{f"skill_{T}": per_year[T] for T in YEARS},
+                **{f"skill_{T}": per_year[T] for T in years},
             })
     return pd.DataFrame(rows)
 
@@ -238,10 +238,10 @@ if __name__ == "__main__":
     a = ap.parse_args()
     os.makedirs(a.outdir, exist_ok=True)
 
-    keys, Y, dists, W, wcols = load_arrays(a.dataset)
-    val = verify_against_source(a.dataset, keys, Y, dists, W, wcols)
+    keys, Y, dists, W, wcols, years = load_arrays(a.dataset)
+    val = verify_against_source(a.dataset, keys, Y, dists, W, wcols, years)
     p, sel = run(a.dataset, a.config)
-    comp = summarise(p)
+    comp = summarise(p, years)
     crop = by_crop(p)
 
     comp.to_csv(os.path.join(a.outdir, "five_year_loyo_comparison_v1.csv"), index=False)
@@ -257,8 +257,8 @@ if __name__ == "__main__":
     cols = ["model", "variant", "n", "mae_kg_ha", "clim_mae_kg_ha", "scaled_mae", "clim_scaled_mae",
             "skill_vs_clim_pct", "beats_clim_pct", "years_better_than_clim", "direction_acc_pct",
             "district_wilcoxon_p", "verdict"]
-    print("\nFIVE-YEAR RETROSPECTIVE RESPONSE ESTIMATION (NOT forecasting)\n")
+    print(f"\nRETROSPECTIVE RESPONSE ESTIMATION OVER {len(years)} YEARS (NOT forecasting)\n")
     print(comp[cols].round(3).to_string(index=False))
-    sk = ["model", "variant"] + [f"skill_{T}" for T in YEARS]
+    sk = ["model", "variant"] + [f"skill_{T}" for T in years]
     print("\nSKILL VS CLIMATOLOGY BY HELD-OUT YEAR (%)\n")
     print(comp[sk].round(1).to_string(index=False))

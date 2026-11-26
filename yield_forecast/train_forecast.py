@@ -41,6 +41,11 @@ import sys
 import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr, wilcoxon
+
+try:  # imported as a package (python -m ...) or run as a script (python yield_forecast/train_forecast.py)
+    from yield_forecast.folds import generate_folds, validate_folds
+except ModuleNotFoundError:
+    from folds import generate_folds, validate_folds
 from sklearn.linear_model import Ridge
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
@@ -201,7 +206,16 @@ def run_training_pipeline(
     fold_metrics = []
     pi_evaluations = []
 
-    folds = config["validation"]["folds"]
+    # Folds are built from the years actually present in the data (year-agnostic; see folds.py).
+    all_years = sorted(int(y) for y in df["year"].unique())
+    years_with_targets = sorted(int(y) for y in df_eval["year"].unique())
+    folds = generate_folds(config["validation"], years_with_targets, all_years)
+    fold_summary = validate_folds(folds, df_eval, int(config["validation"].get("min_training_rows", 8)))
+    print(f"Validation mode: {config['validation'].get('mode', 'explicit')} | years in data: {all_years[0]}-{all_years[-1]} "
+          f"({len(all_years)}) | years with targets: {years_with_targets}")
+    for fs_ in fold_summary:
+        print(f"  Fold {fs_['fold']}: test {fs_['test_year']} (n={fs_['n_test']}) | train rows {fs_['n_train']} "
+              f"from years {fs_['train_years_with_targets']}")
 
     for f_info in folds:
         fold_idx = f_info["fold"]

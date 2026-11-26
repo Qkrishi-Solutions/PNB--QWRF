@@ -30,6 +30,7 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from xgboost import XGBRegressor
 from catboost import CatBoostRegressor
 
+from yield_forecast.folds import generate_folds, validate_folds
 from yield_forecast.train_forecast import (
     ClimatologyBaseline,
     classify_performance,
@@ -69,13 +70,15 @@ def run(dataset, config, outdir):
     with open(config, encoding="utf-8") as f:
         cfg = json.load(f)
     target = cfg["target_column"]
-    df = pd.read_csv(dataset)
-    df = df[df["usable_for_forward_chaining_eval"] == True].copy()  # noqa: E712
+    raw = pd.read_csv(dataset)
+    df = raw[raw["usable_for_forward_chaining_eval"] == True].copy()  # noqa: E712
     weather = [c for c in df.columns if c.startswith("wanom__")]
     fs = cfg["feature_selection"]
+    folds = generate_folds(cfg["validation"], sorted(df["year"].unique()), sorted(raw["year"].unique()))
+    validate_folds(folds, df, int(cfg["validation"].get("min_training_rows", 8)))
 
     recs = []
-    for fold in cfg["validation"]["folds"]:
+    for fold in folds:
         tr = df[df["year"].isin(fold["train_years"])].copy()
         te = df[df["year"] == fold["test_year"]].copy().reset_index(drop=True)
 

@@ -2,7 +2,7 @@
 """
 experiment_lodo.py - Issue #50 follow-up: forward-chaining leave-one-district-out check.
 
-For every held-out district d and test year T in {2018, 2019}:
+For every held-out district d and every test year T of the configured folds (2018 and 2019 in the current data):
   - train on the OTHER 12 districts, using only years < T (strict forward chaining)
   - feature selection runs on that training set only; no imputation
   - predict district d in year T
@@ -27,6 +27,7 @@ from scipy.stats import wilcoxon
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 from yield_forecast.experiment_scaled_shrinkage import MODELS, build_models
+from yield_forecast.folds import generate_folds
 from yield_forecast.train_forecast import (
     ClimatologyBaseline,
     classify_performance,
@@ -41,10 +42,11 @@ def run(dataset, config):
         cfg = json.load(f)
     target = cfg["target_column"]
     fs = cfg["feature_selection"]
-    df = pd.read_csv(dataset)
-    df = df[df["usable_for_forward_chaining_eval"] == True].copy()  # noqa: E712
+    raw = pd.read_csv(dataset)
+    df = raw[raw["usable_for_forward_chaining_eval"] == True].copy()  # noqa: E712
     weather = [c for c in df.columns if c.startswith("wanom__")]
-    test_years = [f["test_year"] for f in cfg["validation"]["folds"]]
+    folds = generate_folds(cfg["validation"], sorted(df["year"].unique()), sorted(raw["year"].unique()))
+    test_years = [f["test_year"] for f in folds]
 
     recs = []
     for district in sorted(df["district_code"].unique()):
