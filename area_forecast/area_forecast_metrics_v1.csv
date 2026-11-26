@@ -1,0 +1,8 @@
+model,total_test_samples,mae_1000_ha,rmse_1000_ha,medae_1000_ha,wape_percent,smape_percent,r2,scaled_mae,mae_diff_vs_last_value,rmse_diff_vs_last_value,skill_vs_last_value_pct,beats_last_value_mae,beats_last_value_rmse,district_wilcoxon_p_value,empirical_pi_coverage_80,pi_calibration_status,verdict
+LastValue,286,3.7708,10.5727,0.565,12.48,37.6,0.9793,0.4361,0.0,0.0,0.0,False,False,1.0,,not_applicable,Reference Persistence Baseline
+XGBoost_L1_LogDelta,286,3.8277,10.4949,0.5868,12.67,43.9,0.9796,0.4383,0.0569,-0.0778,-1.51,False,True,0.587891,0.8322,uncalibrated_in_sample_exploratory,Does not beat LastValue (p=0.5879)
+HistGBR_L1_LogDelta,286,3.8496,10.7193,0.5692,12.75,38.86,0.9787,0.4399,0.0788,0.1466,-2.09,False,False,0.587891,0.8427,uncalibrated_in_sample_exploratory,Does not beat LastValue (p=0.5879)
+RandomForest_L1_LogDelta,286,3.8986,10.8495,0.6029,12.91,48.43,0.9782,0.4416,0.1277,0.2768,-3.39,False,False,0.839355,0.8147,uncalibrated_in_sample_exploratory,Does not beat LastValue (p=0.8394)
+LinearTrend,286,4.2343,10.6156,0.5767,14.02,48.51,0.9791,0.5258,0.4635,0.0429,-12.29,False,False,0.039795,,not_applicable,Does not beat LastValue; significantly worse (p=0.0398)
+Climatology,286,4.5468,11.8898,0.9029,15.05,46.6,0.9738,0.4934,0.776,1.3171,-20.58,False,False,0.167725,,not_applicable,Does not beat LastValue (p=0.1677)
+Ridge_Delta,286,6.5984,17.1522,1.3933,21.85,75.07,0.9455,0.5532,2.8276,6.5795,-74.99,False,False,0.000244,0.7622,uncalibrated_in_sample_exploratory,Does not beat LastValue; significantly worse (p=0.0002)
