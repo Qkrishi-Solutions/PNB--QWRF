@@ -1,0 +1,91 @@
+{
+  "project": "PNB--QWRF",
+  "issue": 49,
+  "module": "area_forecast",
+  "version": "2.0.0",
+  "random_seed": 42,
+  "thread_count": 1,
+  "target_column": "area_1000_ha",
+  "target_mode": "log_delta_and_additive_delta",
+  "operational_horizon": "pre_sowing_operational_forecast",
+  "timing_horizon_note": "Strictly causal pre-sowing operational configuration: baselines and lag features use only year <= test_year - 1, and candidate weather features are restricted exclusively to prior-season wact__rabi_prev__* (before Kharif sowing). No contemporaneous or future weather is used. Zero silent imputation: missing lags are handled natively by tree learners or excluded from linear/RF pools.",
+  "baselines": [
+    "LastValue",
+    "Climatology",
+    "LinearTrend"
+  ],
+  "feature_selection": {
+    "weather_prefix_allowed": "wact__rabi_prev__",
+    "method": "spearman_correlation_and_collinearity_filter",
+    "correlation_metric": "spearman_rho",
+    "max_features": 4,
+    "max_collinearity": 0.80,
+    "min_observed_fraction": 1.0,
+    "min_pairs": 8
+  },
+  "inner_tuning": {
+    "method": "GridSearchCV_GroupKFold_by_year",
+    "scoring": "neg_mean_absolute_error"
+  },
+  "models": {
+    "XGBoost_L1_LogDelta": {
+      "objective": "reg:absoluteerror",
+      "native_nan": true,
+      "param_grid": {
+        "n_estimators": [20, 40, 60],
+        "max_depth": [2, 3],
+        "learning_rate": [0.02, 0.05],
+        "reg_alpha": [0.5, 2.0, 5.0],
+        "reg_lambda": [2.0, 10.0],
+        "subsample": [0.8]
+      }
+    },
+    "HistGBR_L1_LogDelta": {
+      "loss": "absolute_error",
+      "native_nan": false,
+      "input_set": "100pct_observed_pure_lags_and_weather",
+      "param_grid": {
+        "max_iter": [30, 60],
+        "max_depth": [2, 3],
+        "learning_rate": [0.03, 0.05],
+        "min_samples_leaf": [10, 20],
+        "l2_regularization": [1.0, 5.0]
+      }
+    },
+    "RandomForest_L1_LogDelta": {
+      "criterion": "absolute_error",
+      "param_grid": {
+        "n_estimators": [50, 100],
+        "max_depth": [2, 3, 4],
+        "min_samples_leaf": [5, 10, 15],
+        "max_features": ["sqrt", 0.5]
+      }
+    },
+    "Ridge_Delta": {
+      "alpha": 10.0,
+      "fit_intercept": true,
+      "target_scaling": "per_crop_training_fold_std"
+    }
+  },
+  "validation": {
+    "method": "forward_chaining",
+    "folds": [
+      {
+        "fold": 1,
+        "train_years": [2016, 2017],
+        "test_year": 2018
+      },
+      {
+        "fold": 2,
+        "train_years": [2016, 2017, 2018],
+        "test_year": 2019
+      }
+    ]
+  },
+  "prediction_intervals": {
+    "method": "in_sample_residual_quantile",
+    "confidence_level": 0.80,
+    "calibration_status": "uncalibrated_in_sample_exploratory",
+    "note": "Derived from in-sample training residuals; uncalibrated exploratory uncertainty bounds."
+  }
+}
