@@ -28,7 +28,8 @@ def checks():
 def test_deliverables_exist():
     for f in ["ml_ready_dataset_v1.csv", "ml_ready_column_dictionary_v1.csv", "join_coverage_report_v1.csv",
               "unmatched_keys_v1.csv", "exclusion_report_v1.csv", "validation_checks_v1.csv",
-              "reproducibility_report_v1.json", "README.md"]:
+              "reproducibility_report_v1.json", "README.md", "missing_data_report_v1.csv",
+              "excluded_crop_rows_v1.csv", "weather_loyo_anomalies_v1.csv"]:
         assert os.path.getsize(os.path.join(OUT, f)) > 0, f
 
 
@@ -270,3 +271,119 @@ def test_dictionary_marks_fc_columns_and_points_loyo_users_to_them():
     assert len(fc) == 5 and (fc["role"] == "selection_info_forward_chaining").all()
     loyo = d[d["role"] == "selection_info_loyo"]
     assert loyo["leakage_note"].str.contains("fc_").all()
+
+
+# ---------------- completeness: nothing missing is silent ----------------
+
+def _crop_long():
+    return pd.read_csv(DEFAULTS["crop_long"])
+
+
+def test_every_crop_long_row_is_carried_or_listed_as_excluded(df):
+    cl = _crop_long()
+    ex = pd.read_csv(os.path.join(OUT, "excluded_crop_rows_v1.csv"))
+    assert len(df) + len(ex) == len(cl)
+    assert not ex.duplicated(KEY).any()
+    assert len(ex[KEY].merge(df[KEY], on=KEY)) == 0
+    assert set(ex["crop"]) == set(cl["crop"]) - set(df["crop"])
+    assert {"exclusion_reason", "eligibility_class", "anomaly_status"} <= set(ex.columns)
+
+
+def test_excluded_rows_carry_the_issue4_anomalies_from_the_source():
+    ex = pd.read_csv(os.path.join(OUT, "excluded_crop_rows_v1.csv"))
+    src = pd.read_csv(DEFAULTS["yield_fc"])
+    m = ex.merge(src[KEY + ["yield_anomaly_kg_per_ha"]], on=KEY, suffixes=("", "_src"))
+    assert len(m) == len(ex)
+    assert np.allclose(m["yield_anomaly_kg_per_ha"].fillna(-1e18), m["yield_anomaly_kg_per_ha_src"].fillna(-1e18))
+
+
+def test_yield_value_status_partitions_rows_and_labels_zeros_correctly(df):
+    assert df["yield_value_status"].notna().all()
+    assert set(df["yield_value_status"]) <= {"valid", "missing", "zero_source_filled", "zero_ambiguous", "zero_yield_only"}
+    cl = _crop_long().merge(df[KEY], on=KEY)  # independent recount from the source rows that are carried
+    zero = (cl["area_1000_ha"] == 0) & (cl["production_1000_tons"] == 0) & (cl["yield_kg_per_ha"] == 0)
+    filled = cl["flag_nan_filled_with_zero"].astype(bool)
+    assert int((df["yield_value_status"] == "zero_ambiguous").sum()) == int((zero & ~filled).sum())
+    assert int((df["yield_value_status"] == "zero_source_filled").sum()) == int((zero & filled).sum())
+    # source values are never altered: raw yield still equals crop-long
+    m = df.merge(cl[KEY + ["yield_kg_per_ha"]], on=KEY, suffixes=("", "_src"))
+    assert np.allclose(m["yield_kg_per_ha"].fillna(-1), m["yield_kg_per_ha_src"].fillna(-1))
+    # a labelled ambiguous zero is never a baseline observation
+    amb = df[df["yield_value_status"] == "zero_ambiguous"]
+    assert not amb["eligible_for_baseline"].astype(bool).any() and amb["yield_anomaly_kg_per_ha"].isna().all()
+
+
+def test_zscore_confidence_flag_and_valid_zscore_flag(df):
+    has = df["yield_anomaly_zscore"].notna()
+    assert (df["has_valid_yield_zscore"] == has).all()
+    flagged = df[df["yield_zscore_low_confidence"]]
+    assert (flagged["training_observation_count"] < 3).all() and flagged["has_valid_yield_zscore"].all()
+    unflagged = df[has & ~df["yield_zscore_low_confidence"]]
+    assert (unflagged["training_observation_count"] >= 3).all()
+    # the unstable z-scores are exactly the ones built on the smallest baseline
+    assert flagged["year"].nunique() == 1
+
+
+def test_empty_columns_are_dropped_and_constant_weather_features_are_flagged_unusable(df):
+    assert not [c for c in df.columns if df[c].isna().all() and not c.startswith(("wanom__", "wz__", "wact__"))]
+    assert "aggregate_member_sum_area" not in df.columns and "aggregate_member_sum_production" not in df.columns
+    dd = pd.read_csv(os.path.join(OUT, "ml_ready_column_dictionary_v1.csv"))
+    assert {"usable_as_feature", "unusable_reason", "availability_note"} <= set(dd.columns)
+    dy = df.drop_duplicates(["district_code", "year"])
+    for c in [c for c in df.columns if c.startswith(("wanom__", "wz__", "wact__"))]:
+        dead = dy[c].isna().all() or dy[c].dropna().nunique() <= 1
+        row = dd[dd["column"] == c].iloc[0]
+        assert bool(row["usable_as_feature"]) == (not dead), c
+        if dead:
+            assert isinstance(row["unusable_reason"], str) and row["unusable_reason"]
+    assert not dd.loc[~dd["baseline_leakage_safe"], "usable_as_feature"].any()
+
+
+def test_list_separators_are_semicolons_everywhere(df):
+    for c in ["training_years", "fc_selection_train_years", "fc_selected_predictors", "flag_summary"]:
+        assert not df[c].dropna().astype(str).str.contains(",").any(), c
+
+
+def test_loyo_weather_companion_covers_every_year_and_matches_the_source():
+    lo = pd.read_csv(os.path.join(OUT, "weather_loyo_anomalies_v1.csv"))
+    main = pd.read_csv(DATA)
+    assert not lo.duplicated(DY).any()
+    assert set(map(tuple, lo[DY].values)) == set(map(tuple, main[DY].drop_duplicates().values))
+    first_two = sorted(main["year"].unique())[:2]
+    assert lo[lo["year"].isin(first_two)].filter(like="wloyo__").notna().any(axis=None)  # the years the main table lacks
+    src = pd.read_csv(DEFAULTS["weather_loyo"])
+    src = src[src["is_validation_year"].astype(bool)].dropna(subset=["anomaly"]).set_index(DY + ["weather_column"])["anomaly"]
+    sample = lo.melt(id_vars=DY, var_name="f", value_name="v").dropna()
+    sample["f"] = sample["f"].str.replace("wloyo__", "", regex=False)
+    src.index = src.index.set_names(DY + ["f"])
+    j = sample.set_index(DY + ["f"]).join(src.rename("src"), how="left")
+    assert len(j) == len(sample)
+    assert j["src"].notna().all() and np.allclose(j["v"], j["src"])
+
+
+def test_missing_data_report_is_complete_and_reconciles():
+    rep = pd.read_csv(os.path.join(OUT, "missing_data_report_v1.csv"))
+    assert {"category", "item", "count", "reason", "by_design", "where_to_look"} <= set(rep.columns)
+    assert set(rep["category"]) == {"rows", "columns"}
+    assert rep["reason"].notna().all() and (rep["reason"].str.len() > 0).all()
+    ex = pd.read_csv(os.path.join(OUT, "excluded_crop_rows_v1.csv"))
+    assert int(rep.loc[rep["item"].str.startswith("crop-long rows of"), "count"].sum()) == len(ex)
+    amb = rep[rep["item"].str.contains("zero_ambiguous")]
+    assert len(amb) == 1 and "AMBIGUOUS" in amb["by_design"].iloc[0]
+    readme = open(os.path.join(OUT, "README.md"), encoding="utf-8").read()
+    assert "COMPLETENESS_START" in readme and "zero_ambiguous" in readme and "excluded_crop_rows_v1.csv" in readme
+
+
+def test_row_accounting_still_holds_when_eligibility_changes(tmp_path):
+    """Robustness: exclude a crop via the eligibility input and every crop-long row must still be accounted for."""
+    cl = _crop_long()
+    elig = pd.read_csv(DEFAULTS["eligibility"])
+    bad = elig.copy()
+    bad.loc[bad["crop"] == "maize", "proceed_to_modelling"] = False  # maize is now excluded -> row counts change
+    p = tmp_path / "elig_bad.csv"
+    bad.to_csv(p, index=False)
+    paths = DEFAULTS_PATHS()
+    paths["eligibility"] = str(p)
+    out_df, cf = build(paths, str(tmp_path / "o"), "pytest")
+    assert len(out_df) + len(pd.read_csv(tmp_path / "o" / "excluded_crop_rows_v1.csv")) == len(cl)
+    assert "maize" not in set(out_df["crop"])

@@ -1,0 +1,43 @@
+category,item,count,out_of,reason,by_design,where_to_look
+rows,crop-long rows of castor (not carried),65,1430,Issue 2: conditionally_eligible,yes,excluded_crop_rows_v1.csv
+rows,crop-long rows of cotton (not carried),65,1430,Issue 2: conditionally_eligible,yes,excluded_crop_rows_v1.csv
+rows,crop-long rows of kharif_sorghum (not carried),65,1430,Issue 2: conditionally_eligible,yes,excluded_crop_rows_v1.csv
+rows,crop-long rows of linseed (not carried),65,1430,Issue 2: ineligible,yes,excluded_crop_rows_v1.csv
+rows,crop-long rows of minor_pulses (not carried),65,1430,Issue 2: ineligible,yes,excluded_crop_rows_v1.csv
+rows,crop-long rows of oilseeds (not carried),65,1430,Issue 2: ineligible,yes,excluded_crop_rows_v1.csv
+rows,crop-long rows of rapeseed_and_mustard (not carried),65,1430,Issue 2: ineligible,yes,excluded_crop_rows_v1.csv
+rows,crop-long rows of safflower (not carried),65,1430,Issue 2: ineligible,yes,excluded_crop_rows_v1.csv
+rows,crop-long rows of sorghum (not carried),65,1430,Issue 2: ineligible,yes,excluded_crop_rows_v1.csv
+rows,crop-long rows of soyabean (not carried),65,1430,Issue 2: ineligible,yes,excluded_crop_rows_v1.csv
+rows,crop-long rows of wheat (not carried),65,1430,Issue 2: ineligible,yes,excluded_crop_rows_v1.csv
+rows,"carried rows without a yield target: insufficient_history, 2015",129,715,a forward-chaining anomaly needs two earlier years,yes,anomaly_status
+rows,"carried rows without a yield target: insufficient_history, 2016",132,715,a forward-chaining anomaly needs two earlier years,yes,anomaly_status
+rows,"carried rows without a yield target: insufficient_history, 2017",3,715,a forward-chaining anomaly needs two earlier years,yes,anomaly_status
+rows,"carried rows without a yield target: insufficient_history, 2018",2,715,a forward-chaining anomaly needs two earlier years,yes,anomaly_status
+rows,"carried rows without a yield target: insufficient_history, 2019",5,715,a forward-chaining anomaly needs two earlier years,yes,anomaly_status
+rows,"carried rows without a yield target: ineligible_observation, 2015",14,715,"zero, missing or non-positive yield; excluded from baselines",yes,anomaly_status
+rows,"carried rows without a yield target: ineligible_observation, 2016",11,715,"zero, missing or non-positive yield; excluded from baselines",yes,anomaly_status
+rows,"carried rows without a yield target: ineligible_observation, 2017",12,715,"zero, missing or non-positive yield; excluded from baselines",yes,anomaly_status
+rows,"carried rows without a yield target: ineligible_observation, 2018",13,715,"zero, missing or non-positive yield; excluded from baselines",yes,anomaly_status
+rows,"carried rows without a yield target: ineligible_observation, 2019",10,715,"zero, missing or non-positive yield; excluded from baselines",yes,anomaly_status
+rows,district-crop pairs with no target in any year,14,143,crop not grown or not recorded in that district,yes,"yield_value_status, flag_*"
+rows,rows with raw zeros: zero_ambiguous,35,715,"area, production and yield all 0 and NOT flagged as filled: a true zero cannot be told from missing","AMBIGUOUS: labelled, source value kept",yield_value_status
+rows,rows with raw zeros: zero_source_filled,21,715,the source filled a missing value with zero (flag_nan_filled_with_zero),labelled,yield_value_status
+rows,rows with raw zeros: zero_yield_only,1,715,yield is 0 while area or production is not,labelled,yield_value_status
+rows,"carried rows with no weather anomaly at all, 2015",143,143,forward-chaining normals need two earlier years,yes,weather_loyo_anomalies_v1.csv holds leave-one-year-out anomalies for these years
+rows,"carried rows with no weather anomaly at all, 2016",143,143,forward-chaining normals need two earlier years,yes,weather_loyo_anomalies_v1.csv holds leave-one-year-out anomalies for these years
+rows,rows with a kg/ha anomaly but no z-score,1,715,baseline standard deviation is zero,yes,has_valid_yield_zscore
+rows,rows whose z-score rests on fewer than 3 baseline observations,128,383,forward-chaining baseline has only 2 observations in the first target year,yes,yield_zscore_low_confidence
+columns,aggregate_member_sum_area (dropped),715,715,empty for every carried row (applies to aggregate categories only),yes,reproducibility_report_v1.json -> dropped_empty_columns
+columns,aggregate_member_sum_production (dropped),715,715,empty for every carried row (applies to aggregate categories only),yes,reproducibility_report_v1.json -> dropped_empty_columns
+columns,"wanom__kharif__cold_days (kept, unusable)",286,715,constant (zero variance): carries no information,yes,ml_ready_column_dictionary_v1.csv: usable_as_feature
+columns,"wz__kharif__cold_days (kept, unusable)",715,715,100% missing,yes,ml_ready_column_dictionary_v1.csv: usable_as_feature
+columns,"wact__kharif__cold_days (kept, unusable)",0,715,constant (zero variance): carries no information,yes,ml_ready_column_dictionary_v1.csv: usable_as_feature
+columns,wz__ z-score columns with gaps beyond the anomaly's,11,78,baseline standard deviation is zero (mostly the cold-days indicators),yes,availability_note
+columns,constant non-weather columns (kept),20,313,provenance flags that are constant because only eligible crops are carried,yes,availability_note
+columns,season_component (mostly empty),650,715,applies to a subset of rows only,yes,n_missing
+columns,component_of_aggregate (mostly empty),455,715,applies to a subset of rows only,yes,n_missing
+columns,flag_summary (mostly empty),402,715,applies to a subset of rows only,yes,n_missing
+columns,fc_n_selected_predictors (mostly empty),455,715,applies to a subset of rows only,yes,n_missing
+columns,raw same-year weather columns of crop-long (not carried),78,78,identical to the wact__ columns (verified); nothing is lost,yes,wact__*
+columns,"leave-one-year-out weather anomalies (companion file, not in the main table)",78,78,"not forward-chaining safe, so kept out of the model-ready table",yes,weather_loyo_anomalies_v1.csv
