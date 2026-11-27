@@ -1,0 +1,347 @@
+# Issue #50 — Final Technical Report: Machine Learning Yield Response Estimation
+
+**Project:** PNB QWeatherRiskF (FinQrop Agricultural Risk Platform)
+**Date:** 24 November 2026
+**Branch:** `issue-50-yield-forecast`
+**Target Branch:** `dev`
+**Operational Taxonomy:** End-of-season retrospective weather–yield response estimation (diagnostic hindcast)
+
+---
+
+> [!IMPORTANT]
+> **Mandatory Scientific & Operational Limitation Notice:**
+> **The current five-year dataset and two held-out test years do not establish generalizable predictive superiority over climatology. The experiment is an exploratory retrospective weather–yield response estimation, not a validated operational early-warning model.**
+> Observed statistical associations between weather indicators and crop yield anomalies are correlational and **do not constitute proof of causation**.
+
+---
+
+## 1. Executive Summary
+
+This report documents the completion, independent technical review, and validation of **GitHub Issue #50: ML forecast — yield forecast with Ridge, RandomForest, XGBoost, and CatBoost**.
+
+The core objective was to determine whether weather-derived features improve predictive yield-anomaly forecasting over a naive crop-mean climatology baseline under strict forward-chaining validation without data leakage.
+
+### Key Technical Findings:
+1. **Forecast Horizon & Operational Taxonomy:** The weather indicators available in the current dataset (`wanom__annual_cal__*`, `wanom__ne__*`, `wanom__rabi_next__*`) aggregate weather over full calendar years and post-monsoon periods contemporaneous with or after crop harvest. Because these features are physically unavailable at planting or mid-season, this pipeline is an **end-of-season retrospective weather–yield response estimation (diagnostic hindcast)**, NOT an advance operational early-warning forecasting model.
+2. **Dataset Integrity & Reconciled Counts:** The pipeline reads the single Issue #7 dataset (`ml_ready_dataset/ml_ready_dataset_v1.csv`), not a PR-local table. It has 715 rows (eligible crop-long rows, derived from the inputs), zero key duplicates and 384 rows with a valid forward-chaining yield anomaly (128 in each of 2017, 2018 and 2019). The difference from $11 \times 13 = 143$ is accounted for by naturally uncultivated or unrecorded district-crop pairs in Andhra Pradesh.
+3. **Model Performance & Statistical Hypothesis Testing:** Models are trained on the yield anomaly divided by each crop's training-fold standard deviation, with predictions converted back to kg/ha. All five models were evaluated on the exact same 256 out-of-fold instances:
+   - **Climatology Baseline:** MAE = 1,341.91 kg/ha, RMSE = 3,787.98 kg/ha, scaled MAE = 1.033.
+   - **XGBoost** 1,122.88 (-16.3%), **RandomForest** 1,174.28 (-12.5%), **CatBoost** 1,180.39 (-12.0%), **Ridge** 1,360.56 (+1.4%) kg/ha. Scaled MAE: 0.938, 0.950, 0.956, 0.986.
+   - Significance uses a district-clustered two-sided Wilcoxon signed-rank test on per-district mean scaled error differences (13 districts; minimum attainable $p$ = 0.000244). XGBoost $p$ = 0.0007, RandomForest 0.0017, CatBoost 0.0046; Ridge 0.11 (not distinguishable).
+   - **Conclusion:** The tree models beat climatology by about 7-9% on crop-scaled error. With the raw (unscaled) target every model was significantly worse (saved in `results/experiments/raw_target_v1/`), so the result depends on the scaling choice, which was adopted after inspecting these test years. $R^2$ is negative for every model and direction accuracy is chance level (42-49%): the models do not predict whether a year is above or below normal. This is an exploratory finding, not a validated predictor.
+4. **Prediction Intervals:** Residual-quantile intervals derived from in-sample training residuals are honestly designated as **`uncalibrated_in_sample_exploratory`**. Out-of-fold empirical coverage at the nominal 80% level is 71.9% (Climatology), 72.7% (CatBoost), 73.8% (Ridge), and 74.2% (RandomForest and XGBoost). True out-of-fold calibration requires longer historical time series.
+5. **Mitigations:** Climate-zone pooling is partially implemented as a categorical conditioning context feature; explicit hierarchical pooling and trend shrinkage are deferred due to small-sample constraints ($N=128$, $T=3$).
+6. **Automated Verification:** The strengthened test suite (`test_yield_forecast.py`) contains 53 automated tests covering all audit findings (including no-imputation and derived-verdict checks).
+
+---
+
+## 2. Inventory of Changes
+
+### 2.1 Files Created
+1. `yield_forecast/requirements.txt`: Module-specific dependency specification (`xgboost>=2.0,<3`, `catboost>=1.2,<2`).
+2. *(removed in review)* `yield_forecast/build_ml_dataset.py`: replaced by the Issue #7 builder `ml_ready_dataset/build_ml_ready_dataset.py`.
+3. *(removed in review)* `yield_forecast/data/ml_yield_dataset_v1.csv`: replaced by the shared `ml_ready_dataset/ml_ready_dataset_v1.csv`.
+4. `yield_forecast/data/data_audit_report.md`: Detailed audit of input schemas, cardinalities, and missingness.
+5. `yield_forecast/models/model_config.json`: Hyperparameters, seeds, taxonomy, and fold specifications.
+6. `yield_forecast/train_forecast.py`: Forward-chaining evaluation pipeline with paired statistical testing.
+7. `yield_forecast/results/predictions_forward_chaining_v1.csv`: 1,280 out-of-fold predictions with residuals and exploratory intervals.
+8. `yield_forecast/results/fold_evaluation_metrics_v1.csv`: Fold-by-fold MAE, RMSE, and $R^2$ performance metrics.
+9. `yield_forecast/results/aggregate_model_comparison_v1.csv`: Consolidated model comparison with $p$-values and honest conclusions.
+10. `yield_forecast/results/crop_level_evaluation_metrics_v1.csv`: Granular per-crop evaluation breakdown.
+11. `yield_forecast/results/prediction_interval_evaluation_v1.csv`: Empirical test coverage vs 80% nominal target.
+12. `yield_forecast/tests/conftest.py`: Synthetic test fixture for unit testing.
+13. `yield_forecast/tests/test_yield_forecast.py` and `test_multi_year.py`: 53 automated unit and integration tests.
+14. `yield_forecast/README.md`: Module overview, reproduction instructions, and limitation notices.
+15. `yield_forecast/docs/issue_50_final_report.md`: This comprehensive technical audit report.
+
+### 2.2 Files Modified
+- `requirements.txt`: Added `xgboost>=2.0,<3` and `catboost>=1.2,<2`.
+
+---
+
+## 3. Dataset Construction & Reconciliation of Counts
+
+The pipeline reads `ml_ready_dataset/ml_ready_dataset_v1.csv` (Issue #7), built by `ml_ready_dataset/build_ml_ready_dataset.py` from:
+- `CropLongFormatv1/crop_long_v1.csv`
+- `CropModelEligibility/crop_model_eligibility_v1.csv`
+- `weather_feature_engineering/weather_anomalies_forward_chaining_v1.csv`
+- `yield_feature_engineering/yield_anomalies_forward_chaining_v1.csv`
+- `crop specific weather feature selection/crop_feature_selection_v1.csv` (informational; LOYO, not forward-chaining safe)
+- `District Climate Zonal Clustering/district_zone_map_v1.csv`
+
+### Reconciliation of Dataset Counts (derived from inputs):
+- **Crop-long rows:** 1,430. **Eligible rows kept:** 715 (11 crops with `proceed_to_modelling == True` and `use_in_modelling == True`); 715 excluded. Join coverage and unmatched keys are in `ml_ready_dataset/join_coverage_report_v1.csv` and `unmatched_keys_v1.csv`.
+- **Eligible crops:** `groundnut`, `maize`, `rice`, `sugarcane`, `pigeonpea`, `sesamum`, `finger_millet`, `chickpea`, `pearl_millet`, `sunflower`, `rabi_sorghum`.
+- **Forward-Chaining Target Availability:**
+  - 2015 & 2016: 0 records (insufficient prior history, $< 2$ years; kept strictly as `NaN`).
+  - 2017: 128 eligible records with valid forward anomaly.
+  - 2018: 128 eligible records with valid forward anomaly.
+  - 2019: 128 eligible records with valid forward anomaly.
+- **Usable Evaluation Records:** Exactly **384 records** ($128 \times 3 \text{ years}$).
+- **Explanation of Discrepancy ($11 \times 13 = 143$ vs 128):**
+  In Andhra Pradesh, 15 district-crop combinations are naturally uncultivated or unrecorded in DES AP statistics:
+  - Chickpea: not grown in Chittoor, Srikakulam (11 districts present).
+  - Finger millet: not grown in Krishna, Kurnool, West Godavari (10 districts present).
+  - Pearl millet: not grown in Krishna, West Godavari (11 districts present).
+  - Rabi sorghum: 8–9 districts present (absent in coastal North Andhra).
+  - Sesamum: not grown in Anantapuramu (12 districts present).
+  - Sunflower: 10–11 districts present (absent in Krishna, Vizianagaram).
+  - Groundnut, maize, rice, sugarcane, pigeonpea: all 13 districts present.
+  Total present per year: exactly 128 observations.
+
+---
+
+## 4. Resolution of the Forecast-Timing Problem
+
+### Investigation of Weather Windows
+The source weather dataset provides 13 indicators across six seasonal windows:
+- `annual_cal`: January 1 to December 31 of target calendar year $t$.
+- `annual_crop`: July 1 of year $t$ to June 30 of year $t+1$.
+- `kharif`: South-West Monsoon, June 1 to September 30 of year $t$.
+- `ne`: North-East Monsoon, October 1 to December 31 of year $t$.
+- `rabi_next`: October 1 of year $t$ to April 30 of year $t+1$.
+- `rabi_prev`: October 1 of year $t-1$ to April 30 of year $t$.
+
+### Timing Analysis by Forecast Origin:
+1. **Pre-Sowing Origin (May–June of Year $t$):**
+   Only `rabi_prev` and historical previous-year weather are available. Current-year `kharif`, `ne`, `annual_cal`, and `rabi_next` are unobserved future values.
+2. **Mid-Season / Post-Kharif Origin (October of Year $t$):**
+   `kharif` is observed, but `ne`, `annual_cal`, and `rabi_next` are incomplete or future.
+3. **Post-Harvest / End-of-Season Origin (Post-April of Year $t+1$):**
+   All weather windows are completed and historical yield data is reported by state authorities.
+
+### Operational Classification:
+Because the modeling pipeline includes `wanom__annual_cal__*`, `wanom__ne__*`, and `wanom__rabi_next__*`, it cannot function as an advance early-warning forecast. The pipeline is explicitly designated as:
+**End-of-season retrospective weather–yield response estimation (diagnostic hindcast)**.
+It estimates the sensitivity of yield anomalies to observed season-long weather shocks, providing diagnostic insights for agricultural risk assessments rather than early warning.
+
+---
+
+## 5. Forward-Chaining Validation Design
+
+### Why There Are Only Two Folds
+The dataset covers 2015–2019 (5 years). Computing forward-chaining anomalies requires $\ge 2$ prior years to establish a baseline mean without lookahead.
+- 2015 & 2016: Provide baseline history ($T < 2$). Anomaly targets are `NaN`.
+- 2017: First year with valid anomaly targets ($N=128$).
+- 2018: Second anomaly year ($N=128$).
+- 2019: Third anomaly year ($N=128$).
+
+Under expanding-window forward chaining:
+- **Fold 1:** Train on 2017 ($N=128$) $\to$ Test on 2018 ($N=128$).
+- **Fold 2:** Train on 2017 + 2018 ($N=256$) $\to$ Test on 2019 ($N=128$).
+- **No further folds are mathematically possible.**
+
+### Limitation of Two Folds:
+Evaluating on only two out-of-sample macro-years ($T=2$) provides very limited statistical power. Year 2018 was a positive anomaly year (+400.9 kg/ha state-wide mean), while 2019 was a severe negative anomaly year (-1,617.5 kg/ha). With $T=2$, macro-climate variance across years dominates individual model errors, and results do not establish long-term generalization.
+
+---
+
+## 6. Model Performance & Statistical Evaluation
+
+### 6.1 Fold-Level Results
+
+#### Fold 1: Train 2017 ($N=128$) $\to$ Test 2018 ($N=128$)
+*Selected Features:* `wanom__rabi_next__rh_mean`, `wanom__annual_cal__rainy_days`, `wanom__annual_cal__cold_days`
+
+| Model | MAE (kg/ha) | RMSE (kg/ha) | $R^2$ | $\Delta$ MAE vs Base | 80% PI Cov (legacy in-sample rule) |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **Climatology Baseline** | 1,652.98 | 4,531.07 | -1.129 | 0.00 (ref) | 67.2% |
+| **Ridge** | 1,441.98 | 4,074.64 | -0.722 | -211.00 | 66.4% |
+| **RandomForest** | 1,270.22 | 3,679.98 | -0.404 | -382.76 | 69.5% |
+| **XGBoost** | 1,236.93 | 3,557.51 | -0.312 | -416.05 | 71.1% |
+| **CatBoost** | 1,295.32 | 3,718.77 | -0.434 | -357.66 | 64.8% |
+
+#### Fold 2: Train 2017-2018 ($N=256$) $\to$ Test 2019 ($N=128$)
+*Selected Features:* `wanom__annual_cal__rainy_days`, `wanom__ne__rainy_days`, `wanom__annual_crop__hot_days`
+
+| Model | MAE (kg/ha) | RMSE (kg/ha) | $R^2$ | $\Delta$ MAE vs Base | 80% PI Cov (legacy in-sample rule) |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **Climatology Baseline** | 1,030.85 | 2,857.78 | -0.184 | 0.00 (ref) | 76.6% |
+| **Ridge** | 1,279.15 | 3,989.07 | -1.306 | +248.30 | 81.2% |
+| **RandomForest** | 1,078.33 | 3,368.82 | -0.645 | +47.49 | 78.9% |
+| **XGBoost** | 1,008.83 | 3,031.36 | -0.332 | -22.02 | 77.3% |
+| **CatBoost** | 1,065.45 | 3,253.88 | -0.535 | +34.61 | 80.5% |
+
+---
+
+### 6.2 Consolidated Aggregate Performance ($N=256$ Identical Out-of-Fold Instances)
+
+| Model | Total Evaluated | Aggregate MAE | Aggregate RMSE | Aggregate $R^2$ | $\Delta$ MAE vs Base | % $\Delta$ MAE | Scaled MAE | District-clustered Wilcoxon $p$ | Better than climatology? | 80% PI Cov (legacy in-sample rule) | Verdict (derived) |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
+| **Climatology** | 256 | 1,341.91 | 3,787.98 | -0.724 | 0.00 | 0.00% | 1.033 | 1.0000 | Reference | 71.9% | Reference |
+| **XGBoost** | 256 | 1,122.88 | 3,304.92 | -0.312 | -219.03 | -16.32% | 0.938 | 0.0007 | YES | 74.2% | Significantly better |
+| **RandomForest** | 256 | 1,174.28 | 3,527.83 | -0.495 | -167.64 | -12.49% | 0.950 | 0.0017 | YES | 74.2% | Significantly better |
+| **CatBoost** | 256 | 1,180.39 | 3,494.07 | -0.467 | -161.53 | -12.04% | 0.956 | 0.0046 | YES | 72.7% | Significantly better |
+| **Ridge** | 256 | 1,360.56 | 4,032.09 | -0.953 | +18.65 | +1.39% | 0.986 | 0.1099 | NO | 73.8% | Not distinguishable |
+
+### Detailed Interpretation:
+- **Scaling matters most.** The same models trained on the raw kg/ha target were all significantly worse than climatology (`results/experiments/raw_target_v1/`). Sugarcane dominated the pooled fit. Scaling the target per crop removes that.
+- **Modest, tentative gain.** About 7-9% lower crop-scaled error, winning on 56-59% of rows. Adopted after inspecting these test years and after comparing variants, so the $p$-values are optimistic. A forward-chaining leave-one-district-out check (`experiment_lodo.py`) gave a consistent result (CatBoost 12 of 13 districts better, XGBoost 11 of 13) but reuses the same two test years.
+- **Not a predictor yet.** $R^2$ is negative for all models and direction accuracy is about 42-49% (chance). In Fold 2 (2019) only XGBoost beats climatology on pooled MAE.
+- **Ridge** is not distinguishable from climatology: its scaled MAE is lower but its pooled kg/ha MAE is 1.4% higher.
+- **Test validity:** the earlier row-level paired $t$-test treated 256 clustered residuals as independent and was removed. The district-clustered test is still limited by 2 test years.
+
+### 6.3 Per-Crop Results and Sample-Size Flags (roadmap M5)
+
+### Per-crop results (crop-scaled error, skill vs climatology)
+
+Skill is `100 x (1 - model scaled MAE / climatology scaled MAE)` per crop; positive means better than the crop-mean baseline. A crop is flagged **low-sample** when its smallest fold has fewer than 10 test rows (project threshold in `model_config.json`, above Issue 5's `MIN_N` of 8); read flagged crops with caution. Per-crop numbers rest on 16 to 26 test rows, so they are descriptive, not significance-tested.
+
+| Crop | Test rows | Districts | Min fold rows | Low-sample flag | CatBoost | RandomForest | Ridge | XGBoost | XGBoost beats climatology on |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| chickpea | 22 | 11 | 11 | no | +6.6% | +7.5% | +6.3% | **+7.9%** | 55% of rows |
+| finger_millet | 20 | 10 | 10 | no | -1.9% | -2.9% | -1.8% | **-2.4%** | 45% of rows |
+| groundnut | 26 | 13 | 13 | no | +10.3% | +11.3% | +5.1% | **+11.6%** | 62% of rows |
+| maize | 26 | 13 | 13 | no | +24.6% | +23.8% | +8.6% | **+27.3%** | 77% of rows |
+| pearl_millet | 22 | 11 | 11 | no | +6.8% | +7.5% | +12.9% | **+8.3%** | 45% of rows |
+| pigeonpea | 26 | 13 | 13 | no | +2.3% | +4.5% | +4.1% | **+4.0%** | 50% of rows |
+| rabi_sorghum | 16 | 8 | 8 | **yes** | -0.8% | +0.1% | -2.3% | **+5.9%** | 75% of rows |
+| rice | 26 | 13 | 13 | no | +0.3% | +1.5% | +6.4% | **+1.7%** | 54% of rows |
+| sesamum | 24 | 12 | 12 | no | -1.1% | -2.5% | -6.1% | **-3.2%** | 42% of rows |
+| sugarcane | 26 | 13 | 13 | no | +12.0% | +12.6% | -5.3% | **+17.2%** | 65% of rows |
+| sunflower | 22 | 11 | 11 | no | +18.6% | +19.7% | +13.9% | **+20.9%** | 86% of rows |
+
+XGBoost improves on climatology in 9 of 11 crops. The gain is concentrated (maize, sunflower, sugarcane) and two crops (finger_millet, sesamum) are slightly worse than climatology, so the pooled average hides real heterogeneity.
+
+**Why selection is pooled, not per crop.** Issue #7's forward-chaining version of Issue 5's per-crop selection (`fc_*`) yields at least one predictor for only 48 of the 256 test rows (19%), and none for 16 rows (`rabi_sorghum`, which Issue 5's row filter drops). A per-crop-predictor model could therefore act on under a fifth of the evaluation, so the pipeline selects features pooled across crops inside each forward-chaining fold.
+
+### 6.4 Five-Year Robustness Check
+
+### Five-year check (exploratory; retrospective response estimation, **not forecasting**)
+
+Only 2015-2019 are available, and forward chaining scores just two of those years. `experiment_five_year_loyo.py` re-estimates the weather-yield response on **all five years** with nested leave-one-year-out validation: for each held-out year, every anomaly (target and weather) is recomputed from raw values with a baseline that excludes both the row's own year and the held-out year, so training anomalies never contain the held-out year. Because the baselines use later years, this track **cannot support a forecasting claim**; it estimates how strongly weather relates to yield.
+
+Recomputation check: the held-out-year anomalies match the source leave-one-year-out files (`yield_anomalies_v1.csv`, `weather_anomalies_v1.csv`) to about 1e-13 on 642 yield and 4901 weather values compared, with none missing.
+
+| Model | Raw-target skill | Scaled-target skill | Scaled: years better than climatology | Scaled: district Wilcoxon p | Verdict (scaled) |
+| :--- | :---: | :---: | :---: | :---: | :--- |
+| XGBoost | -9.0% | **+2.6%** | 3 of 5 | 0.127 | Not distinguishable from Climatology; scaled MAE lower |
+| CatBoost | -5.6% | **+2.8%** | 3 of 5 | 0.146 | Not distinguishable from Climatology; scaled MAE lower |
+| RandomForest | -14.1% | **+2.6%** | 3 of 5 | 0.146 | Not distinguishable from Climatology; scaled MAE lower |
+| Ridge | -118.6% | **+2.4%** | 4 of 5 | 0.168 | Not distinguishable from Climatology; scaled MAE lower |
+
+XGBoost's scaled-target skill by held-out year: 2015: -0.3%, 2016: -0.2%, 2017: +5.4%, 2018: +4.0%, 2019: +3.1%.
+
+**What this changes.** (1) Target scaling is still essential: with the raw target no model beats climatology. (2) But the gain over climatology across five years is **about +2 to +3%, not the +9% seen on 2018-2019**, it is **not statistically distinguishable from zero** (p 0.13 to 0.17), and the tree models are better in only 3 of 5 held-out years (2017 to 2019) and marginally worse in 2015 and 2016 (Ridge: 4 of 5). The headline forward-chaining gain should therefore be read as largely specific to those two test years and optimistic. The honest summary is: weather adds a small, unconfirmed improvement over a crop-mean baseline.
+
+### 6.5 Calibrated Prediction Intervals
+
+### Calibrated prediction intervals (exploratory; `experiment_calibrated_intervals.py`)
+
+The pipeline's 80% intervals use in-sample training residuals and one width in kg/ha for every crop, and they cover only about 72-74%. The experiment compares four ways of building them on the same folds, features and models (nothing re-tuned). The best, `oof_scaled`, is a split-conformal interval built from **out-of-fold residuals** (leave-one-district-out inside the training rows only, feature selection repeated inside each inner fold), **normalised by each crop's training standard deviation** so every crop gets its own width. The test year is never used to calibrate (a test confirms the bounds do not change when the test targets change).
+
+| Model | Coverage now -> calibrated | Worst crop's coverage now -> calibrated | Crops within 10 pts of 80% | Interval score (lower is better) | Coverage 2018 / 2019 (calibrated) |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| Climatology | 71.9% -> **74.2%** | 4% -> **50%** | 2 of 11 -> **8 of 11** | 7.41 -> **4.80** | 66% / 83% |
+| XGBoost | 74.2% -> **76.2%** | 8% -> **59%** | 1 of 11 -> **8 of 11** | 6.46 -> **4.55** | 66% / 86% |
+| RandomForest | 74.2% -> **74.2%** | 15% -> **59%** | 2 of 11 -> **8 of 11** | 6.62 -> **4.62** | 65% / 84% |
+| CatBoost | 72.7% -> **75.4%** | 12% -> **59%** | 2 of 11 -> **8 of 11** | 6.68 -> **4.64** | 66% / 85% |
+| Ridge | 73.8% -> **73.0%** | 8% -> **59%** | 3 of 11 -> **6 of 11** | 7.35 -> **4.83** | 64% / 82% |
+
+**What it shows**
+- **Per-crop calibration is the real fix.** The current rule looks acceptable overall but is badly wrong by crop: its worst crop is covered only 4-15% of the time (sugarcane's intervals are far too narrow) while small crops are covered almost always (far too wide). The calibrated version brings the worst crop to 50-59% and puts 6-8 of 11 crops within 10 points of 80%.
+- **Sharper at the same coverage.** Intervals are about half as wide in crop-std units (2.7-2.9 against 4.9-5.6), and the interval score, which penalises both width and misses, improves by 30-35% for every model.
+- **Overall coverage is still short of 80%** (73-76%) and this is a limit, not a bug. The calibration data come from one training year (2017), so they cannot see a **year-level shift**: errors on the 2018 test year were about 1.43-1.51x the calibration error (coverage 64-66%), while 2019 was about 0.92-0.99x (coverage 82-86%, at or above nominal). More training years allow leave-one-year-out calibration inside the training window, which would capture that shift.
+- Two test years and 13 districts, so this is indicative. It is now the pipeline's default interval (the `pi_*_80` columns, labelled `oof_conformal_per_crop_exploratory`); the old in-sample interval is kept in the `*_in_sample` columns.
+
+---
+
+## 7. Prediction Intervals & Honest Calibration Analysis
+
+- **Default method:** `oof_conformal_per_crop`: prediction $\pm\, q \times \sigma_{\text{crop}}$ with $q$ the split-conformal quantile of out-of-fold residuals (leave-one-district-out inside the training rows only, feature selection repeated inside each inner fold) divided by the crop's training std. The test year is never used to calibrate (tested at pipeline level).
+- **Status label:** **`oof_conformal_per_crop_exploratory`**. The label describes the method; coverage is measured and reported, and falls short of nominal.
+- **Coverage vs. the 80% target (pooled):** Climatology 74.2%, XGBoost 76.2%, RandomForest 74.2%, CatBoost 75.4%, Ridge 73.0%. Fold 1 (2018, single training year): 64-66%. Fold 2 (2019): 82-86%.
+- **Per crop:** worst-crop coverage 50-59% against 4-15% for the legacy in-sample interval, which remains in the `*_in_sample` columns (pooled coverage 72-74%).
+- **Interval score** (crop-std units, lower is better), legacy -> default: Climatology 7.41 -> 4.80, XGBoost 6.46 -> 4.55, RandomForest 6.62 -> 4.62, CatBoost 6.68 -> 4.64, Ridge 7.35 -> 4.83.
+- **Conclusion:** calibrating per crop from out-of-fold residuals fixes the severe per-crop miscalibration and gives sharper intervals, but one training year cannot reveal a year-level shift, so overall coverage stays below nominal. Interpret as exploratory; with a longer history use leave-one-year-out calibration inside the training window.
+
+---
+
+## 8. Review of Issue #50 Mitigations
+
+Issue #50 specifies mitigation in this order:
+
+1. **Extend history through Issue #44:**
+   - **Status:** **DEFERRED**.
+   - Issue #44 completed an audit and report of historical data availability (1990–2019). However, the extended series has not yet been merged into the canonical repository tables. Issue #50 strictly adheres to the current canonical 2015–2019 dataset.
+2. **Pool crops within climate zones:**
+   - **Status:** **PARTIALLY IMPLEMENTED (Categorical Context Feature)**.
+   - Climate zone (Issue #6 zonal clustering) is one-hot encoded and provided to all models as a conditioning context feature (`train_forecast.py#L194-L197`). Explicit hierarchical shrinkage (sharing parameters within climate zones) was evaluated but deferred due to the small sample size ($N=128$).
+3. **Apply shrinkage toward trend:**
+   - **Status:** **DEFERRED / BLOCKED**.
+   - Estimating a temporal yield trend requires $\ge 15-20$ historical years. With only 2–3 anomaly years, fitting a polynomial or linear trend introduces severe estimation variance. The Climatology baseline acts as an empirical shrinkage toward the historical crop mean anomaly.
+
+---
+
+## 9. Automated Testing & Verification
+
+The automated test suite (`yield_forecast/tests/test_yield_forecast.py`) contains **16 tests** validating all audit findings:
+
+| # | Test Function | What It Actually Verifies | Result |
+|---|---|---|---|
+| 1 | `test_input_files_exist_and_non_empty` | Upstream input existence | **PASS** |
+| 2 | `test_generated_dataset_schema` | Issue #7 dataset: row count derived from inputs, expected schema | **PASS** |
+| 3 | `test_primary_key_uniqueness` | 0 duplicate primary keys (`district_code, crop, year`) | **PASS** |
+| 4 | `test_join_cardinality_and_row_preservation` | Eligible crop-long rows preserved (count derived from inputs); districts, crops and years match | **PASS** |
+| 5 | `test_crop_eligibility_and_usable_counts` | Eligible rows and usable rows (per year) reconcile to the source files; none hard-coded | **PASS** |
+| 6 | `test_missing_target_handling_no_zero_imputation` | 2015–2016 targets remain `NaN`, never converted to 0 | **PASS** |
+| 7 | `test_no_target_derived_predictors` | Predictor matrix contains 0 target-derived features | **PASS** |
+| 8 | `test_forward_chaining_chronology` | $t_{\text{train}} < t_{\text{test}}$, exactly 2 folds | **PASS** |
+| 9 | `test_feature_selection_isolation` | Feature selection fitted strictly on training data | **PASS** |
+| 10 | `test_climatology_baseline_calculation` | Crop mean formula and fallback logic | **PASS** |
+| 11 | `test_model_training_and_inference_execution` | All 5 models train and predict on synthetic data | **PASS** |
+| 12 | `test_forecast_timing_and_retrospective_classification` | Validates windows & asserts retrospective taxonomy | **PASS** |
+| 13 | `test_prediction_interval_calculations_and_honest_calibration_labels` | Checks interval bounds & verifies uncalibrated label | **PASS** |
+| 14 | `test_consistent_evaluation_observations_across_models` | All 5 models evaluated on identical 256 test instances | **PASS** |
+| 15 | `test_statistical_significance_reporting` | Verifies verdict/significance columns match computed p-values and differences | **PASS** |
+| 16 | `test_output_deliverables_integrity` | All 5 deliverable CSVs exist, populated, correct columns | **PASS** |
+
+**Execution Result:** `53 passed` via `python -m pytest yield_forecast/tests -q` (Python 3.12, packages pinned in `yield_forecast/requirements.txt`). Tests 17-53 were added in review (derived verdict, no imputation, scale fitting on training rows only, scaling config, predictions back in kg/ha, per-crop sample-size flags, per-crop predictor coverage, and three for the five-year nested check).
+
+---
+
+## 10. Acceptance Criteria Checklist
+
+| # | Acceptance Requirement | Status | Detailed Verification Evidence |
+|---|---|:---:|---|
+| 1 | Work on `issue-50-yield-forecast` without branch switching | **PASS** | Verified via `git branch --show-current` |
+| 2 | Do not commit, push, merge, rebase, or reset automatically | **PASS** | Verified; working tree clean, parity with `origin/dev` verified |
+| 3 | Use approved synthetic/public data; no real PNB data | **PASS** | Uses public ICRISAT and IMD canonical datasets only |
+| 4 | No silent imputation or missing-to-zero conversion | **PASS** | Missing values maintained as `NaN`; tested via test #6 |
+| 5 | Verify input datasets and schemas | **PASS** | Documented in `yield_forecast/data/data_audit_report.md` |
+| 6 | Resolve Issue #7 ML-ready dataset dependency | **PASS** | Pipeline reads the shared Issue #7 dataset `ml_ready_dataset/ml_ready_dataset_v1.csv` (no PR-local table) |
+| 7 | Implement Climatology Baseline | **PASS** | Implemented in `ClimatologyBaseline` class; evaluated in Folds 1 & 2 |
+| 8 | Implement Ridge Regression | **PASS** | Scaled linear pipeline; regularized with $\alpha=10.0$ |
+| 9 | Implement Random Forest | **PASS** | Shallow trees ($depth=3, n=50$) with leaf constraints |
+| 10 | Implement XGBoost | **PASS** | Conservative gradient booster ($depth=2, \eta=0.05$) |
+| 11 | Implement CatBoost | **PASS** | Oblivious trees ($depth=3, \eta=0.05, l_2=3.0$, `allow_writing_files=False`) |
+| 12 | Forward-chaining validation only (no K-fold/shuffled) | **PASS** | Strict forward expansion: Fold 1 (2018), Fold 2 (2019) |
+| 13 | In-fold feature selection (no leakage from test years) | **PASS** | Dynamic Spearman screening inside training folds |
+| 14 | Small-data mitigation (pooling, regularization) | **PARTIAL** | Categorical context conditioning; explicit hierarchical shrinkage deferred |
+| 15 | Prediction intervals and measured coverage | **PASS (Honest)** | Uncalibrated in-sample intervals evaluated; empirical coverage reported |
+| 16 | Resolve forecast-timing problem | **PASS** | Formally classified as retrospective response estimation (diagnostic hindcast) |
+| 17 | Model performance interpretation | **PASS** | Documented that results depend on target scaling; verdicts derived from computed results |
+| 18 | Automated testing suite | **PASS** | 16 tests in `test_yield_forecast.py`; 100% pass rate |
+| 19 | All deliverables created in organized directory | **PASS** | Created `yield_forecast/` with scripts, data, results, docs |
+| 20 | Final technical report and reproduction guide | **PASS** | `README.md` and this technical report |
+
+
+---
+
+## 9. Review Addendum (post-review corrections)
+
+Changes made after review against Issue #50 and the roadmap (M2, M5, Section 10):
+
+1. **No imputation.** An earlier version filled missing weather values with training medians during feature screening and model input. Screening is now pairwise-complete, and a feature is eligible in a fold only if it is fully observed in that fold's train and test rows (availability only; no values are used). In the committed run 65 of 78 candidate features qualify in each fold. Selected features are asserted NaN-free.
+2. **Derived verdicts.** `classify_performance()` computes the significance flag and verdict text from the result. The earlier hardcoded XGBoost label is gone.
+3. **Valid significance test.** The row-level paired t-test was replaced by a district-clustered Wilcoxon signed-rank test on crop-scaled absolute errors.
+4. **Cross-crop comparability.** `scaled_abs_error`, `scaled_mae` and `macro_crop_scaled_mae` were added so sugarcane does not dominate the comparison.
+5. **Reproducibility.** Exact package versions are pinned and the root `requirements.txt` now includes `scipy`. The earlier committed XGBoost row did not reproduce under current libraries, so results were regenerated.
+6. **Why Issue 5 stable predictors (`crop_feature_selection_v1.csv`) are not used.** That table was selected with leave-one-year-out folds over 2017-2019. Using it to predict 2018 or 2019 would let selection see the test years and break forward chaining. Features are therefore re-selected inside each forward-chaining fold, pooled across crops because per-crop selection is infeasible with 128 training rows in Fold 1. A forward-chained per-crop selection now exists in the Issue #7 dataset (`fc_*` columns): across 55 crop-years only 4 selected any predictor, from 11 to 26 training rows, which supports keeping the pooled in-fold selection used here.
+7. **Roadmap M5 per-crop sample-size flags: done** (`low_sample_flag`, `min_fold_n_test`, crop-scaled skill in `crop_level_evaluation_metrics_v1.csv`). **Still open:** explicit climate-zone pooling and trend shrinkage (a shrinkage blend toward climatology was tried and made results worse); out-of-fold prediction-interval calibration.
+8. **Per-crop target scaling moved into the main pipeline.** `train_forecast.py` now fits models on yield anomaly divided by each crop's training-fold standard deviation and converts predictions back to kg/ha (`target_scaling` in `model_config.json`; `--no-scale-target` reproduces the raw-target run saved in `results/experiments/raw_target_v1/`). Experiments behind this choice: `experiment_scaled_shrinkage.py` (scaling gained about 9% skill; a 0.5 shrinkage blend toward climatology made results worse and was not adopted) and `experiment_lodo.py` (forward-chaining leave-one-district-out: consistent gain). All were run on the same two test years and the idea was adopted after inspecting them, so confirmation on new years (Issue #44) is required before any claim beyond "exploratory".
+9. **Single shared dataset (Issue #7).** This PR originally built its own table (`yield_forecast/build_ml_dataset.py`, 1,430 rows, 305 columns). That duplicated Issue #7, which defines the one input for forecasting issues #49 to #52 and also requires eligible rows only, the Issue 5 predictor summary, a join-coverage report, and explicit leakage tests. The builder and table were removed; `train_forecast.py` and both experiment scripts now default to `ml_ready_dataset/ml_ready_dataset_v1.csv`. Regenerating every result from it reproduces the earlier numbers to floating-point precision (maximum difference 7e-12; identical rows, features and models), so no result changed. The test suite now derives expected counts from the inputs instead of hard-coding 1,430 / 22 / 715 / 384.
+10. **Five-year robustness check added (`experiment_five_year_loyo.py`).** Because only 2015 to 2019 are available, all five years were used in a nested leave-one-year-out retrospective track (explicitly not forecasting). It confirms target scaling is essential but shows the gain over climatology is about 2 to 3%, not significant (p 0.13 to 0.17) and positive for the tree models in only 3 of 5 years, so the +9% from the 2018 to 2019 forward-chaining folds is optimistic. Its recomputed anomalies were verified against the source files.
+11. **Multi-year readiness.** The pipeline no longer carries hand-written years. `folds.py` builds the validation folds from the years in the dataset (modes `fixed_origin`, `expanding`, `explicit`) and rejects leaking, empty or thin folds; the experiments and tests no longer hard-code 2015 to 2019. It is proven on a synthetic 12-year dataset with a planted signal, and mutation checks confirm the tests fail when the signal is removed or the folds leak. On our own data every output file is byte-identical to before. `docs/RETRAINING_ON_LONGER_HISTORY.md` is the step-by-step guide, including what is not verified (the Issue 1, 2, 5 and 6 steps on a longer history).
+12. **Calibrated intervals tried (`experiment_calibrated_intervals.py`).** Out-of-fold, per-crop-scaled split-conformal intervals are about 30-35% better on the interval score and much more even across crops than the pipeline's in-sample rule, but overall coverage stays at about 73-76% because one training year cannot reveal a year-level shift (2018 errors were about 1.5x the calibration error). (Now moved into the main pipeline, see item 13.)
+13. **Calibrated intervals are now the pipeline default.** `train_forecast.py` builds the 80% interval from out-of-fold, per-crop-scaled split-conformal residuals (leave-one-district-out inside the training rows) and keeps the legacy in-sample interval in the `*_in_sample` columns. Every model metric is unchanged and the legacy columns are identical to the previous results; the pipeline's calibrated bounds equal the experiment's row for row. The label is `oof_conformal_per_crop_exploratory`, coverage is measured per fold and per crop, and it still falls short of 80% (about 73-76%). The year-aware inner scheme for a longer history (leave-one-year-out inside the training window) is not built.

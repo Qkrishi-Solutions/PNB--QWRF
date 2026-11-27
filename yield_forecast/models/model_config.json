@@ -1,0 +1,88 @@
+{
+  "project": "PNB--QWRF",
+  "issue": 50,
+  "module": "yield_forecast",
+  "version": "1.1.0",
+  "random_seed": 42,
+  "thread_count": 1,
+  "operational_taxonomy": "end_of_season_retrospective_response_estimation_diagnostic_hindcast",
+  "timing_horizon_note": "Weather features span annual and post-monsoon windows contemporaneous with or after crop growth; this pipeline is an exploratory retrospective response estimation, not an advance pre-season operational early-warning forecast.",
+  "target_column": "yield_anomaly_kg_per_ha",
+  "evaluation": {
+    "min_fold_test_samples_for_conclusion": 10,
+    "note": "Project threshold (above Issue 5's MIN_N of 8): a crop with fewer test rows than this in its smallest fold is flagged low_sample and should not be read on its own."
+  },
+  "target_scaling": {
+    "enabled": true,
+    "method": "per_crop_training_fold_std",
+    "note": "Models are fitted on yield anomaly / per-crop training-fold std and predictions are converted back to kg/ha. Exploratory; selected after inspecting the 2018-2019 test years, so confirm on new years."
+  },
+  "climatology_baseline": {
+    "definition": "Mean historical yield anomaly per crop in training fold; global training mean fallback",
+    "fallback": "global_training_mean"
+  },
+  "feature_selection": {
+    "method": "spearman_correlation_and_collinearity_filter",
+    "correlation_metric": "spearman_rho",
+    "max_features": 3,
+    "max_collinearity": 0.80,
+    "min_observed_fraction": 1.0
+  },
+  "models": {
+    "Ridge": {
+      "alpha": 10.0,
+      "fit_intercept": true,
+      "random_state": 42
+    },
+    "RandomForest": {
+      "n_estimators": 50,
+      "max_depth": 3,
+      "min_samples_leaf": 3,
+      "max_features": "sqrt",
+      "n_jobs": 1,
+      "random_state": 42
+    },
+    "XGBoost": {
+      "n_estimators": 30,
+      "max_depth": 2,
+      "learning_rate": 0.05,
+      "reg_alpha": 1.0,
+      "reg_lambda": 2.0,
+      "subsample": 0.8,
+      "colsample_bytree": 0.8,
+      "n_jobs": 1,
+      "random_state": 42
+    },
+    "CatBoost": {
+      "iterations": 50,
+      "depth": 3,
+      "learning_rate": 0.05,
+      "l2_leaf_reg": 3.0,
+      "thread_count": 1,
+      "random_seed": 42,
+      "verbose": false,
+      "allow_writing_files": false
+    }
+  },
+  "validation": {
+    "method": "forward_chaining",
+    "mode": "expanding",
+    "min_train_years_with_targets": 1,
+    "min_training_rows": 8,
+    "modes_available": ["expanding", "fixed_origin", "explicit"],
+    "note": "expanding: every year with targets that has at least min_train_years_with_targets earlier years with targets is a test year, trained on ALL earlier years. For our 2015-2019 data: train 2015-2017 -> test 2018, then train 2015-2018 -> test 2019 (forward-chaining targets exist only from 2017, so 2015 and 2016 add no training rows). Other modes (fixed_origin, explicit) are described in yield_forecast/docs/RETRAINING_ON_LONGER_HISTORY.md."
+  },
+  "prediction_intervals": {
+    "method": "oof_conformal_per_crop",
+    "confidence_level": 0.80,
+    "calibration_status": "oof_conformal_per_crop_exploratory",
+    "inner_scheme": "leave_one_district_out_inside_training_rows",
+    "legacy_method": "in_sample_residual_quantile (kept beside the default in the *_in_sample columns)",
+    "note": "Default interval = prediction +/- q x crop std, q the split-conformal quantile of out-of-fold residuals (leave-one-district-out inside the training rows, feature selection repeated inside each inner fold) divided by the crop's training std. Coverage is MEASURED on the test years and still falls short of nominal (about 73-76% vs 80%) because one training year cannot reveal a year-level shift. Set method to 'in_sample_residual_quantile' for the legacy interval. Tested only on 2015-2019."
+  },
+  "mitigations_status": {
+    "extend_history_issue_44": "DEFERRED",
+    "climate_zone_pooling": "PARTIALLY_IMPLEMENTED (categorical feature conditioning; explicit hierarchical pooling deferred)",
+    "shrinkage_toward_trend": "DEFERRED (insufficient time series; baseline acts as shrinkage toward historical crop mean)"
+  }
+}

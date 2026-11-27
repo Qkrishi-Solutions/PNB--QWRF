@@ -10,6 +10,7 @@ TEST_SUITES = [
     "ml_ready_dataset/tests",
     "synthetic_portfolio/tests",
     "synthetic_training_dataset/tests",
+    "yield_forecast/tests",
 ]
 
 def main():

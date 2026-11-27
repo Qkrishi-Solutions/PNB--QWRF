@@ -1,0 +1,6 @@
+test_year,n_train,n_test,n_features_available,selected
+2015,511,129,65,wanom__annual_cal__rainy_days;wanom__annual_crop__wind_mean;wanom__kharif__dtr_mean
+2016,512,128,65,wanom__kharif__rh_mean;wanom__annual_crop__rainy_days;wanom__kharif__longest_dry
+2017,511,129,65,wanom__annual_crop__rainy_days;wanom__kharif__rh_mean;wanom__annual_cal__tmin_mean
+2018,514,128,65,wanom__kharif__longest_dry;wanom__kharif__rainy_days;wanom__rabi_next__gdd_sum
+2019,514,128,65,wanom__annual_crop__rainy_days;wanom__kharif__rh_mean;wanom__rabi_next__longest_dry
