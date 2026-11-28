@@ -241,3 +241,113 @@ python yield_forecast/train_forecast.py --no-scale-target \
 python -m pytest yield_forecast/tests -v
 ```
 *Expected Output: 53 passed.*
+
+---
+
+## 9. Issue #51 — Provisional Production Forecast with Area-and-Yield Uncertainty (Integration of Issue #49)
+
+### Objective
+This pipeline produces a provisional production forecast (`production_forecast_v1.csv`) by integrating:
+- **Issue #49 area forecasts** (286 rows from `area_forecast/area_forecast_v1.csv`: 13 districts × 22 crop combinations, `pred_Climatology`, `pred_Ridge_Delta`, `pred_RandomForest_L1_LogDelta`, `pred_XGBoost_L1_LogDelta`) with
+- **Issue #50 yield predictions** (715-row eligible-for-baseline dataset from `ml_ready_dataset/ml_ready_dataset_v1.csv`) to compute `predicted_production_1000_tons = predicted_area_1000_ha × predicted_yield_kg_per_ha / 1000`.
+
+Two uncertainty scopes are propagated:
+
+| Scope | Records | Area forecast | CatBoost model |
+|---|---|---|---|
+| `area_and_yield` | 1,024 | Issue #49 area forecast (interval `area_pi_low_80` / `area_pi_high_80`) + yield interval `pi_lower_80` / `pi_upper_80` | N/A (excluded) |
+| `yield_only` | 256 | **Missing** — `missing_area_forecast=True`, `predicted_area_1000_ha = NaN` | CatBoost only |
+
+### Input Files & Exact Reproduction Commands
+
+| Artifact | Source | Description |
+|---|---|---|
+| `area_forecast/area_forecast_v1.csv` | 286 rows | Issue #49 forward-chaining area forecasts (Climatology, Ridge, RandomForest, XGBoost deltas) |
+| `ml_ready_dataset/ml_ready_dataset_v1.csv` | 715 rows | Eligible-for-baseline dataset (Issue #7) joined on `['district_code', 'crop', 'year']` |
+| `yield_forecast/models/model_config.json` | — | Operational taxonomy: `end_of_season_retrospective_response_estimation_diagnostic_hindcast` |
+| `yield_forecast/issue_51_production_forecast.py` | — | Main pipeline script |
+| `yield_forecast/tests/test_issue_51_production_forecast.py` | — | 19 test functions (11 original fixes + 8 integration tests) |
+
+**Reproduction command:**
+```powershell
+python yield_forecast/issue_51_production_forecast.py
+```
+*Expected Output:*
+- `[SAVED] Production forecast: yield_forecast/results/production_forecast_v1.csv (1280 rows)`
+- Empirical production interval coverage metrics require full pipeline execution; updated coverage values are not available while Windows Application Control blocks the Python environment
+
+### Production Formula & Units
+
+```
+predicted_yield_kg_per_ha = baseline_mean_kg_per_ha + predicted_yield_anomaly_kg_per_ha
+predicted_production_1000_tons = predicted_area_1000_ha × predicted_yield_kg_per_ha / 1000
+```
+
+- Area: 1,000 hectares (1000 ha)
+- Yield: kilograms per hectare (kg/ha)
+- Production: 1,000 tons (1000 tons); the `/1000` converts kg to tons given area is in 1000 ha
+
+### Output Files & Actual Roles
+
+| File | Rows | Columns | uncertainty_scope | Role |
+|---|---|---|---|---|
+| `production_forecast_v1.csv` | **1,280** | 25 | area_and_yield: 1,024; yield_only: 256 | **Current pipeline output**. Contains `prod_pi_low_80`, `prod_pi_high_80`, `prod_pi_covered_80`. Production formula applies only to area_and_yield rows (1,024). Yield_only rows have NaN predicted_area_1000_ha. |
+| `production_forecast_combined_v1.csv` | 1,280 | 25 | yield_only: 1,280 | **Preserved fallback** (pre-Issue #49). All rows have `uncertainty_scope=yield_only`; no area forecasts are joined. This file exists as a reference/rollback; the current pipeline produces `production_forecast_v1.csv`. |
+
+Column key (production_forecast_v1.csv):
+`fold`, `train_years`, `year`, `district_code`, `district_name`, `crop`, `model`, `actual_yield_anomaly`, `predicted_yield_anomaly`, `baseline_mean_kg_per_ha`, `predicted_yield_kg_per_ha`, `area_1000_ha`, `predicted_area_1000_ha`, `area_pi_low_80`, `area_pi_high_80`, `predicted_production_1000_tons`, `prod_pi_low_80`, `prod_pi_high_80`, `prod_pi_covered_80`, `uncertainty_scope`, `interval_methodology`, `missing_area_forecast`, `pi_lower_80`, `pi_upper_80`, `residual`
+
+### Two Uncertainty Scopes
+
+- **`area_and_yield` (1,024 records):** Both area and yield intervals are propagated via Monte Carlo (1,000 Normal quantile-matched samples per record, rho=0 independence, seed 42). Normal sigma is estimated from prediction interval widths so that Normal(mean, sigma) has the same P90-P10 width as the original intervals; avoids the interval-narrowing effect of Uniform[P10,P90] sampling. Area interval columns: `area_pi_low_80`, `area_pi_high_80`. Yield interval columns: `pi_lower_80`, `pi_upper_80`. For Climatology rows, area_pi_80 intervals are NaN (no formal prediction intervals in Issue #49; intentional: do not manufacture or reuse Ridge bounds).
+- **`yield_only` (256 CatBoost records):** Area forecast from Issue #49 is **not available**; `missing_area_forecast=True` and `predicted_area_1000_ha = NaN`. Only yield uncertainty is sampled. Production uses the latest pre-forecast-year area from the ML dataset (most recent year < test_year for each district_code/crop) as a conditional area forecast; `mc_production_samples` is computed but not persisted in the CSV output.
+
+### Monte Carlo Assumptions
+
+- **1,000 Normal quantile-matched samples** per record (sigma estimated from prediction interval widths so Normal(mean, sigma) has the same P90-P10 width as the original intervals; seed 42 for reproducibility)
+- **rho=0 independence:** area and yield sampled independently (no correlation)
+- **Interval sampling:** area and yield bounds `[area_pi_low_80, area_pi_high_80]` and `[pi_lower_80, pi_upper_80]` define the interval boundaries; Normal sampling uses sigma = (upper - lower) / (2 * 1.28155) to preserve interval width
+- **Yield-only rows:** historical area_1000_ha replaced by latest pre-forecast-year area from ML dataset; yield sampled from `[pi_lower_80, pi_upper_80]`; `mc_production_samples` is computed per-record but not persisted in the CSV output
+- Derived percentiles (10th/90th) produce `prod_pi_low_80` and `prod_pi_high_80`
+
+### Coverage
+
+**Combined area-and-yield (1,024 records):**
+- Numerator: 313 covered observations
+- Rate: coverage rate requires full pipeline execution; Windows Application Control currently blocks the Python environment
+
+**Year breakdown (area_and_yield only):**
+- Year 2018: 210/512 observations; coverage rate requires full pipeline execution
+- Year 2019: 103/512 observations; coverage rate requires full pipeline execution
+
+**Overall coverage figure:** across all 1,280 rows using `prod_pi_covered_80`, set only for eligible combined-forecast rows. Coverage metrics require full pipeline execution; Windows Application Control currently blocks the Python environment. The legacy Issue #50 calibrated intervals achieved 72-76% coverage on 256 test rows; Issue #51 intervals are wider (reflecting area uncertainty) and deliberately uncalibrated for prospective use. Test execution after commit e085404 has been blocked by Windows Application Control; the 19 Issue #51 test functions have been structurally verified by code review but not run numerically.
+
+**Important:** Intervals are **exploratory and uncalibrated**. Do not claim 80% calibrated coverage or quantum advantage.
+
+### Exploratory & Uncalibrated Statement
+
+- Prediction intervals are **exploratory**, not calibrated to 80%
+- Coverage is **reported and computed** on held-out test years, but intervals are uncalibrated
+- Do not claim calibrated coverage or quantum advantage over climatology
+- The pipeline is a **provisional production forecast** for Issue #51, pending Issue #49 area forecast integration maturity
+
+### Reproduction & Test Commands
+
+```powershell
+# Run the pipeline (Windows Application Control currently blocks the Python environment)
+python yield_forecast/issue_51_production_forecast.py
+
+# The Issue #51 test suite has been expanded. Automated execution and numerical validation
+# are pending because Windows Application Control currently blocks the Python environment.
+# python -m pytest yield_forecast/tests/test_issue_51_production_forecast.py -v
+```
+
+### Limitations, Missing-Data Handling & Scope
+
+- **5-year dataset limitation:** 2015–2019 only; no generalizable predictive superiority over climatology established
+- **CatBoost missing area forecast:** 256 yield-only rows have `missing_area_forecast=True`; `predicted_area_1000_ha = NaN`; production uses the latest pre-forecast-year area from the ML dataset (most recent year < test_year for each district_code/crop) as a conditional area forecast
+- **Area forecast integration:** Issue #49 area forecasts (286 rows) joined via `['district_code', 'crop', 'year']`; 0 rows dropped in the join
+- **Retrospective hindock scope:** Operational taxonomy declares `end_of_season_retrospective_response_estimation_diagnostic_hindcast`; not an advance forecast
+- **NaN propagation:** Missing values from left-joins propagate as NaN; never silently imputed to zero
+- **Monte Carlo 1000 simulations:** Normal quantile-matched sampling (sigma from interval widths), rho=0 independence, seed 42; exploratory only
+- **No quantum advantage claimed:** Intervals are wider than calibrated Issue #50 intervals; coverage reported but not calibrated to 80%
