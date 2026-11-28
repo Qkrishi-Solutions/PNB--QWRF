@@ -274,8 +274,7 @@ python yield_forecast/issue_51_production_forecast.py
 ```
 *Expected Output:*
 - `[SAVED] Production forecast: yield_forecast/results/production_forecast_v1.csv (1280 rows)`
-- Empirical production interval coverage reported (30.6% combined area_and_yield; 27.2% overall including yield_only)
-- All 19 Issue #51 tests pass: `python -m pytest yield_forecast/tests/test_issue_51_production_forecast.py -v`
+- Empirical production interval coverage metrics require full pipeline execution; updated coverage values are not available while Windows Application Control blocks the Python environment
 
 ### Production Formula & Units
 
@@ -300,31 +299,30 @@ Column key (production_forecast_v1.csv):
 
 ### Two Uncertainty Scopes
 
-- **`area_and_yield` (1,024 records):** Both area and yield intervals are propagated via Monte Carlo (1,000 uniform samples per record, rho=0 independence, seed 42). Production = area × yield / 1000. Area interval columns: `area_pi_low_80`, `area_pi_high_80`. Yield interval columns: `pi_lower_80`, `pi_upper_80`.
-- **`yield_only` (256 CatBoost records):** Area forecast from Issue #49 is **not available**; `missing_area_forecast=True` and `predicted_area_1000_ha = NaN`. Only yield uncertainty is sampled. Production uses historical (baseline) area_1000_ha as fixed, yielding `mc_production_samples` with yield-only variation.
+- **`area_and_yield` (1,024 records):** Both area and yield intervals are propagated via Monte Carlo (1,000 Normal quantile-matched samples per record, rho=0 independence, seed 42). Normal sigma is estimated from prediction interval widths so that Normal(mean, sigma) has the same P90-P10 width as the original intervals; avoids the interval-narrowing effect of Uniform[P10,P90] sampling. Area interval columns: `area_pi_low_80`, `area_pi_high_80`. Yield interval columns: `pi_lower_80`, `pi_upper_80`. For Climatology rows, area_pi_80 intervals are NaN (no formal prediction intervals in Issue #49; intentional: do not manufacture or reuse Ridge bounds).
+- **`yield_only` (256 CatBoost records):** Area forecast from Issue #49 is **not available**; `missing_area_forecast=True` and `predicted_area_1000_ha = NaN`. Only yield uncertainty is sampled. Production uses the latest pre-forecast-year area from the ML dataset (most recent year < test_year for each district_code/crop) as a conditional area forecast; `mc_production_samples` is computed but not persisted in the CSV output.
 
 ### Monte Carlo Assumptions
 
-- **1,000 uniform samples** per record
-- **Seed 42** for reproducibility
+- **1,000 Normal quantile-matched samples** per record (sigma estimated from prediction interval widths so Normal(mean, sigma) has the same P90-P10 width as the original intervals; seed 42 for reproducibility)
 - **rho=0 independence:** area and yield sampled independently (no correlation)
-- **Interval sampling:** area uniformly from `[area_pi_low_80, area_pi_high_80]`; yield uniformly from `[pi_lower_80, pi_upper_80]` (area_and_yield only)
-- **Yield-only:** historical `area_1000_ha` fixed; yield sampled from `[pi_lower_80, pi_upper_80]`
-- Output: `mc_production_samples` column (lists of 1,000 floats, stored in CSV as Python `list` objects); derived percentiles produce `prod_pi_low_80` (10th percentile) and `prod_pi_high_80` (90th percentile)
+- **Interval sampling:** area and yield bounds `[area_pi_low_80, area_pi_high_80]` and `[pi_lower_80, pi_upper_80]` define the interval boundaries; Normal sampling uses sigma = (upper - lower) / (2 * 1.28155) to preserve interval width
+- **Yield-only rows:** historical area_1000_ha replaced by latest pre-forecast-year area from ML dataset; yield sampled from `[pi_lower_80, pi_upper_80]`; `mc_production_samples` is computed per-record but not persisted in the CSV output
+- Derived percentiles (10th/90th) produce `prod_pi_low_80` and `prod_pi_high_80`
 
 ### Coverage
 
 **Combined area-and-yield (1,024 records):**
 - Numerator: 313 covered observations
-- Rate: **30.6%**
+- Rate: coverage rate requires full pipeline execution; Windows Application Control currently blocks the Python environment
 
 **Year breakdown (area_and_yield only):**
-- Year 2018: 210/512 = **41.0%**
-- Year 2019: 103/512 = **20.1%**
+- Year 2018: 210/512 observations; coverage rate requires full pipeline execution
+- Year 2019: 103/512 observations; coverage rate requires full pipeline execution
 
-**Overall 27.2% figure:** This is the coverage across **all 1,280 rows** (area_and_yield + yield_only combined), using the `prod_pi_covered_80` column which is set only for eligible combined-forecast rows. It is **not** the combined-only metric (30.6%); the overall figure includes yield_only rows where coverage is computed differently.
+**Overall coverage figure:** across all 1,280 rows using `prod_pi_covered_80`, set only for eligible combined-forecast rows. Coverage metrics require full pipeline execution; Windows Application Control currently blocks the Python environment. The legacy Issue #50 calibrated intervals achieved 72-76% coverage on 256 test rows; Issue #51 intervals are wider (reflecting area uncertainty) and deliberately uncalibrated for prospective use. Test execution after commit e085404 has been blocked by Windows Application Control; the 19 Issue #51 test functions have been structurally verified by code review but not run numerically.
 
-**Important:** Intervals are **exploratory and uncalibrated**. Do not claim 80% calibrated coverage or quantum advantage. The legacy Issue #50 calibrated intervals achieved 72-76% coverage on 256 test rows; Issue #51 intervals are wider (reflecting area uncertainty) and deliberately uncalibrated for prospective use.
+**Important:** Intervals are **exploratory and uncalibrated**. Do not claim 80% calibrated coverage or quantum advantage.
 
 ### Exploratory & Uncalibrated Statement
 
@@ -333,23 +331,23 @@ Column key (production_forecast_v1.csv):
 - Do not claim calibrated coverage or quantum advantage over climatology
 - The pipeline is a **provisional production forecast** for Issue #51, pending Issue #49 area forecast integration maturity
 
-### Reproduction & Test Commands (Verified)
+### Reproduction & Test Commands
 
 ```powershell
-# Run the pipeline
+# Run the pipeline (Windows Application Control currently blocks the Python environment)
 python yield_forecast/issue_51_production_forecast.py
 
-# Run all 19 Issue #51 tests
-python -m pytest yield_forecast/tests/test_issue_51_production_forecast.py -v
-# Expected: 19 passed in ~1.3s
+# The Issue #51 test suite has been expanded. Automated execution and numerical validation
+# are pending because Windows Application Control currently blocks the Python environment.
+# python -m pytest yield_forecast/tests/test_issue_51_production_forecast.py -v
 ```
 
 ### Limitations, Missing-Data Handling & Scope
 
 - **5-year dataset limitation:** 2015–2019 only; no generalizable predictive superiority over climatology established
-- **CatBoost missing area forecast:** 256 yield-only rows have `missing_area_forecast=True`; `predicted_area_1000_ha = NaN`; production uses historical (baseline) area as fixed
+- **CatBoost missing area forecast:** 256 yield-only rows have `missing_area_forecast=True`; `predicted_area_1000_ha = NaN`; production uses the latest pre-forecast-year area from the ML dataset (most recent year < test_year for each district_code/crop) as a conditional area forecast
 - **Area forecast integration:** Issue #49 area forecasts (286 rows) joined via `['district_code', 'crop', 'year']`; 0 rows dropped in the join
 - **Retrospective hindock scope:** Operational taxonomy declares `end_of_season_retrospective_response_estimation_diagnostic_hindcast`; not an advance forecast
 - **NaN propagation:** Missing values from left-joins propagate as NaN; never silently imputed to zero
-- **Monte Carlo 1000 simulations:** Uniform sampling, rho=0, seed 42; exploratory only
+- **Monte Carlo 1000 simulations:** Normal quantile-matched sampling (sigma from interval widths), rho=0 independence, seed 42; exploratory only
 - **No quantum advantage claimed:** Intervals are wider than calibrated Issue #50 intervals; coverage reported but not calibrated to 80%
