@@ -4,14 +4,13 @@ issue_51_production_forecast.py - Issue #51: Provisional Production Forecast
   with Propagated Yield Uncertainty
 
 Computes production forecasts (area × yield) using Issue #50 yield anomaly
-predictions, propagating only yield-side uncertainty (Issue #49 area forecast
-not yet available).
+predictions, propagating yield-side uncertainty with area prediction intervals
+from Issue #49 (model-specific per-model bounds; Ridge, RandomForest, XGBoost,
+HistGBR each use their own interval columns; no Ridge reuse for other models).
 
 Operational taxonomy: end-of-season retrospective response estimation,
-yield-only uncertainty propagation. Complete area-and-yield uncertainty
-propagation pending Issue #49.
-
-Data joins use the canonical primary key: ['district_code', 'crop', 'year'].
+yield-and-area and yield-only uncertainty propagation. Data joins use the
+canonical primary key: ['district_code', 'crop', 'year'].
 """
 
 import json
@@ -127,20 +126,30 @@ def compute_production_forecast(
 
     # Check for missing area or baseline after join
     missing_area_ml = predictions_joined["area_1000_ha"].isna().sum()
-    missing_baseline = predictions_joined["baseline_mean_kg_per_ha"].isna().sum()
+    missing_baseline_flag = predictions_joined["baseline_mean_kg_per_ha"].isna()
+    # missing_baseline as per-row flag: True where baseline_mean is NaN
+    predictions_joined["missing_baseline"] = missing_baseline_flag
     if missing_area_ml > 0:
         print(f"  WARNING: {missing_area_ml} rows missing area_1000_ha after join")
-    if missing_baseline > 0:
-        print(f"  WARNING: {missing_baseline} rows missing baseline_mean_kg_per_ha after join")
+    if missing_baseline_flag.sum() > 0:
+        print(f"  WARNING: {int(missing_baseline_flag.sum())} rows missing baseline_mean_kg_per_ha after join")
 
     # ---- Join 2: area forecast predictions from Issue #49 ----
     # Add area model predictions (Climatology, Ridge, RandomForest, XGBoost)
     # Note: we do NOT include area_1000_ha from area forecast to avoid column name conflict;
     # the historical area_1000_ha from the ML dataset is used as the area proxy
+    # Also load model-specific prediction intervals from Issue #49
+    area_interval_cols = [
+        "pred_Ridge_Delta_pi_low", "pred_Ridge_Delta_pi_high",
+        "pred_RandomForest_L1_LogDelta_pi_low", "pred_RandomForest_L1_LogDelta_pi_high",
+        "pred_XGBoost_L1_LogDelta_pi_low", "pred_XGBoost_L1_LogDelta_pi_high",
+    ]
+    available_interval_cols = [c for c in area_interval_cols if c in area_df.columns]
     if not area_df.empty:
+        merge_cols = primary_key + ["pred_Climatology", "pred_Ridge_Delta",
+                                      "pred_RandomForest_L1_LogDelta", "pred_XGBoost_L1_LogDelta"] + available_interval_cols
         predictions_joined = predictions_joined.merge(
-            area_df[primary_key + ["pred_Climatology", "pred_Ridge_Delta",
-                                  "pred_RandomForest_L1_LogDelta", "pred_XGBoost_L1_LogDelta"]],
+            area_df[merge_cols],
             on=primary_key,
             how="left"
         )
@@ -183,6 +192,16 @@ def compute_production_forecast(
     if n_negative_yield > 0:
         print(f"  FLAGGED: {n_negative_yield} rows with negative predicted yield (not clipped)")
 
+    # Convert yield anomaly intervals to actual yield bounds using baseline_mean
+    # pi_lower_80 / pi_upper_80 are Issue #50 anomaly intervals (in kg/ha above/below baseline)
+    # Actual yield bounds = baseline_mean + anomaly_interval
+    predictions_joined["yield_lower_80"] = (
+        predictions_joined["baseline_mean_kg_per_ha"] + predictions_joined["pi_lower_80"]
+    )
+    predictions_joined["yield_upper_80"] = (
+        predictions_joined["baseline_mean_kg_per_ha"] + predictions_joined["pi_upper_80"]
+    )
+
     # ---- Determine uncertainty scope per-row ----
     # uncertainty_scope = area_and_yield when yield_model is NOT CatBoost
     # uncertainty_scope = yield_only when yield_model IS CatBoost (no area forecast)
@@ -193,53 +212,93 @@ def compute_production_forecast(
     ] = "area_and_yield"
 
     # missing_area_forecast flag: True when yield_model is CatBoost (no area forecast available)
+    # Model name pairing (e.g., Ridge area with Ridge yield) is administrative only:
+    #   shared model names are a convenience for referencing similarly-named models;
+    #   they do NOT imply correlated errors between area and yield forecasts.
+    #   Area and yield uncertainties are propagated independently (rho=0 Monte Carlo assumption).
+    #   This independence assumption is explicit unless empirical evidence supports dependence.
     predictions_joined["missing_area_forecast"] = predictions_joined["model"].isin(["CatBoost"])
 
     # predicted_area_1000_ha: use area forecast if available, otherwise NaN for yield_only rows
     # For area_and_yield rows: use the forecasted area (pred_Climatology, pred_Ridge_Delta, etc.)
-    # For yield_only rows (CatBoost): set to NaN
-    predictions_joined["predicted_area_1000_ha"] = np.nan
+    # predicted_area_1000_ha: use area forecast if available, otherwise NaN for yield_only rows
+    # For area_and_yield rows: use the forecasted area (pred_Climatology, pred_Ridge_Delta, etc.)
     area_and_yield_mask = predictions_joined["uncertainty_scope"] == "area_and_yield"
-    predictions_joined.loc[area_and_yield_mask, "predicted_area_1000_ha"] = (
-        predictions_joined.loc[area_and_yield_mask, "pred_Climatology"]
-    )
-    # Also set from the specific model's area forecast where available
+    predictions_joined.loc[area_and_yield_mask, "predicted_area_1000_ha"] = np.nan
     for model_col, model_name in [("pred_Ridge_Delta", "Ridge"),
                                    ("pred_RandomForest_L1_LogDelta", "RandomForest"),
                                    ("pred_XGBoost_L1_LogDelta", "XGBoost"),
                                    ("pred_Climatology", "Climatology")]:
-        model_mask = (predictions_joined["uncertainty_scope"] == "area_and_yield") & \
-                     (predictions_joined["model"] == model_name)
-        predictions_joined.loc[model_mask, "predicted_area_1000_ha"] = (
-            predictions_joined.loc[model_mask, model_col]
-        )
+        model_mask = area_and_yield_mask & (predictions_joined["model"] == model_name)
+        predictions_joined.loc[model_mask, "predicted_area_1000_ha"] = predictions_joined.loc[model_mask, model_col]
+
+    # Check for negative area predictions and flag them (after predicted_area_1000_ha is set)
+    negative_area_flag = predictions_joined["predicted_area_1000_ha"] < 0
+    predictions_joined["negative_area_prediction"] = negative_area_flag
+    # Flag negative yield anomalies (do not silently clip)
+    predictions_joined["negative_yield_anomaly"] = predictions_joined["actual_yield_anomaly"] < 0
+    # Set sampling_assumption based on uncertainty scope
+    predictions_joined["sampling_assumption"] = "historical_area_yield_only_historical"
+    ay_mask = predictions_joined["uncertainty_scope"] == "area_and_yield"
+    predictions_joined.loc[ay_mask, "sampling_assumption"] = "historical_area_yield_and_yield"
+
+    # For yield_only rows (CatBoost): use latest available pre-forecast-year area from ML dataset
+    # to avoid same-year area leakage; set as conditional area forecast
+    yield_only_mask = predictions_joined["uncertainty_scope"] == "yield_only"
+    predictions_joined.loc[yield_only_mask, "predicted_area_1000_ha"] = np.nan
+    # Compute pre-forecast year area: find the most recent year < test_year for each (district_code, crop)
+    for idx in predictions_joined[yield_only_mask].index:
+        dc = predictions_joined.loc[idx, "district_code"]
+        crop = predictions_joined.loc[idx, "crop"]
+        test_year = predictions_joined.loc[idx, "year"]
+        # Look up in ML dataset for earlier years
+        ml_mask = (ml_dataset_df["district_code"] == dc) & \
+                  (ml_dataset_df["crop"] == crop) & \
+                  (ml_dataset_df["year"] < test_year)
+        ml_matches = ml_dataset_df[ml_mask].sort_values("year", ascending=False)
+        if len(ml_matches) > 0:
+            pre_forecast_area = ml_matches.iloc[0]["area_1000_ha"]
+            predictions_joined.loc[idx, "predicted_area_1000_ha"] = pre_forecast_area
+        # else: remain NaN (should not happen with sufficient data)
+
+    # Add conditional_area_forecast flag: True when predicted_area_1000_ha differs from same-year area_1000_ha
+    predictions_joined["conditional_area_forecast"] = False
+    # For yield_only rows where we found a pre-forecast year area, flag as conditional
+    yomask = predictions_joined["uncertainty_scope"] == "yield_only"
+    has_preforecast = predictions_joined.loc[yomask, "predicted_area_1000_ha"] != predictions_joined.loc[yomask, "area_1000_ha"]
+    predictions_joined.loc[yomask & has_preforecast, "conditional_area_forecast"] = True
+    # For area_and_yield rows, flag when using model-predicted area vs same-year actual area
+    ay_mask = predictions_joined["uncertainty_scope"] == "area_and_yield"
+    has_pred_area = predictions_joined.loc[ay_mask, "predicted_area_1000_ha"] != predictions_joined.loc[ay_mask, "area_1000_ha"]
+    predictions_joined.loc[ay_mask & has_pred_area, "conditional_area_forecast"] = True
 
     # area_pi_low_80 and area_pi_high_80: area prediction interval endpoints
+    # Use model-specific prediction bounds from Issue #49 per model; do not reuse Ridge predictions for other models
     predictions_joined["area_pi_low_80"] = np.nan
     predictions_joined["area_pi_high_80"] = np.nan
     ay_mask = predictions_joined["uncertainty_scope"] == "area_and_yield"
-    predictions_joined.loc[ay_mask, "area_pi_low_80"] = (
-        predictions_joined.loc[ay_mask, "pred_Ridge_Delta"]  # use Ridge as reference, or compute min
-    )
-    predictions_joined.loc[ay_mask, "area_pi_high_80"] = (
-        predictions_joined.loc[ay_mask, "pred_Ridge_Delta"]
-    )
-    # Actually, let me use the appropriate model's interval
-    for model_col_low, model_col_high, model_name in [
-        ("pred_Ridge_Delta", "pred_Ridge_Delta", "Ridge"),
-        ("pred_RandomForest_L1_LogDelta", "pred_RandomForest_L1_LogDelta_pi_high", "RandomForest"),
-        ("pred_XGBoost_L1_LogDelta", "pred_XGBoost_L1_LogDelta_pi_high", "XGBoost"),
-        ("pred_Climatology", "pred_Climatology", "Climatology")
-    ]:
-        if model_col_low in predictions_joined.columns and model_col_high in predictions_joined.columns:
-            model_mask = (predictions_joined["uncertainty_scope"] == "area_and_yield") & \
-                         (predictions_joined["model"] == model_name)
-            predictions_joined.loc[model_mask, "area_pi_low_80"] = np.maximum(
-                predictions_joined.loc[model_mask, model_col_low], predictions_joined.loc[model_mask, "area_pi_low_80"]
-            )
-            predictions_joined.loc[model_mask, "area_pi_high_80"] = np.minimum(
-                predictions_joined.loc[model_mask, model_col_high], predictions_joined.loc[model_mask, "area_pi_high_80"]
-            )
+    # Map each model to its own prediction interval columns from Issue #49
+    area_interval_map = {
+        "Ridge": ("pred_Ridge_Delta_pi_low", "pred_Ridge_Delta_pi_high"),
+        "RandomForest": ("pred_RandomForest_L1_LogDelta_pi_low", "pred_RandomForest_L1_LogDelta_pi_high"),
+        "XGBoost": ("pred_XGBoost_L1_LogDelta_pi_low", "pred_XGBoost_L1_LogDelta_pi_high"),
+        "HistGBR": ("pred_HistGBR_L1_LogDelta_pi_low", "pred_HistGBR_L1_LogDelta_pi_high"),
+    }
+    for model_name, (low_col, high_col) in area_interval_map.items():
+        model_mask = ay_mask & (predictions_joined["model"] == model_name)
+        if low_col in predictions_joined.columns and high_col in predictions_joined.columns:
+            predictions_joined.loc[model_mask, "area_pi_low_80"] = predictions_joined.loc[model_mask, low_col]
+            predictions_joined.loc[model_mask, "area_pi_high_80"] = predictions_joined.loc[model_mask, high_col]
+    # Enforce area_pi_low_80 <= area_pi_high_80 for all eligible rows
+    interval_mask = predictions_joined["area_pi_low_80"].notna() & predictions_joined["area_pi_high_80"].notna()
+    # If low > high, swap to maintain invariant; NaN bounds are preserved
+    swap_mask = interval_mask & (predictions_joined["area_pi_low_80"] > predictions_joined["area_pi_high_80"])
+    if swap_mask.any():
+        predictions_joined.loc[swap_mask, "area_pi_low_80"], predictions_joined.loc[swap_mask, "area_pi_high_80"] = \
+            predictions_joined.loc[swap_mask, "area_pi_high_80"].copy(), \
+            predictions_joined.loc[swap_mask, "area_pi_low_80"].copy()
+    # Climatology has no formal prediction intervals in Issue #49; intervals remain NaN
+    # This is intentional: do not manufacture or reuse Ridge bounds for Climatology
 
     # ---- Compute predicted production ----
     # predicted_production_1000_tons = predicted_area_1000_ha * predicted_yield_kg_per_ha / 1000
@@ -252,15 +311,15 @@ def compute_production_forecast(
     # pi_lower_prod = area * (baseline_mean + pi_lower_80) / 1000
     # pi_upper_prod = area * (baseline_mean + pi_upper_80) / 1000
 
-    # Ensure interval columns exist
-    if "pi_lower_80" in predictions_joined.columns and "pi_upper_80" in predictions_joined.columns:
+    # Ensure interval columns exist - use actual yield bounds
+    if "yield_lower_80" in predictions_joined.columns and "yield_upper_80" in predictions_joined.columns:
         predictions_joined["pi_lower_prod_1000_tons"] = (
             predictions_joined["predicted_area_1000_ha"] *
-            (predictions_joined["baseline_mean_kg_per_ha"] + predictions_joined["pi_lower_80"]) / 1000
+            (predictions_joined["yield_lower_80"]) / 1000
         )
         predictions_joined["pi_upper_prod_1000_tons"] = (
             predictions_joined["predicted_area_1000_ha"] *
-            (predictions_joined["baseline_mean_kg_per_ha"] + predictions_joined["pi_upper_80"]) / 1000
+            (predictions_joined["yield_upper_80"]) / 1000
         )
 
         # Flag negative production interval endpoints (do not silently clip)
@@ -282,15 +341,15 @@ def compute_production_forecast(
         predictions_joined["pi_lower_prod_flag_negative"] = False
         predictions_joined["pi_upper_prod_flag_negative"] = False
 
-    # ---- Monte Carlo uncertainty propagation ----
-    # 1,000 uniform samples per record, rho=0 independence, seed 42
+# ---- Monte Carlo uncertainty propagation ----
+    # 1,000 samples per record, rho=0 independence, seed 42
     n_mc = 1000
     np.random.seed(42)
     
     # Initialize Monte Carlo production samples
     predictions_joined["mc_production_samples"] = None
     
-    # For area_and_yield rows: sample area from area interval and yield from yield interval
+    # For area_and_yield rows: combine area and yield uncertainty
     ay_mask = predictions_joined["uncertainty_scope"] == "area_and_yield"
     y_mask = predictions_joined["uncertainty_scope"] == "yield_only"
     
@@ -298,39 +357,65 @@ def compute_production_forecast(
     
     # For area_and_yield rows: combine area and yield uncertainty
     if ay_mask.any():
-        # Sample area uniformly from area prediction interval
+        # Quantile-matched Normal sampling: estimate sigma from interval widths
+        # so that Normal(mean, sigma) has the same P90-P10 width as the original
+        # prediction intervals. This avoids the interval-narrowing effect that can
+        # occur when Uniform[P10,P90] samples are subsequently P10/P90-extracted.
+        # sigma = (P90 - P10) / (2 * 1.28155) for a Normal distribution.
         area_lo = predictions_joined.loc[ay_mask, "area_pi_low_80"].values
         area_hi = predictions_joined.loc[ay_mask, "area_pi_high_80"].values
-        # Sample yield uniformly from yield interval
-        yield_lo = predictions_joined.loc[ay_mask, "pi_lower_80"].values
-        yield_hi = predictions_joined.loc[ay_mask, "pi_upper_80"].values
-        
-        # Monte Carlo: 1,000 uniform samples for area and yield, independently (rho=0)
-        area_samples = np.random.uniform(
-            np.tile(area_lo, (n_mc, 1)).T,
-            np.tile(area_hi, (n_mc, 1)).T
+        sigma_area = np.where(
+            np.isnan(area_lo) | np.isnan(area_hi) | (area_hi <= area_lo),
+            np.nan,
+            (area_hi - area_lo) / (2 * 1.28155)
         )
-        yield_samples = np.random.uniform(
-            np.tile(yield_lo, (n_mc, 1)).T,
-            np.tile(yield_hi, (n_mc, 1)).T
+        yield_lo = predictions_joined.loc[ay_mask, "yield_lower_80"].values
+        yield_hi = predictions_joined.loc[ay_mask, "yield_upper_80"].values
+        sigma_yield = np.where(
+            np.isnan(yield_lo) | np.isnan(yield_hi) | (yield_hi <= yield_lo),
+            np.nan,
+            (yield_hi - yield_lo) / (2 * 1.28155)
         )
         
-        # Compute production samples: area * yield / 1000
-        # Area is in 1000 ha, yield is in kg/ha, so production = area_1000_ha * yield_kg_per_ha / 1000
-        # But our area is already in 1000 ha and yield is in kg/ha, so:
-        # production_1000_tons = area_1000_ha * yield_kg_per_ha / 1000
-        # Wait, let me reconsider. area_samples is in 1000 ha, yield_samples is in kg/ha
-        # production = area_1000_ha * yield_kg_per_ha / 1000 gives tons
-        # So: mc_prod = area_samples * yield_samples / 1000
+        # Use predicted point estimates as Normal means
+        area_mean = predictions_joined.loc[ay_mask, "predicted_area_1000_ha"].values
+        yield_mean = predictions_joined.loc[ay_mask, "predicted_yield_kg_per_ha"].values
+        
+        # Sample from Normal distributions (rho=0 independence)
+        area_samples = np.random.normal(
+            np.tile(np.where(np.isnan(area_mean), 0, area_mean), (n_mc, 1)).T,
+            np.tile(np.where(np.isnan(sigma_area), 1, sigma_area), (n_mc, 1)).T
+        )
+        yield_samples = np.random.normal(
+            np.tile(np.where(np.isnan(yield_mean), 0, yield_mean), (n_mc, 1)).T,
+            np.tile(np.where(np.isnan(sigma_yield), 1, sigma_yield), (n_mc, 1)).T
+        )
+        
+        # Row-wise: determine which rows have valid sigma (valid interval bounds)
+        # Valid sigma means both bounds exist and lower <= upper
+        valid_area_sigma = ~np.isnan(sigma_area)
+        valid_yield_sigma = ~np.isnan(sigma_yield)
+        valid_both = valid_area_sigma & valid_yield_sigma
+        
+        # For rows with valid sigma, keep Normal samples
+        # For rows with invalid sigma, set NaN (uncertainty unavailable)
+        area_samples = np.where(valid_both, area_samples, np.nan)
+        yield_samples = np.where(valid_both, yield_samples, np.nan)
+        
+        # Compute production samples only where both area and yield uncertainty are available
+        # If either is NaN, the production sample will be NaN
+        # Only rows with valid uncertainty for both area and yield will have valid production samples
         mc_prod = area_samples * yield_samples / 1000
+        # Assign to mc_results for area_and_yield rows - NaN where uncertainty unavailable
         mc_results[ay_mask] = mc_prod
-
+    
     # For yield_only rows: only yield uncertainty, area is historical (fixed)
     if y_mask.any():
         # Use historical area_1000_ha as fixed, sample yield only
         hist_area = predictions_joined.loc[y_mask, "area_1000_ha"].values
-        yield_lo = predictions_joined.loc[y_mask, "pi_lower_80"].values
-        yield_hi = predictions_joined.loc[y_mask, "pi_upper_80"].values
+        # Sample yield uniformly from actual yield bounds (converted from anomaly intervals)
+        yield_lo = predictions_joined.loc[y_mask, "yield_lower_80"].values
+        yield_hi = predictions_joined.loc[y_mask, "yield_upper_80"].values
         
         # Monte Carlo: 1,000 uniform samples for yield only
         yield_samples = np.random.uniform(
@@ -387,9 +472,11 @@ def compute_production_forecast(
 
     # ---- Empirical coverage evaluation on held-out years ----
     # Compute whether the production interval covers the observed production
+    # Separate coverage by uncertainty scope (area_and_yield vs yield_only)
     empirical_coverage = None
     n_coverage_obs = None
     coverage_by_year_model = []
+    coverage_scope_metrics = {}  # per-scope: numerator, denominator, exclusions, percentage
     
     if "production_1000_tons" in ml_dataset_df.columns and \
        "prod_pi_low_80" in predictions_joined.columns and \
@@ -400,6 +487,8 @@ def compute_production_forecast(
             on=primary_key,
             how="left"
         )
+        # Add actual_production_1000_tons to predictions_joined from the merge
+        predictions_joined["actual_production_1000_tons"] = coverage_df["production_1000_tons"]
         # Check coverage ONLY for rows with valid combined intervals and actual production
         valid_combined_mask = (
             (coverage_df["prod_pi_low_80"].notna()) &
@@ -407,6 +496,54 @@ def compute_production_forecast(
             (coverage_df["production_1000_tons"].notna())
         )
         coverage_df_valid = coverage_df[valid_combined_mask]
+        
+        # Coverage for area_and_yield rows
+        ay_mask = predictions_joined["uncertainty_scope"] == "area_and_yield"
+        ay_valid = valid_combined_mask & ay_mask
+        ay_valid_df = coverage_df[ay_valid]
+        if len(ay_valid_df) > 0:
+            ay_coverage_mask = (
+                (ay_valid_df["prod_pi_low_80"] <= ay_valid_df["production_1000_tons"]) &
+                (ay_valid_df["production_1000_tons"] <= ay_valid_df["prod_pi_high_80"])
+            )
+            n_ay_eligible = ay_valid_mask.sum()
+            n_ay_covered = int(ay_coverage_mask.sum())
+            n_ay_excluded = int((~ay_valid_mask).sum())
+            ay_coverage_rate = n_ay_covered / n_ay_eligible if n_ay_eligible > 0 else None
+            coverage_scope_metrics["area_and_yield"] = {
+                "n_eligible": int(n_ay_eligible),
+                "n_covered": n_ay_covered,
+                "n_excluded": n_ay_excluded,
+                "coverage_percentage": ay_coverage_rate * 100 if ay_coverage_rate is not None else None
+            }
+        else:
+            coverage_scope_metrics["area_and_yield"] = {
+                "n_eligible": 0, "n_covered": 0, "n_excluded": 0, "coverage_percentage": None
+            }
+        
+        # Coverage for yield_only rows
+        y_mask = predictions_joined["uncertainty_scope"] == "yield_only"
+        y_valid = valid_combined_mask & y_mask
+        y_valid_df = coverage_df[y_valid]
+        if len(y_valid_df) > 0:
+            y_coverage_mask = (
+                (y_valid_df["prod_pi_low_80"] <= y_valid_df["production_1000_tons"]) &
+                (y_valid_df["production_1000_tons"] <= y_valid_df["prod_pi_high_80"])
+            )
+            n_y_eligible = y_valid_mask.sum()
+            n_y_covered = int(y_coverage_mask.sum())
+            n_y_excluded = int((~y_valid_mask).sum())
+            y_coverage_rate = n_y_covered / n_y_eligible if n_y_eligible > 0 else None
+            coverage_scope_metrics["yield_only"] = {
+                "n_eligible": int(n_y_eligible),
+                "n_covered": n_y_covered,
+                "n_excluded": n_y_excluded,
+                "coverage_percentage": y_coverage_rate * 100 if y_coverage_rate is not None else None
+            }
+        else:
+            coverage_scope_metrics["yield_only"] = {
+                "n_eligible": 0, "n_covered": 0, "n_excluded": 0, "coverage_percentage": None
+            }
         
         if len(coverage_df_valid) > 0:
             coverage_mask = (
@@ -422,14 +559,33 @@ def compute_production_forecast(
             n_with_prod = 0
             print("\nNo rows with valid combined forecast intervals and observed production for coverage evaluation")
         
-        predictions_joined["prod_pi_covered_80"] = False
-        # Set coverage mask only for eligible rows
+        # Initialize prod_pi_covered_80 as nullable boolean with NA default
+        predictions_joined["prod_pi_covered_80"] = pd.NA
+        
+        # Set coverage only for eligible rows (valid combined forecast + observed production)
         eligible_mask = valid_combined_mask.copy()
-        predictions_joined.loc[eligible_mask, "prod_pi_covered_80"] = (
+        # True when production is inside the 80% prediction interval
+        in_interval = (
             (coverage_df["prod_pi_low_80"][eligible_mask] <= coverage_df["production_1000_tons"][eligible_mask]) &
             (coverage_df["production_1000_tons"][eligible_mask] <= coverage_df["prod_pi_high_80"][eligible_mask])
         )
-        n_coverage_obs = n_with_prod
+        # Set True for covered, False for uncovered, keep NA for ineligible
+        pred_covered = pd.Series(pd.NA, index=predictions_joined.index)
+        pred_covered.loc[eligible_mask & in_interval] = True
+        pred_covered.loc[eligible_mask & ~in_interval] = False
+        predictions_joined["prod_pi_covered_80"] = pred_covered
+        
+        # Count coverage metrics for reporting
+        n_eligible = eligible_mask.sum()
+        n_covered = int(pred_covered.eq(True).sum())
+        n_excluded = int((~eligible_mask).sum())
+        n_total = len(predictions_joined)
+        
+        # Also compute production_covered_80 for backward compatibility
+        # Map: True->True, False->False, NA->NaN
+        prod_covered_val = predictions_joined["prod_pi_covered_80"].copy()
+        prod_covered_val = prod_covered_val.where(pd.notna(prod_covered_val), None)
+        predictions_joined["production_covered_80"] = prod_covered_val.values
         
         # Coverage by year and model pairing
         if len(coverage_df_valid) > 0:
@@ -453,7 +609,8 @@ def compute_production_forecast(
     coverage_info = {
         "empirical_coverage": empirical_coverage,
         "coverage_observations": n_coverage_obs,
-        "coverage_by_year_model": coverage_by_year_model
+        "coverage_by_year_model": coverage_by_year_model,
+        "coverage_by_scope": coverage_scope_metrics
     }
 
     # ---- Select and order output columns ----
@@ -471,7 +628,8 @@ def compute_production_forecast(
         "interval_methodology",
         "missing_baseline", "missing_area_forecast", "negative_area_prediction", "negative_yield_anomaly",
         "pi_lower_80", "pi_upper_80",
-        "residual"
+        "residual",
+        "conditional_area_forecast"
     ]
 
     # Only include columns that exist
@@ -511,6 +669,15 @@ def generate_metrics_report(df: pd.DataFrame, coverage_n: int = None, coverage_r
         report["empirical_production_coverage_80"] = coverage_rate
     if coverage_n is not None:
         report["coverage_observations"] = coverage_n
+
+    # Coverage numerator/denominator/exclusions
+    n_total = len(df)
+    n_eligible = int((df["prod_pi_covered_80"] != pd.NA).sum()) if "prod_pi_covered_80" in df.columns else n_total
+    n_covered = int((df["prod_pi_covered_80"] == True).sum()) if "prod_pi_covered_80" in df.columns else 0
+    n_excluded = n_total - n_eligible
+    report["coverage_numerator"] = n_covered
+    report["coverage_denominator"] = n_eligible
+    report["coverage_exclusions"] = n_excluded
 
     # By model breakdown
     if "model" in df.columns:
@@ -569,7 +736,7 @@ def main():
     print("  predicted_production_1000_tons = area_1000_ha * predicted_yield_kg_per_ha / 1000")
     print("  pi_lower_prod_1000_tons = area_1000_ha * (baseline_mean_kg_per_ha + pi_lower_80) / 1000")
     print("  pi_upper_prod_1000_tons = area_1000_ha * (baseline_mean_kg_per_ha + pi_upper_80) / 1000")
-    print("  Uncertainty scope: yield_only (Issue #49 area forecast not available)")
+    print("  Uncertainty scope: area_and_yield (Ridge/RF/XGBoost/Climatology) or yield_only (CatBoost)")
     print("  Labels: uncalibrated_in_sample_exploratory")
 
     return forecast_df
